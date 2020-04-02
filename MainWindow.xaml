@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CSaVe_Electrochemical_Data"
         mc:Ignorable="d"
-        Title="Convert DTA files to CSV files" Height="500" Width="900">
+        Title="CSaVe Electrochemical Data" Height="500" Width="900">
     <Grid VerticalAlignment="Top" HorizontalAlignment="Center" ShowGridLines="False" Width="890" Height="490">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto"/>
