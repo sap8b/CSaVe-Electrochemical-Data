@@ -1,7 +1,6 @@
-<img src = "https://github.com/sap8b/EIS_To_CSV_2/blob/master/EIS_CSV.ico" align = "right" width = "64" height = "64">
+<img src = "https://github.com/sap8b/CSaVe-Electrochemical-Data/blob/master/CSaVeElectrochemicalData.ico" align = "right" width = "64" height = "64">
 
 # CSaVe-Electrochemical-Data
-2020
 A utility for extracting data from electrochemical experimentation datafiles and saving them as CSV files for easier plotting.
 
 ## Introduction
