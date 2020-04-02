@@ -14,7 +14,7 @@ This project started as a Windows Presentation Foundation (WPF) project for use 
 This project was written in C# and XAML using Microsoft Visual Studio 2019. 
 
 ## Installation
-The app is available here: https://www.microsoft.com/store/productId/9NFF5C7FN14B
+The app is available here: https://www.microsoft.com/store/productId/9MWJ4GK6S7ZK
 
 ## Next Steps
 * Add the capability to extract open-circuit potentials and polarization responses from polarization curve files
