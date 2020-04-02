@@ -17,6 +17,6 @@ This project was written in C# and XAML using Microsoft Visual Studio 2019.
 The app is available here: https://www.microsoft.com/store/productId/9MWJ4GK6S7ZK
 
 ## Next Steps
-* Add the capability to extract open-circuit potentials and polarization responses from polarization curve files
+* <strike>Add the capability to extract open-circuit potentials and polarization responses from polarization curve files</strike>
 * Add support for other manufacturers datafiles - if they aren't already easily plottable
 * Add plotting scripts for some common plotting packages
