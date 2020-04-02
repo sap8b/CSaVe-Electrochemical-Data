@@ -1,4 +1,4 @@
-<img src = "https://github.com/sap8b/CSaVe-Electrochemical-Data/blob/master/CSaVe Electrochemical Data Logo.png" align = "left" width = "1024" height = "128">
+<img src = "https://github.com/sap8b/CSaVe-Electrochemical-Data/blob/master/CSaVe Electrochemical Data Logo.png" align = "left" width = "1024" height = "200">
 
 # 
 A utility for extracting data from electrochemical experimentation datafiles and saving them as CSV files for easier plotting.
