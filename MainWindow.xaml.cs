@@ -722,14 +722,14 @@ namespace CSaVe_Electrochemical_Data
                         // Get Eoc data
                         int point_check = Convert.ToInt32(line_array[0]);
 
-                        if (line_count2 != point_check)
+                        if (line_count != point_check)
                         {
                             sW.WriteLine(Make_a_CSV_Line(line_array));
-                            line_count2 += 1;
+                            line_count += 1;
                         }
 
                         sW.WriteLine(Make_a_CSV_Line(line_array));
-                        line_count2 += 1;
+                        line_count += 1;
                     }
 
                     // Get ring data
@@ -850,14 +850,14 @@ namespace CSaVe_Electrochemical_Data
                     {  
                         int point_check = Convert.ToInt32(line_array[0]);
 
-                        if (line_count2 != point_check)
+                        if (line_count != point_check)
                         {
                             sW.WriteLine(Make_a_CSV_Line(line_array));
-                            line_count2 += 1;
+                            line_count += 1;
                         }
 
                         sW.WriteLine(Make_a_CSV_Line(line_array));
-                        line_count2 += 1;
+                        line_count += 1;
                     }
 
                     // Get CV data
