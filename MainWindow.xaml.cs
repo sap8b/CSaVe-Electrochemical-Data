@@ -611,11 +611,11 @@ namespace CSaVe_Electrochemical_Data
                         // Get Eoc data
                         int point_check = Convert.ToInt32(line_array[0]);
 
-                        if (line_count2 != point_check)
-                        {
-                            sW.WriteLine(Make_a_CSV_Line(line_array));
-                            line_count2 += 1;
-                        }
+                        //if (line_count2 != point_check)
+                        //{
+                        //    sW.WriteLine(Make_a_CSV_Line(line_array));
+                        //    line_count2 += 1;
+                        //}
 
                         sW.WriteLine(Make_a_CSV_Line(line_array));
                         line_count2 += 1;
@@ -626,11 +626,11 @@ namespace CSaVe_Electrochemical_Data
                         // Get potentiodynmic data
                         int point_check = Convert.ToInt32(line_array[0]);
 
-                        if (line_count2 != point_check)
-                        {
-                            sW1.WriteLine(Make_a_CSV_Line(line_array));
-                            line_count2 += 1;
-                        }
+                        //if (line_count2 != point_check)
+                        //{
+                        //    sW1.WriteLine(Make_a_CSV_Line(line_array));
+                        //    line_count2 += 1;
+                        //}
 
                         sW1.WriteLine(Make_a_CSV_Line(line_array));
                         line_count2 += 1;
