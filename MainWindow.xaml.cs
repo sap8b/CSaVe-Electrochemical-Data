@@ -23,15 +23,99 @@ namespace CSaVe_Electrochemical_Data
     /// </summary>
     public partial class MainWindow : Window
     {
+        private enum TypeOfDTAFile
+        {
+            EISPOT, POTENTIODYNAMIC, CORPOT, COLLECT, CV, CYCPOL, GALVEIS, GALVANOSTATIC, POTENTIOSTATIC, UNK
+        }
+        private string ConvertDTAToString(TypeOfDTAFile val)
+        {
+            string output;
+
+            switch (val)
+            {
+                case TypeOfDTAFile.COLLECT:
+                    output = "COLLECT";
+                    break;
+                case TypeOfDTAFile.CYCPOL:
+                    output = "CYCPOL";
+                    break;
+                case TypeOfDTAFile.CV:
+                    output = "CV";
+                    break;
+                case TypeOfDTAFile.CORPOT:
+                    output = "CORPOT";
+                    break;
+                case TypeOfDTAFile.EISPOT:
+                    output = "EISPOT";
+                    break;
+                case TypeOfDTAFile.GALVEIS:
+                    output = "GALVEIS";
+                    break;
+                case TypeOfDTAFile.GALVANOSTATIC:
+                    output = "GALVANOSTATIC";
+                    break;
+                case TypeOfDTAFile.POTENTIODYNAMIC:
+                    output = "POTENTIODYNAMIC";
+                    break;
+                case TypeOfDTAFile.POTENTIOSTATIC:
+                    output = "POTENTIOSTATIC";
+                    break;
+                default:
+                    output = "Type Unknown";
+                    break;
+            }
+
+            return output;
+        }
+
+        private TypeOfDTAFile ConvertStringToDTA(string val)
+        {
+            TypeOfDTAFile output;
+
+            switch (val)
+            {
+                case "EISPOT":
+                    output = TypeOfDTAFile.EISPOT;
+                    break;
+                case "POTENTIODYNAMIC":
+                    output = TypeOfDTAFile.POTENTIODYNAMIC;
+                    break;
+                case "CORPOT":
+                    output = TypeOfDTAFile.CORPOT;
+                    break;
+                case "COLLECT":
+                    output = TypeOfDTAFile.COLLECT;
+                    break;
+                case "CV":
+                    output = TypeOfDTAFile.CV;
+                    break;
+                case "CYCPOL":
+                    output = TypeOfDTAFile.CYCPOL;
+                    break;
+                case "GALVEIS":
+                    output = TypeOfDTAFile.GALVEIS;
+                    break;
+                case "GALVANOSTATIC":
+                    output = TypeOfDTAFile.GALVANOSTATIC;
+                    break;
+                case "POTENTIOSTATIC":
+                    output = TypeOfDTAFile.POTENTIOSTATIC;
+                    break;
+                default:
+                    output = TypeOfDTAFile.UNK;
+                    break;
+
+            }
+
+            return output;
+        }
+
         private FolderBrowserDialog SelectFolderForDTAFiles, SelectFolderForCSVFiles;
         private DirectoryInfo dataFolder;
 
         private List<FileInfo> list_of_DTA_files;
         private List<string> list_of_folders_in_DTA_directory; // = new List<string>();
         private List<string> list_of_folders_in_CSV_directory; // = new List<string>();
-
-        private string[] ColumnHeadings;
-        private string[] Units;
 
         // create a background worker
         private BackgroundWorker worker;
@@ -107,7 +191,7 @@ namespace CSaVe_Electrochemical_Data
                                 string new_filename_base = split_filename[0].ToUpper();
                                 string suffix = ".csv";
 
-                                int result = ConvertGamryEISDatafileToCSVFile(copyFolder.FullName, new_filename_base, suffix, sR);
+                                int result = ConvertGamryDatafileToCSVFile(copyFolder.FullName, new_filename_base, suffix, sR);
 
                                 // Create and initialize a delegate to accept the progress bar update method
                                 UpdateProgressDelegate update = new UpdateProgressDelegate(UpdateProgressBar);
@@ -186,7 +270,7 @@ namespace CSaVe_Electrochemical_Data
 
                 // This conditional statement checks the length of the dta folder list.
                 // If the count > 0 then it creates copies of the folders
-                if (list_of_folders_in_DTA_directory.Count > 0)
+                if (list_of_folders_in_DTA_directory.Count >= 2)
                 {
                     int i = 0;
                     foreach (string centry in list_of_folders_in_DTA_directory)
@@ -211,7 +295,7 @@ namespace CSaVe_Electrochemical_Data
                 // If the count == 0, then it creates only a single folder that matches the folder name in the dta folder list
                 else
                 {
-                    string new_name = System.IO.Path.Combine(csv_directory, dataFolder.Name);
+                    string new_name = csv_directory; // System.IO.Path.Combine(csv_directory, dataFolder.Name);
                     list_of_folders_in_CSV_directory.Add(new_name);
 
                     if (!Directory.Exists(new_name))
@@ -253,8 +337,9 @@ namespace CSaVe_Electrochemical_Data
             SelectFolderForDTAFiles.ShowDialog();
             string base_directory = SelectFolderForDTAFiles.SelectedPath;
 
-            if (base_directory != null && base_directory != "")
+            if (Directory.Exists(base_directory)) //base_directory != null && base_directory != ""
             {
+                // Update the ParentFolder textbox in the MainWindow
                 ParentFolder.Text = base_directory;
 
                 DirectoryInfo directory = new DirectoryInfo(base_directory);
@@ -264,6 +349,7 @@ namespace CSaVe_Electrochemical_Data
                 // If there are multiple folders then they are added to the dta folder list
                 if (temp_directory_array.Length > 0)
                 {
+                    DataFilesTextBox.Text = "";
                     foreach (string t_directory in temp_directory_array)
                     {
                         list_of_folders_in_DTA_directory.Add(t_directory);
@@ -302,7 +388,7 @@ namespace CSaVe_Electrochemical_Data
             // If no data directory is chosen, an error message is displayed
             else
             {
-                System.Windows.MessageBox.Show("Please select a directory.");
+                System.Windows.MessageBox.Show("No directory selected.");
             }
         }
 
@@ -312,9 +398,10 @@ namespace CSaVe_Electrochemical_Data
         /// <param name="copy_filename"></param>
         /// <param name="sR"></param>
         /// <returns></returns>
-        private int ConvertGamryEISDatafileToCSVFile(string copy_folder, string copy_filename_base, string suffix, StreamReader sR)
+        private int ConvertGamryDatafileToCSVFile(string copy_folder, string copy_filename_base, string suffix, StreamReader sR)
         {
             int result = 0;
+            
 
             _ = sR.ReadLine();
             string line1 = sR.ReadLine();
@@ -323,265 +410,518 @@ namespace CSaVe_Electrochemical_Data
 
             if (line1_split.Length > 0)
             {
-                switch (line1_split[1].ToUpper())
+                string read_a_line, element0;
+
+                bool keep_header_line = false;
+                bool keep_data_lines = false;
+                bool keep_header_line2 = false;
+                bool keep_data_lines2 = false;
+
+                int line_count = 0;
+                int line_count2 = 0;
+                result = 1;
+                FileStream fS, fS1, fS2;
+                StreamWriter sW, sW1, sW2;
+
+                TypeOfDTAFile file_type = ConvertStringToDTA(line1_split[1].ToUpper());
+                string top_data_copy_filename, middle_data_copy_filename, bottom_data_copy_filename;
+                string stop_element0, stop_element1, stop_element2, stop_element3;
+
+                switch (file_type)
                 {
-                    case "EISPOT":
-                        result = 1;
-                        string copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + suffix);
-                        FileStream fS = new FileStream(copy_filename, FileMode.Create);
-                        StreamWriter sW = new StreamWriter(fS);
-
-                        string line2_and_greater;
-                        bool keep_one_line = false;
-                        bool keep_all_lines = false;
-
-                        int line_count = 0;
-                        while ((line2_and_greater = sR.ReadLine()) != null)
-                        {
-                            string[] line_array = line2_and_greater.Split(new char[] { '\t' }, StringSplitOptions.RemoveEmptyEntries);
-
-                            if (keep_one_line == false && keep_all_lines == true)
-                            {
-                                int point_check = Convert.ToInt32(line_array[0]);
-
-                                if (line_count != point_check)
-                                {
-                                    string the_line2 = null;
-                                    for (int i = 0; i <= line_array.Length - 2; i++)
-                                    {
-                                        the_line2 += line_array[i] + ",";
-                                    }
-                                    the_line2 += line_array[^1];
-
-                                    sW.WriteLine(the_line2);
-
-                                    line_count += 1;
-                                    //Console.WriteLine("Help!");
-                                }
-                                string the_line = null;
-                                for (int i = 0; i <= line_array.Length - 2; i++)
-                                {
-                                    the_line += line_array[i] + ",";
-                                }
-                                the_line += line_array[^1];
-
-                                sW.WriteLine(the_line);
-
-                                line_count += 1;
-                            }
-
-                            if (line_array.Length > 0)
-                            {
-                                if (line_array[0] == "ZCURVE" && keep_one_line == false)
-                                {
-                                    keep_one_line = true;
-                                }
-                                if (keep_one_line == true)
-                                {
-                                    string next_line = sR.ReadLine();
-                                    ColumnHeadings = new string[11];
-                                    Array.Copy(next_line.Split('\t'), 1, ColumnHeadings, 0, 11);
-
-                                    string the_line = null;
-                                    for (int i = 0; i <= ColumnHeadings.Length - 2; i++)
-                                    {
-                                        the_line += ColumnHeadings[i] + ",";
-                                    }
-                                    the_line += ColumnHeadings[ColumnHeadings.Length - 1];
-
-                                    sW.WriteLine(the_line);
-
-
-                                    next_line = sR.ReadLine();
-                                    Units = new string[11];
-                                    Array.Copy(next_line.Split('\t'), 1, Units, 0, 11);
-                                    keep_one_line = false;
-                                    keep_all_lines = true;
-                                }
-                            }
-                        }
-                        sW.Close();
-                        fS.Close();
+                    case TypeOfDTAFile.EISPOT:
+                        // Outputs 1 datafile with impedance data
+                        top_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_eispot" + suffix);
+                        stop_element0 = "ZCURVE";
+                        Output1DataFile(top_data_copy_filename, stop_element0, sR);
                         break;
-
-                    case "POTENTIODYNAMIC":
+                    case TypeOfDTAFile.POTENTIODYNAMIC:
+                        // Outputs 2 datafiles: 1 with Eoc and 1 with potentiodynamic data
+                        top_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_eoc" + suffix);
+                        bottom_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_pd" + suffix);
+                        stop_element0 = "OCVCURVE";
+                        stop_element1 = "EOC";
+                        stop_element2 = "CURVE";
+                        Output2DataFiles(top_data_copy_filename, bottom_data_copy_filename, stop_element0, stop_element1, stop_element2, sR);
+                        break;
+                    case TypeOfDTAFile.CORPOT:
+                        // Outputs 1 datafile with corrosion potential data
+                        top_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_corpot" + suffix);
+                        stop_element0 = "CURVE";
+                        Output1DataFile(top_data_copy_filename, stop_element0, sR);
+                        break;
+                    case TypeOfDTAFile.COLLECT:
+                        // Outputs 3 datafiles: 1 with Eoc, 1 with ring data, and 1 with disc data
+                        top_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_eoc" + suffix);
+                        middle_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_ring" + suffix);
+                        bottom_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_disk" + suffix);
+                        stop_element0 = "OCVCURVE";
+                        stop_element1 = "PSTATMODEL";
+                        stop_element2 = "RINGCURVE";
+                        stop_element3 = "DISKCURVE";
+                        Output3DataFiles(top_data_copy_filename, middle_data_copy_filename, bottom_data_copy_filename, stop_element0, stop_element1, stop_element2, stop_element3, sR);
+                        break;
+                    case TypeOfDTAFile.CV:
+                        // Outputs 2 datafiles: 1 with Eoc and 1 with all CV curve data
+                        top_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_eoc" + suffix);
+                        bottom_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_cv" + suffix);
+                        stop_element0 = "OCVCURVE";
+                        stop_element1 = "EOC";
+                        stop_element2 = "CURVE1";
+                        Output2DataFiles_CV(top_data_copy_filename, bottom_data_copy_filename, stop_element0, stop_element1, stop_element2, sR);
+                        break;
+                    case TypeOfDTAFile.CYCPOL:
+                        // Outputs 2 datafiles: 1 with Eoc and 1 with cyclic polarization data
+                        top_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_eoc" + suffix);
+                        bottom_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_cycpol" + suffix);
+                        stop_element0 = "OCVCURVE";
+                        stop_element1 = "EOC";
+                        stop_element2 = "CURVE";
+                        Output2DataFiles(top_data_copy_filename, bottom_data_copy_filename, stop_element0, stop_element1, stop_element2, sR);
+                        break;
+                    case TypeOfDTAFile.GALVEIS:
+                        // Outputs 1 datafile with impedance data
+                        top_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_eisgalv" + suffix);
+                        stop_element0 = "ZCURVE";
+                        Output1DataFile(top_data_copy_filename, stop_element0, sR);
+                        break;
+                    case TypeOfDTAFile.GALVANOSTATIC:
+                        // Outputs 2 datafiles: 1 with Eoc and 1 with galvanostatic data
+                        top_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_eoc" + suffix);
+                        bottom_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_galv" + suffix);
+                        stop_element0 = "OCVCURVE";
+                        stop_element1 = "EOC";
+                        stop_element2 = "CURVE";
+                        Output2DataFiles(top_data_copy_filename, bottom_data_copy_filename, stop_element0, stop_element1, stop_element2, sR);
+                        break;
+                    case TypeOfDTAFile.POTENTIOSTATIC:
+                        // Outputs 2 datafiles: 1 with Eoc and 1 with potentiostatic data
+                        top_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_eoc" + suffix);
+                        bottom_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_ps" + suffix);
+                        stop_element0 = "OCVCURVE";
+                        stop_element1 = "EOC";
+                        stop_element2 = "CURVE";
+                        Output2DataFiles(top_data_copy_filename, bottom_data_copy_filename, stop_element0, stop_element1, stop_element2, sR);
                         result = 1;
-                        string eoc_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "e_oc" + suffix);
-                        string pd_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "pd" + suffix);
-
-                        FileStream fS1 = new FileStream(eoc_copy_filename, FileMode.Create);
-                        FileStream fS2 = new FileStream(pd_copy_filename, FileMode.Create);
-                        StreamWriter sW1 = new StreamWriter(fS1);
-                        StreamWriter sW2 = new StreamWriter(fS2);
-
-                        string eoc_readline;
-                        bool keep_one_line2 = false;
-                        bool keep_one_line3 = false;
-                        bool keep_all_lines2 = false;
-                        bool keep_all_lines3 = false;
-
-                        int line_count2 = 0;
-
-                        while ((eoc_readline = sR.ReadLine()) != null)
-                        {
-                            string[] line_array = eoc_readline.Split(new char[] { '\t' }, StringSplitOptions.RemoveEmptyEntries);
-
-                            if (line_array.Length > 0)
-                            {
-                                if (line_array[0] == "EOC" && keep_all_lines2 == true)
-                                {
-                                    keep_all_lines2 = false;
-                                    keep_one_line2 = false;
-                                }
-
-                                if (line_array[0] == "CURVE" && keep_one_line3 == false)
-                                {
-                                    keep_one_line3 = true;
-                                }
-
-                            }
-
-                            if (keep_one_line2 == false && keep_all_lines2 == true)
-                            {
-                                int point_check = Convert.ToInt32(line_array[0]);
-
-                                if (line_count2 != point_check)
-                                {
-                                    string the_line2 = null;
-                                    for (int i = 0; i <= line_array.Length - 2; i++)
-                                    {
-                                        the_line2 += line_array[i] + ",";
-                                    }
-                                    the_line2 += line_array[^1];
-
-                                    sW1.WriteLine(the_line2);
-
-                                    line_count2 += 1;
-                                }
-
-                                string the_line = null;
-                                for (int i = 0; i <= line_array.Length - 2; i++)
-                                {
-                                    the_line += line_array[i] + ",";
-                                }
-                                the_line += line_array[^1];
-
-                                sW1.WriteLine(the_line);
-
-                                line_count2 += 1;
-                            }
-
-                            if (keep_one_line3 == false && keep_all_lines3 == true)
-                            {
-                                int point_check = Convert.ToInt32(line_array[0]);
-
-                                if (line_count2 != point_check)
-                                {
-                                    string the_line2 = null;
-                                    for (int i = 0; i <= line_array.Length - 2; i++)
-                                    {
-                                        the_line2 += line_array[i] + ",";
-                                    }
-                                    the_line2 += line_array[^1];
-
-                                    sW2.WriteLine(the_line2);
-
-                                    line_count2 += 1;
-                                }
-
-                                string the_line = null;
-                                for (int i = 0; i <= line_array.Length - 2; i++)
-                                {
-                                    the_line += line_array[i] + ",";
-                                }
-                                the_line += line_array[^1];
-
-                                sW2.WriteLine(the_line);
-
-                                line_count2 += 1;
-                            }
-
-                            if (line_array.Length > 0)
-                            {
-                                if (line_array[0] == "OCVCURVE" && keep_one_line2 == false)
-                                {
-                                    keep_one_line2 = true;
-                                }
-
-                                if (keep_one_line2 == true)
-                                {
-                                    string next_line = sR.ReadLine();
-                                    string[] nline_split = next_line.Split('\t');
-
-                                    ColumnHeadings = new string[nline_split.Length];
-
-                                    Array.Copy(nline_split, 1, ColumnHeadings, 0, nline_split.Length - 1);
-
-                                    string the_line = null;
-                                    for (int i = 0; i <= ColumnHeadings.Length - 2; i++)
-                                    {
-                                        the_line += ColumnHeadings[i] + ",";
-                                    }
-                                    the_line += ColumnHeadings[^1];
-
-                                    sW1.WriteLine(the_line);
-
-
-                                    next_line = sR.ReadLine();
-                                    nline_split = next_line.Split('\t');
-                                    Units = new string[nline_split.Length];
-
-                                    Array.Copy(next_line.Split('\t'), 1, Units, 0, nline_split.Length - 1);
-                                    keep_one_line2 = false;
-                                    keep_all_lines2 = true;
-                                }
-
-
-
-                                if (keep_one_line3 == true)
-                                {
-                                    string next_line = sR.ReadLine();
-                                    string[] nline_split = next_line.Split('\t');
-
-                                    ColumnHeadings = new string[nline_split.Length];
-                                    Array.Copy(next_line.Split('\t'), 1, ColumnHeadings, 0, nline_split.Length - 1);
-
-                                    string the_line = null;
-                                    for (int i = 0; i <= ColumnHeadings.Length - 2; i++)
-                                    {
-                                        the_line += ColumnHeadings[i] + ",";
-                                    }
-                                    the_line += ColumnHeadings[^1];
-
-                                    sW2.WriteLine(the_line);
-
-
-                                    next_line = sR.ReadLine();
-                                    nline_split = next_line.Split('\t');
-                                    Units = new string[nline_split.Length];
-                                    Array.Copy(next_line.Split('\t'), 1, Units, 0, nline_split.Length - 1);
-                                    keep_one_line3 = false;
-                                    keep_all_lines3 = true;
-                                }
-                            }
-                        }
-
-                        sW2.Close();
-                        sW1.Close();
-                        fS2.Close();
-                        fS1.Close();
-
-
+                        break;
+                    default:
+                        top_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_eoc" + suffix);
+                        bottom_data_copy_filename = System.IO.Path.Combine(copy_folder, copy_filename_base + "_pd" + suffix);
                         break;
                 }
-
-
-
             }
 
-
-
             return result;
+        }
+
+        private static void Output1DataFile(string top_data_copy_filename, string stop_element0, StreamReader sR)
+        {
+            FileStream fS;
+            StreamWriter sW;
+
+            string read_a_line, element0;
+
+            bool keep_header_line = false;
+            bool keep_data_lines = false;
+
+            int line_count = 0;
+
+            fS = new FileStream(top_data_copy_filename, FileMode.Create);
+            sW = new StreamWriter(fS);
+
+            while ((read_a_line = sR.ReadLine()) != null)
+            {
+                string[] line_array = read_a_line.Split(new char[] { '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+                if (line_array.Length > 0)
+                {
+                    element0 = line_array[0];
+                    if (keep_header_line == false && keep_data_lines == true)
+                    {
+                        int point_check = Convert.ToInt32(line_array[0]);
+
+                        // This checks for missing data points in EIS files and adds the previous value if one is missing
+                        if (line_count != point_check)
+                        {
+                            sW.WriteLine(Make_a_CSV_Line(line_array));
+                            line_count += 1;
+                        }
+
+                        sW.WriteLine(Make_a_CSV_Line(line_array));
+                        line_count += 1;
+                    }
+                    else if (element0 == stop_element0 && keep_header_line == false)
+                    {
+                        keep_header_line = true;
+                    }
+                    else if (keep_header_line == true)
+                    {
+                        sW.WriteLine(Make_a_CSV_Line(line_array));
+
+                        // Skip the units line
+                        _ = sR.ReadLine();
+
+                        keep_header_line = false;
+                        keep_data_lines = true;
+                    }
+                }
+            }
+            sW.Close();
+            fS.Close();
+        }
+
+        private static void Output2DataFiles(string top_data_copy_filename, string bottom_data_copy_filename,  string stop_element0, string stop_element1, string stop_element2,
+            StreamReader sR)
+        {
+            FileStream fS, fS1;
+            StreamWriter sW, sW1;
+            string read_a_line, element0;
+
+            bool keep_header_line = false;
+            bool keep_data_lines = false;
+            bool keep_header_line2 = false;
+            bool keep_data_lines2 = false;
+
+            int line_count = 0;
+            int line_count2 = 0;
+
+            fS = new FileStream(top_data_copy_filename, FileMode.Create);
+            fS1 = new FileStream(bottom_data_copy_filename, FileMode.Create);
+            sW = new StreamWriter(fS);
+            sW1 = new StreamWriter(fS1);
+
+            string eoc_readline;
+
+            while ((eoc_readline = sR.ReadLine()) != null)
+            {
+                string[] line_array = eoc_readline.Split(new char[] { '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+                if (line_array.Length > 0)
+                {
+                     element0 = line_array[0];
+
+                    if (element0 == stop_element1 && keep_data_lines == true)
+                    {
+                        keep_data_lines = false;
+                        keep_header_line = false;
+                    }
+
+                    if (keep_header_line == false && keep_data_lines == true)
+                    {
+                        // Get Eoc data
+                        int point_check = Convert.ToInt32(line_array[0]);
+
+                        if (line_count2 != point_check)
+                        {
+                            sW.WriteLine(Make_a_CSV_Line(line_array));
+                            line_count2 += 1;
+                        }
+
+                        sW.WriteLine(Make_a_CSV_Line(line_array));
+                        line_count2 += 1;
+                    }
+
+                    if (keep_header_line2 == false && keep_data_lines2 == true)
+                    {
+                        // Get potentiodynmic data
+                        int point_check = Convert.ToInt32(line_array[0]);
+
+                        if (line_count2 != point_check)
+                        {
+                            sW1.WriteLine(Make_a_CSV_Line(line_array));
+                            line_count2 += 1;
+                        }
+
+                        sW1.WriteLine(Make_a_CSV_Line(line_array));
+                        line_count2 += 1;
+                    }
+
+                    if (element0 == stop_element0 && keep_header_line == false)
+                    {
+                        keep_header_line = true;
+                        // Get Eoc header information
+                        string next_line = sR.ReadLine();
+                        string[] nline_split = next_line.Split(new char[] { '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                        sW.WriteLine(Make_a_CSV_Line(nline_split));
+                        _ = sR.ReadLine();
+                        keep_header_line = false;
+                        keep_data_lines = true;
+                    }
+
+                    if (element0 == stop_element2 && keep_header_line2 == false)
+                    {
+                        keep_header_line2 = true;
+                        // Get Potentiodynamic header informatiom
+                        string next_line = sR.ReadLine();
+                        string[] nline_split = next_line.Split(new char[] { '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                        sW1.WriteLine(Make_a_CSV_Line(nline_split));
+                        _ = sR.ReadLine();
+                        keep_header_line2 = false;
+                        keep_data_lines2 = true;
+                    }
+                }
+            }
+
+            sW1.Close();
+            sW.Close();
+            fS1.Close();
+            fS.Close();
+        }
+
+        private static void Output3DataFiles(string top_data_copy_filename, string middle_data_copy_filename, string bottom_data_copy_filename,
+            string stop_element0, string stop_element1, string stop_element2, string stop_element3, StreamReader sR)
+        {
+            FileStream fS, fS1, fS2;
+            StreamWriter sW, sW1, sW2;
+            string read_a_line, element0;
+
+            bool keep_header_line = false;
+            bool keep_data_lines = false;
+
+            bool keep_header_line2 = false;
+            bool keep_data_lines2 = false;
+
+            bool keep_header_line3 = false;
+            bool keep_data_lines3 = false;
+
+            int line_count = 0;
+            int line_count2 = 0;
+            int line_count3 = 0;
+
+            fS = new FileStream(top_data_copy_filename, FileMode.Create);
+            fS1 = new FileStream(middle_data_copy_filename, FileMode.Create);
+            fS2 = new FileStream(bottom_data_copy_filename, FileMode.Create);
+            sW = new StreamWriter(fS);
+            sW1 = new StreamWriter(fS1);
+            sW2 = new StreamWriter(fS2);
+
+            string eoc_readline;
+
+            while ((eoc_readline = sR.ReadLine()) != null)
+            {
+                string[] line_array = eoc_readline.Split(new char[] { '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+                if (line_array.Length > 0)
+                {
+                    element0 = line_array[0];
+
+                    if (element0 == stop_element1 && keep_data_lines == true)
+                    {
+                        keep_data_lines = false;
+                        keep_header_line = false;
+                    }
+                    if (element0 == stop_element3 && keep_data_lines2 == true) 
+                    {
+                        keep_data_lines2 = false;
+                        keep_header_line2 = false;
+                    }
+
+                    // Get Eoc data
+                    if (keep_header_line == false && keep_data_lines == true)
+                    {
+                        // Get Eoc data
+                        int point_check = Convert.ToInt32(line_array[0]);
+
+                        if (line_count2 != point_check)
+                        {
+                            sW.WriteLine(Make_a_CSV_Line(line_array));
+                            line_count2 += 1;
+                        }
+
+                        sW.WriteLine(Make_a_CSV_Line(line_array));
+                        line_count2 += 1;
+                    }
+
+                    // Get ring data
+                    if (keep_header_line2 == false && keep_data_lines2 == true)
+                    {
+                        // Get ring data
+                        int point_check = Convert.ToInt32(line_array[0]);
+
+                        if (line_count2 != point_check)
+                        {
+                            sW1.WriteLine(Make_a_CSV_Line(line_array));
+                            line_count2 += 1;
+                        }
+
+                        sW1.WriteLine(Make_a_CSV_Line(line_array));
+                        line_count2 += 1;
+                    }
+
+                    // Get disk data
+                    if (keep_header_line3 == false && keep_data_lines3 == true) 
+                    {
+                        int point_check = Convert.ToInt32(line_array[0]);
+
+                        if (line_count3 != point_check)
+                        {
+                            sW2.WriteLine(Make_a_CSV_Line(line_array));
+                            line_count3 += 1;
+                        }
+
+                        sW2.WriteLine(Make_a_CSV_Line(line_array));
+                        line_count3 += 1;
+                    }
+
+                    // Get Eoc header information
+                    if (element0 == stop_element0 && keep_header_line == false)
+                    {
+                        keep_header_line = true;                      
+                        string next_line = sR.ReadLine();
+                        string[] nline_split = next_line.Split(new char[] { '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                        sW.WriteLine(Make_a_CSV_Line(nline_split));
+                        _ = sR.ReadLine();
+                        keep_header_line = false;
+                        keep_data_lines = true;
+                    }
+
+                    // Get ring header informatiom
+                    if (element0 == stop_element2 && keep_header_line2 == false)
+                    {
+                        keep_header_line2 = true;                        
+                        string next_line = sR.ReadLine();
+                        string[] nline_split = next_line.Split(new char[] { '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                        sW1.WriteLine(Make_a_CSV_Line(nline_split));
+                        _ = sR.ReadLine();
+                        keep_header_line2 = false;
+                        keep_data_lines2 = true;
+                    }
+
+                    // Get disk header informatiom
+                    if (element0 == stop_element3 && keep_header_line3 == false)
+                    {
+                        keep_header_line3 = true;
+                        string next_line = sR.ReadLine();
+                        string[] nline_split = next_line.Split(new char[] { '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                        sW2.WriteLine(Make_a_CSV_Line(nline_split));
+                        _ = sR.ReadLine();
+                        keep_header_line3 = false;
+                        keep_data_lines3 = true;
+                    }
+
+                }
+            }
+            sW2.Close();
+            sW1.Close();
+            sW.Close();
+            fS2.Close();
+            fS1.Close();
+            fS.Close();
+        }
+
+        private static void Output2DataFiles_CV(string top_data_copy_filename, string bottom_data_copy_filename, string stop_element0, string stop_element1, string stop_element2,
+    StreamReader sR)
+        {
+            FileStream fS, fS1;
+            StreamWriter sW, sW1;
+            string read_a_line, element0;
+
+            bool keep_header_line = false;
+            bool keep_data_lines = false;
+            bool keep_header_line2 = false;
+            bool keep_data_lines2 = false;
+
+            int line_count = 0;
+            int line_count2 = 0;
+
+            fS = new FileStream(top_data_copy_filename, FileMode.Create);
+            fS1 = new FileStream(bottom_data_copy_filename, FileMode.Create);
+            sW = new StreamWriter(fS);
+            sW1 = new StreamWriter(fS1);
+
+            string eoc_readline;
+
+            while ((eoc_readline = sR.ReadLine()) != null)
+            {
+                string[] line_array = eoc_readline.Split(new char[] { '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+                if (line_array.Length > 0)
+                {
+                    element0 = line_array[0];
+
+                    if (element0 == stop_element1 && keep_data_lines == true)
+                    {
+                        keep_data_lines = false;
+                        keep_header_line = false;
+                    }
+
+                    // Get Eoc data
+                    if (keep_header_line == false && keep_data_lines == true)
+                    {  
+                        int point_check = Convert.ToInt32(line_array[0]);
+
+                        if (line_count2 != point_check)
+                        {
+                            sW.WriteLine(Make_a_CSV_Line(line_array));
+                            line_count2 += 1;
+                        }
+
+                        sW.WriteLine(Make_a_CSV_Line(line_array));
+                        line_count2 += 1;
+                    }
+
+                    // Get CV data
+                    if (keep_header_line2 == false && keep_data_lines2 == true)
+                    {   
+                        if (line_array[1] != "TABLE" && 
+                            line_array[0] != "Pt" &&
+                            line_array[0] != "#")
+                        {
+                            int point_check = Convert.ToInt32(line_array[0]);
+
+                            if (line_count2 != point_check)
+                            {
+                                sW1.WriteLine(Make_a_CSV_Line(line_array));
+                                line_count2 += 1;
+                            }
+
+                            sW1.WriteLine(Make_a_CSV_Line(line_array));
+                            line_count2 += 1;
+                        }
+                        
+                    }
+
+                    // Get Eoc header information
+                    if (element0 == stop_element0 && keep_header_line == false)
+                    {
+                        keep_header_line = true;                        
+                        string next_line = sR.ReadLine();
+                        string[] nline_split = next_line.Split(new char[] { '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                        sW.WriteLine(Make_a_CSV_Line(nline_split));
+                        _ = sR.ReadLine();
+                        keep_header_line = false;
+                        keep_data_lines = true;
+                    }
+
+                    // Get CV header informatiom
+                    if (element0 == stop_element2 && keep_header_line2 == false)
+                    {
+                        keep_header_line2 = true;
+                        string next_line = sR.ReadLine();
+                        string[] nline_split = next_line.Split(new char[] { '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                        sW1.WriteLine(Make_a_CSV_Line(nline_split));
+                        _ = sR.ReadLine();
+                        keep_header_line2 = false;
+                        keep_data_lines2 = true;
+                    }
+                }
+            }
+
+            sW1.Close();
+            sW.Close();
+            fS1.Close();
+            fS.Close();
+        }
+        private static string Make_a_CSV_Line(string[] line_array)
+        {
+            string the_line2 = null;
+            for (int i = 0; i <= line_array.Length - 2; i++)
+            {
+                the_line2 += line_array[i] + ",";
+            }
+            the_line2 += line_array[^1];
+
+            return the_line2;
         }
     }
 }
