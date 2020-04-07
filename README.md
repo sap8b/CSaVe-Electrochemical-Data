@@ -1,6 +1,6 @@
-<img src = "https://github.com/sap8b/CSaVe-Electrochemical-Data/blob/master/CSaVeElectrochemicalData.ico" align = "right" width = "64" height = "64">
+<img src = "https://github.com/sap8b/CSaVe-Electrochemical-Data/blob/master/CSaVe Electrochemical Data Logo.png" align = "left" width = "1024" height = "200">
 
-# CSaVe-Electrochemical-Data
+# 
 A utility for extracting data from electrochemical experimentation datafiles and saving them as CSV files for easier plotting.
 
 ## Introduction
@@ -14,9 +14,9 @@ This project started as a Windows Presentation Foundation (WPF) project for use 
 This project was written in C# and XAML using Microsoft Visual Studio 2019. 
 
 ## Installation
-The app is available here: https://www.microsoft.com/store/productId/9NFF5C7FN14B
+The app is available here: https://www.microsoft.com/store/productId/9MWJ4GK6S7ZK
 
 ## Next Steps
-* Add the capability to extract open-circuit potentials and polarization responses from polarization curve files
+* <strike>Add the capability to extract open-circuit potentials and polarization responses from polarization curve files</strike>
 * Add support for other manufacturers datafiles - if they aren't already easily plottable
 * Add plotting scripts for some common plotting packages
