@@ -17,6 +17,15 @@ This project was written in C# and XAML using Microsoft Visual Studio 2019.
 The app is available here: https://www.microsoft.com/store/productId/9MWJ4GK6S7ZK
 
 ## Next Steps
-* <strike>Add the capability to extract open-circuit potentials and polarization responses from polarization curve files</strike>
+* Add the capability to extract data for the following filetypes:
+    - <strike>Corrosion potential</strike>
+    - <strike>Cyclic polarization</strike>
+    - <strike>Potentiodynamic polarization</strike>
+    - <strike>Cyclic voltammetry</strike>
+    - <strike>Potentiostatic EIS</strike>
+    - <strike>Galvanostatic EIS</strike>
+    - <strike>BiPotentiostat RDE</strike>
+    - <strike>Galvanostatic</strike>
+    - <strike>Potentiostatic</strike>
 * Add support for other manufacturers datafiles - if they aren't already easily plottable
 * Add plotting scripts for some common plotting packages
