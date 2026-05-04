@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -922,6 +924,147 @@ namespace CSaVe_Electrochemical_Data
             the_line2 += line_array[^1];
 
             return the_line2;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // Tab 2: Combine CSVs → XML  event handlers
+        // ─────────────────────────────────────────────────────────────────────────
+
+        private void BrowseAnodicButton_Click(object sender, RoutedEventArgs e)
+        {
+            using var dlg = new OpenFileDialog
+            {
+                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                Title = "Select Anodic CSV file"
+            };
+            if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                AnodicCsvPath.Text = dlg.FileName;
+                AutoPopulateXmlFilename(dlg.FileName);
+            }
+        }
+
+        private void BrowseCathodicButton_Click(object sender, RoutedEventArgs e)
+        {
+            using var dlg = new OpenFileDialog
+            {
+                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                Title = "Select Cathodic CSV file"
+            };
+            if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                CathodicCsvPath.Text = dlg.FileName;
+        }
+
+        private void BrowseXmlOutputFolderButton_Click(object sender, RoutedEventArgs e)
+        {
+            using var dlg = new FolderBrowserDialog
+            {
+                RootFolder = Environment.SpecialFolder.MyComputer,
+                UseDescriptionForTitle = true,
+                Description = "Select the folder to save the XML file in"
+            };
+            if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
+                XmlOutputFolder.Text = dlg.SelectedPath;
+                // Update the directory component of the suggested filename, preserving any user-edited filename.
+                // Only update if XmlOutputFilename does not already contain a custom directory path.
+                string existingText = XmlOutputFilename.Text?.Trim() ?? string.Empty;
+                string existingFilename = System.IO.Path.GetFileName(existingText);
+                if (!string.IsNullOrWhiteSpace(existingFilename))
+                    XmlOutputFilename.Text = System.IO.Path.Combine(dlg.SelectedPath, existingFilename);
+            }
+        }
+
+        /// <summary>
+        /// Derives the suggested XML output filename from the anodic CSV path.
+        /// Expected anodic filename format: {BaseName}Anodic{optional_digits}.csv
+        /// E.g. "HY80Anodic1.csv" → "HY80_polarization.xml"
+        /// </summary>
+        private void AutoPopulateXmlFilename(string anodicPath)
+        {
+            string baseName = System.IO.Path.GetFileNameWithoutExtension(anodicPath);
+            // Remove trailing "Anodic" (case-insensitive) followed by optional digits,
+            // e.g. "HY80Anodic1" → "HY80", "SteelAnodic" → "Steel"
+            string stripped = Regex.Replace(baseName, @"(?i)Anodic\d*$", "");
+            string suggestedName = stripped + "_polarization.xml";
+
+            string outputFolder = XmlOutputFolder.Text;
+            if (!string.IsNullOrWhiteSpace(outputFolder) && Directory.Exists(outputFolder))
+                XmlOutputFilename.Text = System.IO.Path.Combine(outputFolder, suggestedName);
+            else
+                XmlOutputFilename.Text = suggestedName;
+        }
+
+        private void GenerateXmlButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string anodicPath = AnodicCsvPath.Text?.Trim();
+                string cathodicPath = CathodicCsvPath.Text?.Trim();
+                string outputFolder = XmlOutputFolder.Text?.Trim();
+                string outputFile = XmlOutputFilename.Text?.Trim();
+
+                // Validation
+                if (string.IsNullOrEmpty(anodicPath) || !File.Exists(anodicPath))
+                {
+                    System.Windows.MessageBox.Show("Anodic CSV file not found. Please select a valid file.",
+                        "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                if (string.IsNullOrEmpty(cathodicPath) || !File.Exists(cathodicPath))
+                {
+                    System.Windows.MessageBox.Show("Cathodic CSV file not found. Please select a valid file.",
+                        "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                if (string.IsNullOrEmpty(outputFile))
+                {
+                    System.Windows.MessageBox.Show("Please specify an output filename.",
+                        "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                // Ensure output directory exists
+                string resolvedOutputDir = System.IO.Path.GetDirectoryName(outputFile);
+                if (!string.IsNullOrEmpty(resolvedOutputDir) && !Directory.Exists(resolvedOutputDir))
+                    Directory.CreateDirectory(resolvedOutputDir);
+
+                // Build metadata from UI fields
+                var meta = new PolarizationCurveMetadata
+                {
+                    InstituteName = MetaInstituteName.Text,
+                    City          = MetaCity.Text,
+                    State         = MetaState.Text,
+                    Country       = MetaCountry.Text,
+                    UNSCode       = MetaUNSCode.Text,
+                    CommonName    = MetaCommonName.Text,
+                    SurfacePrep   = MetaSurfacePrep.Text,
+                    ExpArea       = ParseDouble(MetaExpArea.Text, 1.0e-4),
+                    ClConc        = ParseDouble(MetaClConc.Text, 1.0),
+                    pH            = ParseDouble(MetapH.Text, 8.0),
+                    O2conc        = ParseDouble(MetaO2Conc.Text, 2.5e-4),
+                    S2conc        = ParseDouble(MetaS2Conc.Text, 0.08),
+                    Temperature   = ParseDouble(MetaTemperature.Text, 50.0),
+                    Conductivity  = ParseDouble(MetaConductivity.Text, 5.0),
+                    Flow          = ParseDouble(MetaFlow.Text, 0.0)
+                };
+
+                PolarizationCurveXmlExporter.Export(anodicPath, cathodicPath, outputFile, meta);
+
+                XmlStatusBox.Text = $"XML export complete: {outputFile}";
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Error generating XML:\n{ex.Message}",
+                    "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private static double ParseDouble(string text, double defaultValue)
+        {
+            if (double.TryParse(text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double result))
+                return result;
+            return defaultValue;
         }
     }
 }
