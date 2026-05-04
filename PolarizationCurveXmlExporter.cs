@@ -10,26 +10,75 @@ namespace CSaVe_Electrochemical_Data
     public static class PolarizationCurveXmlExporter
     {
         /// <summary>
-        /// Parses a CSV file with two columns (current_A, voltage_V_vs_SCE) and returns a list of data points.
+        /// Parses a CSV file and returns a list of (current_A, voltage_V) data points.
+        /// Supports two formats:
+        ///   Format A — GAMRY-converted multi-column CSV with a header row (e.g. "Pt,T,Vf,Im,...").
+        ///   Format B — Simple 2-column headerless CSV (current, voltage).
         /// </summary>
         private static List<(double I, double V)> ParseCsv(string csvPath)
         {
             var points = new List<(double I, double V)>();
-            foreach (string line in File.ReadAllLines(csvPath))
+            string[] allLines = File.ReadAllLines(csvPath);
+
+            int currentColIndex = 0;
+            int voltageColIndex = 1;
+            bool headerParsed = false;
+            bool isFormatA = false;
+
+            foreach (string line in allLines)
             {
                 string trimmed = line.Trim();
                 if (string.IsNullOrEmpty(trimmed))
                     continue;
 
                 string[] parts = trimmed.Split(',');
-                if (parts.Length < 2)
-                    throw new FormatException($"Invalid CSV line (expected 2 columns): \"{line}\"");
 
-                if (!double.TryParse(parts[0].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double current))
-                    throw new FormatException($"Cannot parse current value: \"{parts[0].Trim()}\"");
+                if (!headerParsed)
+                {
+                    headerParsed = true;
+                    string firstToken = parts[0].Trim();
 
-                if (!double.TryParse(parts[1].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double voltage))
-                    throw new FormatException($"Cannot parse voltage value: \"{parts[1].Trim()}\"");
+                    if (!double.TryParse(firstToken, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                    {
+                        // Format A: header row — find column indices for Im (current) and Vf (voltage)
+                        isFormatA = true;
+                        currentColIndex = -1;
+                        voltageColIndex = -1;
+                        for (int c = 0; c < parts.Length; c++)
+                        {
+                            string col = parts[c].Trim();
+                            if (string.Equals(col, "Im", StringComparison.OrdinalIgnoreCase))
+                                currentColIndex = c;
+                            else if (string.Equals(col, "Vf", StringComparison.OrdinalIgnoreCase))
+                                voltageColIndex = c;
+                        }
+                        if (currentColIndex < 0)
+                            throw new FormatException("CSV header does not contain an 'Im' column. Check that the selected file is a valid CSV produced by CSaVe Electrochemical Data.");
+                        if (voltageColIndex < 0)
+                            throw new FormatException("CSV header does not contain a 'Vf' column. Check that the selected file is a valid CSV produced by CSaVe Electrochemical Data.");
+
+                        // Header row processed; move to next line for data
+                        continue;
+                    }
+                    // else Format B: first line is data — fall through to parse it below
+                }
+
+                // Skip secondary header/unit rows: the first token must parse as an integer point number
+                // (e.g. skip lines like "#  s  V vs. Ref." that appear in some GAMRY exports)
+                if (isFormatA && !int.TryParse(parts[0].Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out _))
+                    continue;
+
+                if (parts.Length <= Math.Max(currentColIndex, voltageColIndex))
+                    continue;
+
+                string currentStr = parts[currentColIndex].Trim();
+                string voltageStr = parts[voltageColIndex].Trim();
+
+                if (!double.TryParse(currentStr, NumberStyles.Float, CultureInfo.InvariantCulture, out double current))
+                    throw new FormatException($"Cannot parse '{currentStr}' as a number. Check that the selected file is a valid CSV produced by CSaVe Electrochemical Data.");
+
+                if (!double.TryParse(voltageStr, NumberStyles.Float, CultureInfo.InvariantCulture, out double voltage))
+                    throw new FormatException($"Cannot parse '{voltageStr}' as a number. Check that the selected file is a valid CSV produced by CSaVe Electrochemical Data.");
 
                 points.Add((current, voltage));
             }
@@ -54,7 +103,26 @@ namespace CSaVe_Electrochemical_Data
             if (cathodicPoints.Count == 0)
                 throw new InvalidOperationException("Cathodic CSV contains no data points.");
 
-            // 2. Find E_corr: index with minimum |I| in anodic CSV
+            // 2. Trim anodic return sweep: keep only the forward sweep up to the apex (max voltage).
+            //    Cyclic polarization goes up to the apex then returns; discard the return portion.
+            int anodicApexIndex = 0;
+            for (int i = 1; i < anodicPoints.Count; i++)
+            {
+                if (anodicPoints[i].V > anodicPoints[anodicApexIndex].V)
+                    anodicApexIndex = i;
+            }
+            anodicPoints = anodicPoints.GetRange(0, anodicApexIndex + 1);
+
+            // 3. Trim cathodic return sweep: keep only the forward sweep down to the apex (min voltage).
+            int cathodicApexIndex = 0;
+            for (int i = 1; i < cathodicPoints.Count; i++)
+            {
+                if (cathodicPoints[i].V < cathodicPoints[cathodicApexIndex].V)
+                    cathodicApexIndex = i;
+            }
+            cathodicPoints = cathodicPoints.GetRange(0, cathodicApexIndex + 1);
+
+            // 4. Find E_corr: index with minimum |I| in anodic CSV
             int ecorrIndex = 0;
             double minAbsI = Math.Abs(anodicPoints[0].I);
             for (int i = 1; i < anodicPoints.Count; i++)
@@ -68,20 +136,20 @@ namespace CSaVe_Electrochemical_Data
             }
             double vEcorr = anodicPoints[ecorrIndex].V;
 
-            // 3. Trim anodic branch: keep points where V >= V_ecorr.
+            // 5. Trim anodic branch: keep points where V >= V_ecorr.
             //    The anodic (oxidation) sweep runs from E_corr upward in voltage.
             var anodicTrimmed = anodicPoints.Where(p => p.V >= vEcorr).ToList();
 
-            // 4. Trim cathodic branch: keep points where V < V_ecorr (remove overlap near E_corr).
+            // 6. Trim cathodic branch: keep points where V < V_ecorr (remove overlap near E_corr).
             //    The cathodic (reduction) sweep runs from near E_corr downward in voltage.
             var cathodicTrimmed = cathodicPoints.Where(p => p.V < vEcorr).ToList();
 
-            // 5. Combine and sort ascending by voltage
+            // 7. Combine and sort ascending by voltage
             var merged = anodicTrimmed.Concat(cathodicTrimmed)
                                       .OrderBy(p => p.V)
                                       .ToList();
 
-            // 6. Write XML
+            // 8. Write XML
             var xmlSettings = new XmlWriterSettings
             {
                 Indent = true,
