@@ -976,16 +976,17 @@ namespace CSaVe_Electrochemical_Data
         }
 
         /// <summary>
-        /// Derives the suggested XML output filename from the anodic CSV path.
-        /// Expected anodic filename format: {BaseName}Anodic{optional_digits}.csv
-        /// E.g. "HY80Anodic1.csv" → "HY80_polarization.xml"
+        /// Derives the suggested XML output filename from the primary CSV path.
+        /// Strips trailing suffix patterns (case-insensitive):
+        ///   Anodic{digits}  — e.g. "HY80Anodic1"  → "HY80"
+        ///   Cycpol{digits}  — e.g. "SteelCycpol2" → "Steel"
+        ///   Pol{digits}     — e.g. "SamplePol"    → "Sample"
+        /// Then appends "_polarization.xml".
         /// </summary>
-        private void AutoPopulateXmlFilename(string anodicPath)
+        private void AutoPopulateXmlFilename(string primaryPath)
         {
-            string baseName = System.IO.Path.GetFileNameWithoutExtension(anodicPath);
-            // Remove trailing "Anodic" (case-insensitive) followed by optional digits,
-            // e.g. "HY80Anodic1" → "HY80", "SteelAnodic" → "Steel"
-            string stripped = Regex.Replace(baseName, @"(?i)Anodic\d*$", "");
+            string baseName = System.IO.Path.GetFileNameWithoutExtension(primaryPath);
+            string stripped = Regex.Replace(baseName, @"(?i)(Cycpol|Anodic|Pol)\d*$", "");
             string suggestedName = stripped + "_polarization.xml";
 
             string outputFolder = XmlOutputFolder.Text;
@@ -1007,13 +1008,14 @@ namespace CSaVe_Electrochemical_Data
                 // Validation
                 if (string.IsNullOrEmpty(anodicPath) || !File.Exists(anodicPath))
                 {
-                    System.Windows.MessageBox.Show("Anodic CSV file not found. Please select a valid file.",
+                    System.Windows.MessageBox.Show("Polarization CSV file not found. Please select a valid file.",
                         "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
-                if (string.IsNullOrEmpty(cathodicPath) || !File.Exists(cathodicPath))
+                // cathodicPath is optional; if provided it must exist
+                if (!string.IsNullOrWhiteSpace(cathodicPath) && !File.Exists(cathodicPath))
                 {
-                    System.Windows.MessageBox.Show("Cathodic CSV file not found. Please select a valid file.",
+                    System.Windows.MessageBox.Show("Cathodic CSV file not found. Please select a valid file or leave the field empty to use single-file mode.",
                         "Validation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
@@ -1049,7 +1051,11 @@ namespace CSaVe_Electrochemical_Data
                     Flow          = ParseDouble(MetaFlow.Text, 0.0)
                 };
 
-                PolarizationCurveXmlExporter.Export(anodicPath, cathodicPath, outputFile, meta);
+                PolarizationCurveXmlExporter.Export(
+                    anodicPath,
+                    string.IsNullOrWhiteSpace(cathodicPath) ? null : cathodicPath,
+                    outputFile,
+                    meta);
 
                 XmlStatusBox.Text = $"XML export complete: {outputFile}";
             }
