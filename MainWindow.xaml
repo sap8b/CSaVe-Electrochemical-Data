@@ -64,7 +64,7 @@
                               VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                     <TextBox x:Name="DataFilesTextBox" Text="Datafiles"
                              TextWrapping="NoWrap" AcceptsReturn="True" IsReadOnly="True"
-                             Height="180"
+                             Height="298"
                              VerticalScrollBarVisibility="Auto"
                              HorizontalScrollBarVisibility="Auto"/>
                 </ScrollViewer>
@@ -140,9 +140,9 @@
                             <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
                                 <TextBlock Text="Material:" VerticalAlignment="Center" Width="80"/>
                                 <TextBlock Text="UNS Code:" VerticalAlignment="Center" Margin="4,0,4,0"/>
-                                <TextBox x:Name="MetaUNSCode" Width="80" Margin="0,0,8,0"/>
+                                <TextBox x:Name="MetaUNSCode" Width="80" Margin="0,0,8,0" Text="K31820"/>
                                 <TextBlock Text="Common Name:" VerticalAlignment="Center" Margin="4,0,4,0"/>
-                                <TextBox x:Name="MetaCommonName" Width="160" Text="sample"/>
+                                <TextBox x:Name="MetaCommonName" Width="160" Text="HY-80"/>
                             </StackPanel>
 
                             <!-- Material row 2 -->
