@@ -986,7 +986,7 @@ namespace CSaVe_Electrochemical_Data
         private void AutoPopulateXmlFilename(string primaryPath)
         {
             string baseName = System.IO.Path.GetFileNameWithoutExtension(primaryPath);
-            string stripped = Regex.Replace(baseName, @"(?i)(Anodic|Cycpol|Pol)\d*$", "");
+            string stripped = Regex.Replace(baseName, @"(?i)(Cycpol|Anodic|Pol)\d*$", "");
             string suggestedName = stripped + "_polarization.xml";
 
             string outputFolder = XmlOutputFolder.Text;

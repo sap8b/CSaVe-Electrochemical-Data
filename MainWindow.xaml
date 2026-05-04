@@ -101,7 +101,7 @@
                             <!-- Hint shown below the primary CSV field -->
                             <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
                                        Margin="0,0,0,4" Foreground="Gray" FontStyle="Italic"
-                                       Text="If this file contains both branches, leave Cathodic CSV empty."/>
+                                       Text="If this file contains both branches, leave the Cathodic CSV field empty."/>
 
                             <Button x:Name="BrowseCathodicButton" Grid.Row="2" Grid.Column="0"
                                     Margin="0,4,8,4" Height="30" Background="LightBlue" FontWeight="Bold"
