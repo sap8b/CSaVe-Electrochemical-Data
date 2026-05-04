@@ -9,7 +9,7 @@
     <TabControl Margin="5">
 
         <!-- ═══════════════════════════════════════════════════ Tab 1: DTA → CSV ═══════════════════════════════════════════════════ -->
-        <TabItem Header="DTA → CSV">
+        <TabItem Header="DTA -> CSV">
             <Grid Margin="10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="220"/>
@@ -72,7 +72,7 @@
         </TabItem>
 
         <!-- ═══════════════════════════════════════════════ Tab 2: Combine CSVs → XML ════════════════════════════════════════════════ -->
-        <TabItem Header="Combine CSVs → XML">
+        <TabItem Header="Combine CSVs -> XML">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="12,10,12,10">
 
