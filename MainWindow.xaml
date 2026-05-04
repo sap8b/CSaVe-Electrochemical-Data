@@ -5,32 +5,194 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CSaVe_Electrochemical_Data"
         mc:Ignorable="d"
-        Title="CSaVe Electrochemical Data" Height="500" Width="900">
-    <Grid VerticalAlignment="Top" HorizontalAlignment="Center" ShowGridLines="False" Width="890" Height="490">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="Auto"/>
-        </Grid.ColumnDefinitions>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        Title="CSaVe Electrochemical Data" Height="620" Width="960">
+    <TabControl Margin="5">
 
-        <Button x:Name="LoadDataButton" Grid.Row="0" Grid.Column="0" HorizontalAlignment="Left" Margin="10,10,10,0" VerticalAlignment="Center" Width ="200" Height ="50" Content="1. Select Folder with DTA files" Background="LightGreen" FontWeight="Bold" Click="LoadDataButton_Click" BorderThickness="2,2,2,2" />
-        <Button x:Name="SelectOutputLocationButton" Grid.Row="1" Grid.Column="0" HorizontalAlignment="Center" Margin="10,10,10,0" VerticalAlignment="Center" Width ="200" Height ="50" Background="LightGreen" Content="2. Select Folder For Conversions" FontWeight="Bold" IsEnabled="False" Click="SelectOutputLocationButton_Click" BorderThickness="2,2,2,2" />
-        <Button x:Name="ConvertFiles" Grid.Row="2" Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10,10,10,0"  Width ="200" Height ="50" Background="LightGreen" Content="3. Convert DTA to CSV" FontWeight="Bold" IsEnabled="False" Click="ConvertFiles_Click" BorderThickness="2,2,2,2"/>
+        <!-- ═══════════════════════════════════════════════════ Tab 1: DTA → CSV ═══════════════════════════════════════════════════ -->
+        <TabItem Header="DTA → CSV">
+            <Grid Margin="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="220"/>
+                    <ColumnDefinition Width="300"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-        <TextBox x:Name="ParentFolder" Grid.Row="0" Grid.Column="1"  HorizontalAlignment="Left" Margin="20,10,0,0" VerticalAlignment="Center" Width ="290" Text="Parent DTA folder" Grid.ColumnSpan="2"/>
-        <TextBox x:Name="OutputFolder" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Left" Margin="20,10,0,0" VerticalAlignment="Center" Width ="290" Text="Parent CSV folder"/>
-        <TextBox x:Name="StatusBox" Grid.Row="2" Grid.Column="1" HorizontalAlignment="Left" Margin="20,10,0,0" VerticalAlignment="Center" Width ="290" Text="Status"/>
+                <!-- Buttons -->
+                <Button x:Name="LoadDataButton" Grid.Row="0" Grid.Column="0"
+                        Margin="0,8,10,0" Width="210" Height="50"
+                        HorizontalAlignment="Left" VerticalAlignment="Center"
+                        Background="LightGreen" FontWeight="Bold" BorderThickness="2"
+                        Content="1. Select Folder with DTA files"
+                        Click="LoadDataButton_Click"/>
+                <Button x:Name="SelectOutputLocationButton" Grid.Row="1" Grid.Column="0"
+                        Margin="0,8,10,0" Width="210" Height="50"
+                        HorizontalAlignment="Left" VerticalAlignment="Center"
+                        Background="LightGreen" FontWeight="Bold" BorderThickness="2"
+                        Content="2. Select Folder For Conversions"
+                        IsEnabled="False" Click="SelectOutputLocationButton_Click"/>
+                <Button x:Name="ConvertFiles" Grid.Row="2" Grid.Column="0"
+                        Margin="0,8,10,0" Width="210" Height="50"
+                        HorizontalAlignment="Left" VerticalAlignment="Center"
+                        Background="LightGreen" FontWeight="Bold" BorderThickness="2"
+                        Content="3. Convert DTA to CSV"
+                        IsEnabled="False" Click="ConvertFiles_Click"/>
 
-        <TextBox x:Name="DataFilesTextBox" Grid.RowSpan ="5" Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="25,10,0,0" Width ="300" Height="350" Text="Datafiles" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" />
+                <!-- Path / status textboxes -->
+                <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,8,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Parent DTA folder:" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <TextBox x:Name="ParentFolder" Width="290" HorizontalAlignment="Left" Text="Parent DTA folder"/>
+                </StackPanel>
+                <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,8,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Output CSV folder:" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <TextBox x:Name="OutputFolder" Width="290" HorizontalAlignment="Left" Text="Parent CSV folder"/>
+                </StackPanel>
+                <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,8,0,0" VerticalAlignment="Center">
+                    <TextBlock Text="Status:" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <TextBox x:Name="StatusBox" Width="290" HorizontalAlignment="Left" Text="Status"/>
+                </StackPanel>
 
-    </Grid>
+                <!-- Data files list -->
+                <StackPanel Grid.Row="0" Grid.Column="2" Grid.RowSpan="5" Margin="20,8,0,0">
+                    <TextBlock Text="Data files found:" FontWeight="SemiBold" Margin="0,0,0,2"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Height="490">
+                        <TextBox x:Name="DataFilesTextBox" Width="320" Text="Datafiles"
+                                 TextWrapping="NoWrap" AcceptsReturn="True"
+                                 VerticalScrollBarVisibility="Disabled"
+                                 HorizontalScrollBarVisibility="Disabled"/>
+                    </ScrollViewer>
+                </StackPanel>
+            </Grid>
+        </TabItem>
+
+        <!-- ═══════════════════════════════════════════════ Tab 2: Combine CSVs → XML ════════════════════════════════════════════════ -->
+        <TabItem Header="Combine CSVs → XML">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="12,10,12,10">
+
+                    <!-- File paths -->
+                    <GroupBox Header="Input / Output Files" Margin="0,0,0,8" Padding="8">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="180"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <Button x:Name="BrowseAnodicButton" Grid.Row="0" Grid.Column="0"
+                                    Margin="0,4,8,4" Height="30" Background="LightBlue" FontWeight="Bold"
+                                    Content="Browse Anodic CSV" Click="BrowseAnodicButton_Click"/>
+                            <TextBox x:Name="AnodicCsvPath" Grid.Row="0" Grid.Column="1"
+                                     Margin="0,4,0,4" VerticalAlignment="Center"
+                                     ToolTip="Path to anodic CSV file"/>
+
+                            <Button x:Name="BrowseCathodicButton" Grid.Row="1" Grid.Column="0"
+                                    Margin="0,4,8,4" Height="30" Background="LightBlue" FontWeight="Bold"
+                                    Content="Browse Cathodic CSV" Click="BrowseCathodicButton_Click"/>
+                            <TextBox x:Name="CathodicCsvPath" Grid.Row="1" Grid.Column="1"
+                                     Margin="0,4,0,4" VerticalAlignment="Center"
+                                     ToolTip="Path to cathodic CSV file"/>
+
+                            <Button x:Name="BrowseXmlOutputFolderButton" Grid.Row="2" Grid.Column="0"
+                                    Margin="0,4,8,4" Height="30" Background="LightBlue" FontWeight="Bold"
+                                    Content="Browse Output Folder" Click="BrowseXmlOutputFolderButton_Click"/>
+                            <TextBox x:Name="XmlOutputFolder" Grid.Row="2" Grid.Column="1"
+                                     Margin="0,4,0,4" VerticalAlignment="Center"
+                                     ToolTip="Folder where the XML file will be saved"/>
+
+                            <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,4,8,4"
+                                       VerticalAlignment="Center" Text="Output filename:"/>
+                            <TextBox x:Name="XmlOutputFilename" Grid.Row="3" Grid.Column="1"
+                                     Margin="0,4,0,4" VerticalAlignment="Center"
+                                     ToolTip="Suggested XML output filename (auto-populated, editable)"/>
+                        </Grid>
+                    </GroupBox>
+
+                    <!-- Metadata -->
+                    <GroupBox Header="Metadata" Margin="0,0,0,8" Padding="8">
+                        <StackPanel>
+
+                            <!-- Institute -->
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
+                                <TextBlock Text="Institute:" VerticalAlignment="Center" Width="80"/>
+                                <TextBlock Text="Name:" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetaInstituteName" Width="120" Text="NRL" Margin="0,0,8,0"/>
+                                <TextBlock Text="City:" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetaCity" Width="100" Text="Washington" Margin="0,0,8,0"/>
+                                <TextBlock Text="State:" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetaState" Width="40" Text="DC" Margin="0,0,8,0"/>
+                                <TextBlock Text="Country:" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetaCountry" Width="60" Text="USA"/>
+                            </StackPanel>
+
+                            <!-- Material row 1 -->
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
+                                <TextBlock Text="Material:" VerticalAlignment="Center" Width="80"/>
+                                <TextBlock Text="UNS Code:" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetaUNSCode" Width="80" Margin="0,0,8,0"/>
+                                <TextBlock Text="Common Name:" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetaCommonName" Width="160" Text="sample"/>
+                            </StackPanel>
+
+                            <!-- Material row 2 -->
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
+                                <TextBlock VerticalAlignment="Center" Width="80"/>
+                                <TextBlock Text="Surface Prep:" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetaSurfacePrep" Width="200" Text="600 grit SiC" Margin="0,0,8,0"/>
+                                <TextBlock Text="Exposed Area (m²):" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetaExpArea" Width="110" Text="1.000000E-04"/>
+                            </StackPanel>
+
+                            <!-- Electrolyte row 1 -->
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
+                                <TextBlock Text="Electrolyte:" VerticalAlignment="Center" Width="80"/>
+                                <TextBlock Text="Cl⁻ (M):" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetaClConc" Width="50" Text="1" Margin="0,0,8,0"/>
+                                <TextBlock Text="pH:" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetapH" Width="40" Text="8" Margin="0,0,8,0"/>
+                                <TextBlock Text="O₂ (M):" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetaO2Conc" Width="70" Text="2.5E-4" Margin="0,0,8,0"/>
+                                <TextBlock Text="S²⁻ (M):" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetaS2Conc" Width="60" Text="0.08"/>
+                            </StackPanel>
+
+                            <!-- Electrolyte row 2 -->
+                            <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
+                                <TextBlock VerticalAlignment="Center" Width="80"/>
+                                <TextBlock Text="Temp (°C):" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetaTemperature" Width="50" Text="50" Margin="0,0,8,0"/>
+                                <TextBlock Text="Conductivity (S/m):" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetaConductivity" Width="50" Text="5" Margin="0,0,8,0"/>
+                                <TextBlock Text="Flow (m/s):" VerticalAlignment="Center" Margin="4,0,4,0"/>
+                                <TextBox x:Name="MetaFlow" Width="50" Text="0"/>
+                            </StackPanel>
+
+                        </StackPanel>
+                    </GroupBox>
+
+                    <!-- Generate button + status -->
+                    <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                        <Button x:Name="GenerateXmlButton" Width="160" Height="40"
+                                Background="LightGreen" FontWeight="Bold" BorderThickness="2"
+                                Content="Generate XML" Click="GenerateXmlButton_Click" Margin="0,0,16,0"/>
+                        <TextBox x:Name="XmlStatusBox" VerticalAlignment="Center"
+                                 Width="550" Text="Status" IsReadOnly="True"/>
+                    </StackPanel>
+
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+    </TabControl>
 </Window>
