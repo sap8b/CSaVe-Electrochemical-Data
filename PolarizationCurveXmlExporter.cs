@@ -112,53 +112,62 @@ namespace CSaVe_Electrochemical_Data
             {
                 // ── Single-file mode ────────────────────────────────────────────────────
                 // The file contains a full cyclic polarization sweep (forward + return).
+                // Works for both anodic-first (sweep up to Vmax then down) and
+                // cathodic-first (sweep down to Vmin then up) scans.
+
                 // 1. Parse the single file.
                 List<(double I, double V)> allPoints = ParseCsv(primaryCsvPath);
                 if (allPoints.Count == 0)
                     throw new InvalidOperationException("CSV contains no data points.");
 
-                // 2. Find the apex: index of maximum voltage.
-                int apexIndex = 0;
+                // 2. Find the global voltage apexes.
+                int apexMaxIndex = 0;
+                int apexMinIndex = 0;
                 for (int i = 1; i < allPoints.Count; i++)
                 {
-                    if (allPoints[i].V > allPoints[apexIndex].V)
-                        apexIndex = i;
+                    if (allPoints[i].V > allPoints[apexMaxIndex].V)
+                        apexMaxIndex = i;
+                    if (allPoints[i].V < allPoints[apexMinIndex].V)
+                        apexMinIndex = i;
                 }
 
-                // 3. Trim return sweep: keep only the forward sweep up to and including the apex.
-                var forwardSweep = allPoints.GetRange(0, apexIndex + 1);
-
-                // 4. Find E_corr: index of minimum |I| in the forward sweep.
-                int ecorrIndex = 0;
-                double minAbsI = Math.Abs(forwardSweep[0].I);
-                for (int i = 1; i < forwardSweep.Count; i++)
+                // 3. Find OCP: index of minimum |I| across all points.
+                int ocpIndex = 0;
+                double minAbsI = Math.Abs(allPoints[0].I);
+                for (int i = 1; i < allPoints.Count; i++)
                 {
-                    double absI = Math.Abs(forwardSweep[i].I);
+                    double absI = Math.Abs(allPoints[i].I);
                     if (absI < minAbsI)
                     {
                         minAbsI = absI;
-                        ecorrIndex = i;
+                        ocpIndex = i;
                     }
                 }
-                double vEcorr = forwardSweep[ecorrIndex].V;
+                double vOcp = allPoints[ocpIndex].V;
 
-                // 5. Split into branches on E_corr.
-                anodicTrimmed   = forwardSweep.Where(p => p.V >= vEcorr).ToList();
-                cathodicTrimmed = forwardSweep.Where(p => p.V <  vEcorr).ToList();
+                // 4. Determine scan direction by which apex occurs first.
+                //    Extract the two monotone segments between the apexes; any data after
+                //    the second apex (return sweep) is discarded automatically.
+                List<(double I, double V)> anodicSegment;
+                List<(double I, double V)> cathodicSegment;
 
-                // 5b. Trim cathodic apex: keep only the forward sweep down to the minimum voltage.
-                //     Mirrors the two-file cathodic trim: discard any points after the minimum
-                //     voltage (the "cathodic return" portion). No-op when cathodicTrimmed is empty.
-                if (cathodicTrimmed.Count > 0)
+                if (apexMaxIndex < apexMinIndex)
                 {
-                    int cathodicApexIndex = 0;
-                    for (int i = 1; i < cathodicTrimmed.Count; i++)
-                    {
-                        if (cathodicTrimmed[i].V < cathodicTrimmed[cathodicApexIndex].V)
-                            cathodicApexIndex = i;
-                    }
-                    cathodicTrimmed = cathodicTrimmed.GetRange(0, cathodicApexIndex + 1);
+                    // Anodic-first: data goes OCP → Vmax → Vmin
+                    anodicSegment   = allPoints.GetRange(0, apexMaxIndex + 1);
+                    cathodicSegment = allPoints.GetRange(apexMaxIndex + 1, apexMinIndex - apexMaxIndex);
                 }
+                else
+                {
+                    // Cathodic-first: data goes OCP → Vmin → Vmax
+                    cathodicSegment = allPoints.GetRange(0, apexMinIndex + 1);
+                    anodicSegment   = allPoints.GetRange(apexMinIndex + 1, apexMaxIndex - apexMinIndex);
+                }
+
+                // 5. Apply OCP boundary split: anodic branch keeps V >= V_ocp,
+                //    cathodic branch keeps V < V_ocp.
+                anodicTrimmed   = anodicSegment.Where(p => p.V >= vOcp).ToList();
+                cathodicTrimmed = cathodicSegment.Where(p => p.V < vOcp).ToList();
             }
             else
             {
