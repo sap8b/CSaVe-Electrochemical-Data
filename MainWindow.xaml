@@ -88,32 +88,55 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
                             <Button x:Name="BrowseAnodicButton" Grid.Row="0" Grid.Column="0"
                                     Margin="0,4,8,4" Height="30" Background="LightBlue" FontWeight="Bold"
-                                    Content="Browse Anodic CSV" Click="BrowseAnodicButton_Click"/>
+                                    Content="Browse Polarization CSV (or Anodic CSV)" Click="BrowseAnodicButton_Click"/>
                             <TextBox x:Name="AnodicCsvPath" Grid.Row="0" Grid.Column="1"
                                      Margin="0,4,0,4" VerticalAlignment="Center"
-                                     ToolTip="Path to anodic CSV file"/>
+                                     ToolTip="Path to the polarization CSV file (or anodic CSV when using two-file mode)"/>
 
-                            <Button x:Name="BrowseCathodicButton" Grid.Row="1" Grid.Column="0"
+                            <!-- Hint shown below the primary CSV field -->
+                            <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                       Margin="0,0,0,4" Foreground="Gray" FontStyle="Italic"
+                                       Text="If this file contains both branches, leave Cathodic CSV empty."/>
+
+                            <Button x:Name="BrowseCathodicButton" Grid.Row="2" Grid.Column="0"
                                     Margin="0,4,8,4" Height="30" Background="LightBlue" FontWeight="Bold"
-                                    Content="Browse Cathodic CSV" Click="BrowseCathodicButton_Click"/>
-                            <TextBox x:Name="CathodicCsvPath" Grid.Row="1" Grid.Column="1"
-                                     Margin="0,4,0,4" VerticalAlignment="Center"
-                                     ToolTip="Path to cathodic CSV file"/>
+                                    Content="Browse Cathodic CSV (optional)" Click="BrowseCathodicButton_Click"/>
+                            <!-- Cathodic path textbox with placeholder overlay -->
+                            <Grid Grid.Row="2" Grid.Column="1" Margin="0,4,0,4">
+                                <TextBox x:Name="CathodicCsvPath" VerticalAlignment="Center"
+                                         ToolTip="Path to cathodic CSV file (optional — leave empty for single-file mode)"/>
+                                <TextBlock IsHitTestVisible="False"
+                                           VerticalAlignment="Center" Margin="4,0,0,0"
+                                           Foreground="Gray" FontStyle="Italic"
+                                           Text="Leave empty to use single-file mode">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Hidden"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Text, ElementName=CathodicCsvPath}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
 
-                            <Button x:Name="BrowseXmlOutputFolderButton" Grid.Row="2" Grid.Column="0"
+                            <Button x:Name="BrowseXmlOutputFolderButton" Grid.Row="3" Grid.Column="0"
                                     Margin="0,4,8,4" Height="30" Background="LightBlue" FontWeight="Bold"
                                     Content="Browse Output Folder" Click="BrowseXmlOutputFolderButton_Click"/>
-                            <TextBox x:Name="XmlOutputFolder" Grid.Row="2" Grid.Column="1"
+                            <TextBox x:Name="XmlOutputFolder" Grid.Row="3" Grid.Column="1"
                                      Margin="0,4,0,4" VerticalAlignment="Center"
                                      ToolTip="Folder where the XML file will be saved"/>
 
-                            <TextBlock Grid.Row="3" Grid.Column="0" Margin="0,4,8,4"
+                            <TextBlock Grid.Row="4" Grid.Column="0" Margin="0,4,8,4"
                                        VerticalAlignment="Center" Text="Output filename:"/>
-                            <TextBox x:Name="XmlOutputFilename" Grid.Row="3" Grid.Column="1"
+                            <TextBox x:Name="XmlOutputFilename" Grid.Row="4" Grid.Column="1"
                                      Margin="0,4,0,4" VerticalAlignment="Center"
                                      ToolTip="Suggested XML output filename (auto-populated, editable)"/>
                         </Grid>

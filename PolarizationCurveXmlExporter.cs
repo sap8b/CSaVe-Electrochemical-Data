@@ -86,63 +86,119 @@ namespace CSaVe_Electrochemical_Data
         }
 
         /// <summary>
-        /// Exports a PolarizationCurve XML file by merging an anodic CSV and a cathodic CSV.
+        /// Exports a PolarizationCurve XML file from either a single cyclic polarization CSV
+        /// (single-file mode) or separate anodic and cathodic CSV files (two-file mode).
         /// </summary>
+        /// <param name="primaryCsvPath">
+        /// Required. Path to the anodic-only CSV, or to the full cyclic polarization CSV when
+        /// <paramref name="cathodicCsvPath"/> is null or empty.
+        /// </param>
+        /// <param name="cathodicCsvPath">
+        /// Optional. Path to the cathodic CSV. Pass null or an empty string to use single-file mode,
+        /// where both branches are extracted automatically from <paramref name="primaryCsvPath"/>.
+        /// </param>
+        /// <param name="outputXmlPath">Destination XML file path.</param>
+        /// <param name="metadata">Experiment metadata to embed in the XML.</param>
         public static void Export(
-            string anodicCsvPath,
+            string primaryCsvPath,
             string cathodicCsvPath,
             string outputXmlPath,
             PolarizationCurveMetadata metadata)
         {
-            // 1. Parse both CSV files
-            List<(double I, double V)> anodicPoints = ParseCsv(anodicCsvPath);
-            List<(double I, double V)> cathodicPoints = ParseCsv(cathodicCsvPath);
+            List<(double I, double V)> anodicTrimmed;
+            List<(double I, double V)> cathodicTrimmed;
 
-            if (anodicPoints.Count == 0)
-                throw new InvalidOperationException("Anodic CSV contains no data points.");
-            if (cathodicPoints.Count == 0)
-                throw new InvalidOperationException("Cathodic CSV contains no data points.");
-
-            // 2. Trim anodic return sweep: keep only the forward sweep up to the apex (max voltage).
-            //    Cyclic polarization goes up to the apex then returns; discard the return portion.
-            int anodicApexIndex = 0;
-            for (int i = 1; i < anodicPoints.Count; i++)
+            if (string.IsNullOrWhiteSpace(cathodicCsvPath))
             {
-                if (anodicPoints[i].V > anodicPoints[anodicApexIndex].V)
-                    anodicApexIndex = i;
-            }
-            anodicPoints = anodicPoints.GetRange(0, anodicApexIndex + 1);
+                // ── Single-file mode ────────────────────────────────────────────────────
+                // The file contains a full cyclic polarization sweep (forward + return).
+                // 1. Parse the single file.
+                List<(double I, double V)> allPoints = ParseCsv(primaryCsvPath);
+                if (allPoints.Count == 0)
+                    throw new InvalidOperationException("CSV contains no data points.");
 
-            // 3. Trim cathodic return sweep: keep only the forward sweep down to the apex (min voltage).
-            int cathodicApexIndex = 0;
-            for (int i = 1; i < cathodicPoints.Count; i++)
-            {
-                if (cathodicPoints[i].V < cathodicPoints[cathodicApexIndex].V)
-                    cathodicApexIndex = i;
-            }
-            cathodicPoints = cathodicPoints.GetRange(0, cathodicApexIndex + 1);
-
-            // 4. Find E_corr: index with minimum |I| in anodic CSV
-            int ecorrIndex = 0;
-            double minAbsI = Math.Abs(anodicPoints[0].I);
-            for (int i = 1; i < anodicPoints.Count; i++)
-            {
-                double absI = Math.Abs(anodicPoints[i].I);
-                if (absI < minAbsI)
+                // 2. Find the apex: index of maximum voltage.
+                int apexIndex = 0;
+                for (int i = 1; i < allPoints.Count; i++)
                 {
-                    minAbsI = absI;
-                    ecorrIndex = i;
+                    if (allPoints[i].V > allPoints[apexIndex].V)
+                        apexIndex = i;
                 }
+
+                // 3. Trim return sweep: keep only the forward sweep up to and including the apex.
+                var forwardSweep = allPoints.GetRange(0, apexIndex + 1);
+
+                // 4. Find E_corr: index of minimum |I| in the forward sweep.
+                int ecorrIndex = 0;
+                double minAbsI = Math.Abs(forwardSweep[0].I);
+                for (int i = 1; i < forwardSweep.Count; i++)
+                {
+                    double absI = Math.Abs(forwardSweep[i].I);
+                    if (absI < minAbsI)
+                    {
+                        minAbsI = absI;
+                        ecorrIndex = i;
+                    }
+                }
+                double vEcorr = forwardSweep[ecorrIndex].V;
+
+                // 5. Split into branches on E_corr.
+                anodicTrimmed   = forwardSweep.Where(p => p.V >= vEcorr).ToList();
+                cathodicTrimmed = forwardSweep.Where(p => p.V <  vEcorr).ToList();
             }
-            double vEcorr = anodicPoints[ecorrIndex].V;
+            else
+            {
+                // ── Two-file mode (original behaviour) ──────────────────────────────────
+                // 1. Parse both CSV files.
+                List<(double I, double V)> anodicPoints   = ParseCsv(primaryCsvPath);
+                List<(double I, double V)> cathodicPoints = ParseCsv(cathodicCsvPath);
 
-            // 5. Trim anodic branch: keep points where V >= V_ecorr.
-            //    The anodic (oxidation) sweep runs from E_corr upward in voltage.
-            var anodicTrimmed = anodicPoints.Where(p => p.V >= vEcorr).ToList();
+                if (anodicPoints.Count == 0)
+                    throw new InvalidOperationException("Anodic CSV contains no data points.");
+                if (cathodicPoints.Count == 0)
+                    throw new InvalidOperationException("Cathodic CSV contains no data points.");
 
-            // 6. Trim cathodic branch: keep points where V < V_ecorr (remove overlap near E_corr).
-            //    The cathodic (reduction) sweep runs from near E_corr downward in voltage.
-            var cathodicTrimmed = cathodicPoints.Where(p => p.V < vEcorr).ToList();
+                // 2. Trim anodic return sweep: keep only the forward sweep up to the apex (max voltage).
+                //    Cyclic polarization goes up to the apex then returns; discard the return portion.
+                int anodicApexIndex = 0;
+                for (int i = 1; i < anodicPoints.Count; i++)
+                {
+                    if (anodicPoints[i].V > anodicPoints[anodicApexIndex].V)
+                        anodicApexIndex = i;
+                }
+                anodicPoints = anodicPoints.GetRange(0, anodicApexIndex + 1);
+
+                // 3. Trim cathodic return sweep: keep only the forward sweep down to the apex (min voltage).
+                int cathodicApexIndex = 0;
+                for (int i = 1; i < cathodicPoints.Count; i++)
+                {
+                    if (cathodicPoints[i].V < cathodicPoints[cathodicApexIndex].V)
+                        cathodicApexIndex = i;
+                }
+                cathodicPoints = cathodicPoints.GetRange(0, cathodicApexIndex + 1);
+
+                // 4. Find E_corr: index with minimum |I| in anodic CSV.
+                int ecorrIndex = 0;
+                double minAbsI = Math.Abs(anodicPoints[0].I);
+                for (int i = 1; i < anodicPoints.Count; i++)
+                {
+                    double absI = Math.Abs(anodicPoints[i].I);
+                    if (absI < minAbsI)
+                    {
+                        minAbsI = absI;
+                        ecorrIndex = i;
+                    }
+                }
+                double vEcorr = anodicPoints[ecorrIndex].V;
+
+                // 5. Trim anodic branch: keep points where V >= V_ecorr.
+                //    The anodic (oxidation) sweep runs from E_corr upward in voltage.
+                anodicTrimmed = anodicPoints.Where(p => p.V >= vEcorr).ToList();
+
+                // 6. Trim cathodic branch: keep points where V < V_ecorr (remove overlap near E_corr).
+                //    The cathodic (reduction) sweep runs from near E_corr downward in voltage.
+                cathodicTrimmed = cathodicPoints.Where(p => p.V < vEcorr).ToList();
+            }
 
             // 7. Combine and sort ascending by voltage
             var merged = anodicTrimmed.Concat(cathodicTrimmed)
