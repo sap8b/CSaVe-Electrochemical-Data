@@ -155,13 +155,13 @@ namespace CSaVe_Electrochemical_Data
                 {
                     // Anodic-first: data goes OCP → Vmax → Vmin
                     anodicSegment   = allPoints.GetRange(0, apexMaxIndex + 1);
-                    cathodicSegment = allPoints.GetRange(apexMaxIndex, apexMinIndex - apexMaxIndex + 1);
+                    cathodicSegment = allPoints.GetRange(apexMaxIndex + 1, apexMinIndex - apexMaxIndex);
                 }
                 else
                 {
                     // Cathodic-first: data goes OCP → Vmin → Vmax
                     cathodicSegment = allPoints.GetRange(0, apexMinIndex + 1);
-                    anodicSegment   = allPoints.GetRange(apexMinIndex, apexMaxIndex - apexMinIndex + 1);
+                    anodicSegment   = allPoints.GetRange(apexMinIndex + 1, apexMaxIndex - apexMinIndex);
                 }
 
                 // 5. Apply OCP boundary split: anodic branch keeps V >= V_ocp,
