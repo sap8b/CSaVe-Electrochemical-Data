@@ -13,7 +13,6 @@
             <Grid Margin="10">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="220"/>
-                    <ColumnDefinition Width="300"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
@@ -47,27 +46,28 @@
                 <!-- Path / status textboxes -->
                 <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,8,0,0" VerticalAlignment="Center">
                     <TextBlock Text="Parent DTA folder:" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <TextBox x:Name="ParentFolder" Width="290" HorizontalAlignment="Left" Text="Parent DTA folder"/>
+                    <TextBox x:Name="ParentFolder" HorizontalAlignment="Stretch" Text="Parent DTA folder"/>
                 </StackPanel>
                 <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,8,0,0" VerticalAlignment="Center">
                     <TextBlock Text="Output CSV folder:" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <TextBox x:Name="OutputFolder" Width="290" HorizontalAlignment="Left" Text="Parent CSV folder"/>
+                    <TextBox x:Name="OutputFolder" HorizontalAlignment="Stretch" Text="Parent CSV folder"/>
                 </StackPanel>
                 <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,8,0,0" VerticalAlignment="Center">
                     <TextBlock Text="Status:" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <TextBox x:Name="StatusBox" Width="290" HorizontalAlignment="Left" Text="Status"/>
+                    <TextBox x:Name="StatusBox" HorizontalAlignment="Stretch" Text="Status"/>
                 </StackPanel>
 
-                <!-- Data files list -->
-                <StackPanel Grid.Row="0" Grid.Column="2" Grid.RowSpan="5" Margin="20,8,0,0">
-                    <TextBlock Text="Data files found:" FontWeight="SemiBold" Margin="0,0,0,2"/>
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" Height="490">
-                        <TextBox x:Name="DataFilesTextBox" Width="320" Text="Datafiles"
-                                 TextWrapping="NoWrap" AcceptsReturn="True"
-                                 VerticalScrollBarVisibility="Disabled"
-                                 HorizontalScrollBarVisibility="Disabled"/>
-                    </ScrollViewer>
-                </StackPanel>
+                <!-- Data files list — full-width section below buttons -->
+                <TextBlock Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
+                           Text="Data files found:" FontWeight="SemiBold" Margin="0,12,0,2"/>
+                <ScrollViewer Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="2"
+                              VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                    <TextBox x:Name="DataFilesTextBox" Text="Datafiles"
+                             TextWrapping="NoWrap" AcceptsReturn="True" IsReadOnly="True"
+                             Height="180"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto"/>
+                </ScrollViewer>
             </Grid>
         </TabItem>
 
