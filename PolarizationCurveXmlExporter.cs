@@ -68,10 +68,12 @@ namespace CSaVe_Electrochemical_Data
             }
             double vEcorr = anodicPoints[ecorrIndex].V;
 
-            // 3. Trim anodic branch: keep points where V >= V_ecorr
+            // 3. Trim anodic branch: keep points where V >= V_ecorr.
+            //    The anodic (oxidation) sweep runs from E_corr upward in voltage.
             var anodicTrimmed = anodicPoints.Where(p => p.V >= vEcorr).ToList();
 
-            // 4. Trim cathodic branch: keep points where V < V_ecorr
+            // 4. Trim cathodic branch: keep points where V < V_ecorr (remove overlap near E_corr).
+            //    The cathodic (reduction) sweep runs from near E_corr downward in voltage.
             var cathodicTrimmed = cathodicPoints.Where(p => p.V < vEcorr).ToList();
 
             // 5. Combine and sort ascending by voltage
@@ -131,6 +133,8 @@ namespace CSaVe_Electrochemical_Data
                 double voltage = merged[n].V;
 
                 WriteValueWithUnits(writer, "point", "unitless", (n + 1).ToString());
+                // Component currents (anodici, orri, heri) are set to 0 for raw experimental data.
+                // The CSaVe schema reserves these fields for model-fitted components.
                 WriteValueWithUnits(writer, "anodici", "A/m2", "0");
                 WriteValueWithUnits(writer, "orri", "A/m2", "0");
                 WriteValueWithUnits(writer, "heri", "A/m2", "0");

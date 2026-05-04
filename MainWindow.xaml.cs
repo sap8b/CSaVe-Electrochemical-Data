@@ -966,23 +966,25 @@ namespace CSaVe_Electrochemical_Data
             if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
             {
                 XmlOutputFolder.Text = dlg.SelectedPath;
-                // Re-derive the full suggested path if we have a filename already
-                if (!string.IsNullOrWhiteSpace(XmlOutputFilename.Text))
-                {
-                    string fn = System.IO.Path.GetFileName(XmlOutputFilename.Text);
-                    XmlOutputFilename.Text = System.IO.Path.Combine(dlg.SelectedPath, fn);
-                }
+                // Update the directory component of the suggested filename, preserving any user-edited filename.
+                // Only update if XmlOutputFilename does not already contain a custom directory path.
+                string existingText = XmlOutputFilename.Text?.Trim() ?? string.Empty;
+                string existingFilename = System.IO.Path.GetFileName(existingText);
+                if (!string.IsNullOrWhiteSpace(existingFilename))
+                    XmlOutputFilename.Text = System.IO.Path.Combine(dlg.SelectedPath, existingFilename);
             }
         }
 
         /// <summary>
         /// Derives the suggested XML output filename from the anodic CSV path.
+        /// Expected anodic filename format: {BaseName}Anodic{optional_digits}.csv
         /// E.g. "HY80Anodic1.csv" → "HY80_polarization.xml"
         /// </summary>
         private void AutoPopulateXmlFilename(string anodicPath)
         {
             string baseName = System.IO.Path.GetFileNameWithoutExtension(anodicPath);
-            // Remove trailing "Anodic" (case-insensitive) followed by optional digits
+            // Remove trailing "Anodic" (case-insensitive) followed by optional digits,
+            // e.g. "HY80Anodic1" → "HY80", "SteelAnodic" → "Steel"
             string stripped = Regex.Replace(baseName, @"(?i)Anodic\d*$", "");
             string suggestedName = stripped + "_polarization.xml";
 
