@@ -145,6 +145,20 @@ namespace CSaVe_Electrochemical_Data
                 // 5. Split into branches on E_corr.
                 anodicTrimmed   = forwardSweep.Where(p => p.V >= vEcorr).ToList();
                 cathodicTrimmed = forwardSweep.Where(p => p.V <  vEcorr).ToList();
+
+                // 5b. Trim cathodic apex: keep only the forward sweep down to the minimum voltage.
+                //     Mirrors the two-file cathodic trim: discard any points after the minimum
+                //     voltage (the "cathodic return" portion). No-op when cathodicTrimmed is empty.
+                if (cathodicTrimmed.Count > 0)
+                {
+                    int cathodicApexIndex = 0;
+                    for (int i = 1; i < cathodicTrimmed.Count; i++)
+                    {
+                        if (cathodicTrimmed[i].V < cathodicTrimmed[cathodicApexIndex].V)
+                            cathodicApexIndex = i;
+                    }
+                    cathodicTrimmed = cathodicTrimmed.GetRange(0, cathodicApexIndex + 1);
+                }
             }
             else
             {
