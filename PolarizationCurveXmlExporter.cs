@@ -285,8 +285,8 @@ namespace CSaVe_Electrochemical_Data
                 WriteValueWithUnits(writer, "anodici", "A/m2", "0");
                 WriteValueWithUnits(writer, "orri", "A/m2", "0");
                 WriteValueWithUnits(writer, "heri", "A/m2", "0");
-                WriteValueWithUnits(writer, "totali", "A/m2", currentDensity.ToString("G6", CultureInfo.InvariantCulture));
-                WriteValueWithUnits(writer, "Vapp", "Vsce", voltage.ToString("F2", CultureInfo.InvariantCulture));
+                WriteValueWithUnits(writer, "totali", "A/m2", currentDensity.ToString("E6", CultureInfo.InvariantCulture));
+                WriteValueWithUnits(writer, "Vapp", "Vsce", voltage.ToString("F6", CultureInfo.InvariantCulture));
             }
             writer.WriteEndElement(); // Data
 
