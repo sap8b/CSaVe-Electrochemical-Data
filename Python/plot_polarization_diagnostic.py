@@ -509,14 +509,55 @@ def main():
     # Cathodic DTA branch — thin red dotted
     if V_cat_dta is not None and len(V_cat_dta) > 0:
         ax.plot(
-            to_density(I_cat_dta), V_cat_dta,
+            np.abs(to_density(I_cat_dta)), V_cat_dta,
             linestyle=":", linewidth=1, color="red", label="Cathodic DTA",
         )
 
     # XML (merged) — thick black solid
+    # Split into anodic (totali >= 0) and cathodic (totali < 0) sub-branches,
+    # sort each to eliminate the zigzag artefact caused by Vapp quantization in
+    # the XML exporter, then concatenate into a single continuous trace.
     if V_xml is not None and len(V_xml) > 0:
+        # Estimate E_corr from XML when no DTA files were supplied.
+        if v_ecorr is None:
+            v_ecorr = V_xml[np.argmin(np.abs(I_xml))]
+
+        # Use strictly positive values for anodic branch (log scale requires > 0).
+        an_mask = I_xml > 0
+        cat_mask = I_xml < 0
+
+        V_an_xml = V_xml[an_mask]
+        I_an_xml = I_xml[an_mask]
+        V_cat_xml = V_xml[cat_mask]
+        I_cat_xml = I_xml[cat_mask]
+
+        # Anodic branch: sort by Vapp ascending, then by totali ascending within
+        # the same (quantized) voltage bucket.
+        if len(V_an_xml) > 0:
+            an_sort_idx = np.lexsort((I_an_xml, V_an_xml))
+            V_an_sorted = V_an_xml[an_sort_idx]
+            I_an_sorted = I_an_xml[an_sort_idx]
+        else:
+            V_an_sorted = V_an_xml
+            I_an_sorted = I_an_xml
+
+        # Cathodic branch: sort by Vapp descending (from E_corr downward toward
+        # more negative potentials), then by abs(totali) ascending within the
+        # same bucket.
+        if len(V_cat_xml) > 0:
+            cat_sort_idx = np.lexsort((np.abs(I_cat_xml), -V_cat_xml))
+            V_cat_sorted = V_cat_xml[cat_sort_idx]
+            abs_I_cat_sorted = np.abs(I_cat_xml[cat_sort_idx])
+        else:
+            V_cat_sorted = V_cat_xml
+            abs_I_cat_sorted = np.abs(I_cat_xml)
+
+        # Cathodic branch first (downward from E_corr), then anodic (upward).
+        x_xml = np.concatenate([abs_I_cat_sorted, I_an_sorted])
+        y_xml = np.concatenate([V_cat_sorted, V_an_sorted])
+
         ax.plot(
-            I_xml, V_xml,
+            x_xml, y_xml,
             linestyle="-", linewidth=2.5, color="black", label="XML (merged)",
         )
 
@@ -535,9 +576,9 @@ def main():
             va="bottom",
         )
 
-    # Axes — Evans diagram: potential on Y, current density on X (symlog)
-    ax.set_xscale("symlog", linthresh=0.1)
-    ax.set_xlabel("Current Density (A/m²)")
+    # Axes — Evans diagram: potential on Y, current density on X (log)
+    ax.set_xscale("log")
+    ax.set_xlabel("|Current Density| (A/m²)")
     ax.set_ylabel("Potential (V vs. SCE)")
     ax.set_title(title)
     ax.legend(loc="best", fontsize=9)
