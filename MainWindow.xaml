@@ -181,7 +181,7 @@
                             <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
                                 <TextBlock Text="Electrolyte:" VerticalAlignment="Center" Width="80"/>
                                 <TextBlock Text="Cl⁻ (M):" VerticalAlignment="Center" Margin="4,0,4,0"/>
-                                <TextBox x:Name="MetaClConc" Width="50" Text="1" Margin="0,0,8,0"/>
+                                <TextBox x:Name="MetaClConc" Width="50" Text="0.6" Margin="0,0,8,0"/>
                                 <TextBlock Text="pH:" VerticalAlignment="Center" Margin="4,0,4,0"/>
                                 <TextBox x:Name="MetapH" Width="40" Text="8" Margin="0,0,8,0"/>
                                 <TextBlock Text="O₂ (M):" VerticalAlignment="Center" Margin="4,0,4,0"/>
@@ -194,7 +194,7 @@
                             <StackPanel Orientation="Horizontal" Margin="0,4,0,4">
                                 <TextBlock VerticalAlignment="Center" Width="80"/>
                                 <TextBlock Text="Temp (°C):" VerticalAlignment="Center" Margin="4,0,4,0"/>
-                                <TextBox x:Name="MetaTemperature" Width="50" Text="50" Margin="0,0,8,0"/>
+                                <TextBox x:Name="MetaTemperature" Width="50" Text="25" Margin="0,0,8,0"/>
                                 <TextBlock Text="Conductivity (S/m):" VerticalAlignment="Center" Margin="4,0,4,0"/>
                                 <TextBox x:Name="MetaConductivity" Width="50" Text="5" Margin="0,0,8,0"/>
                                 <TextBlock Text="Flow (m/s):" VerticalAlignment="Center" Margin="4,0,4,0"/>
