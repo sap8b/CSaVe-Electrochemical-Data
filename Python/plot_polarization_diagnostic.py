@@ -215,24 +215,23 @@ def parse_xml(path):
 # ---------------------------------------------------------------------------
 
 def split_single_file_branches(V, I):
-    """Split a full cyclic polarization sweep into anodic and cathodic branches.
+    """Split a single-file polarization CSV into anodic and cathodic branches.
 
     This mirrors the branch-splitting logic in ``PolarizationCurveXmlExporter.cs``
-    (steps 2–5 of single-file mode):
+    (single-file mode):
 
-    1. Find the global voltage maximum (apexMax) and minimum (apexMin).
-    2. Determine scan direction: whichever apex comes first in the time series
-       defines the first sweep direction.
-       - Anodic-first  (apexMax < apexMin): data goes OCP → Vmax → Vmin
-       - Cathodic-first (apexMin < apexMax): data goes OCP → Vmin → Vmax
-       Data after the second apex (return sweep) is discarded.
-    3. Find OCP (E_corr) as the point of minimum |I| across all data.
-    4. Trim: anodic segment keeps V >= V_ocp; cathodic segment keeps V < V_ocp.
+    1. Sort all data points by voltage (ascending) so the potential axis is
+       monotonically increasing, regardless of the order in the file.  This
+       handles both a true cyclic sweep and two separate scans (anodic +
+       cathodic) that have been concatenated into one file.
+    2. Find OCP (E_corr) as the point of minimum |I| in the sorted data.
+    3. Split at OCP: anodic branch keeps V >= V_ocp; cathodic branch keeps
+       V < V_ocp.
 
     Parameters
     ----------
     V, I : array_like
-        Voltage (V) and current (A) from the DTA file, in acquisition order.
+        Voltage (V) and current (A) from the DTA/CSV file, in any order.
 
     Returns
     -------
@@ -243,35 +242,24 @@ def split_single_file_branches(V, I):
     V = np.asarray(V, dtype=float)
     I = np.asarray(I, dtype=float)
 
-    apex_max_idx = int(np.argmax(V))
-    apex_min_idx = int(np.argmin(V))
+    # Sort ascending by voltage to ensure a monotonic potential axis.
+    sort_idx = np.argsort(V)
+    V = V[sort_idx]
+    I = I[sort_idx]
 
-    # OCP: point of minimum |I| in the full sweep
+    # OCP: point of minimum |I| in the sorted data.
     ocp_idx = int(np.argmin(np.abs(I)))
     v_ocp = V[ocp_idx]
 
-    if apex_max_idx < apex_min_idx:
-        # Anodic-first sweep: OCP → Vmax → Vmin
-        anodic_seg_V = V[: apex_max_idx + 1]
-        anodic_seg_I = I[: apex_max_idx + 1]
-        cathodic_seg_V = V[apex_max_idx + 1 : apex_min_idx + 1]
-        cathodic_seg_I = I[apex_max_idx + 1 : apex_min_idx + 1]
-    else:
-        # Cathodic-first sweep: OCP → Vmin → Vmax
-        cathodic_seg_V = V[: apex_min_idx + 1]
-        cathodic_seg_I = I[: apex_min_idx + 1]
-        anodic_seg_V = V[apex_min_idx + 1 : apex_max_idx + 1]
-        anodic_seg_I = I[apex_min_idx + 1 : apex_max_idx + 1]
-
-    # Trim at OCP boundary
-    an_mask = anodic_seg_V >= v_ocp
-    cat_mask = cathodic_seg_V < v_ocp
+    # Split at OCP boundary.
+    an_mask = V >= v_ocp
+    cat_mask = V < v_ocp
 
     return (
-        anodic_seg_V[an_mask],
-        anodic_seg_I[an_mask],
-        cathodic_seg_V[cat_mask],
-        cathodic_seg_I[cat_mask],
+        V[an_mask],
+        I[an_mask],
+        V[cat_mask],
+        I[cat_mask],
         v_ocp,
     )
 
