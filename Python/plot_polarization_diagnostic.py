@@ -541,18 +541,18 @@ def main():
             V_an_sorted = V_an_xml
             I_an_sorted = I_an_xml
 
-        # Cathodic branch: sort by Vapp descending (from E_corr downward toward
-        # more negative potentials), then by abs(totali) ascending within the
-        # same bucket.
+        # Cathodic branch: sort by Vapp ascending (from V_min upward toward
+        # E_corr), then by abs(totali) ascending within the same bucket, so the
+        # concatenated trace reads V_min → E_corr → V_max with no back-jump.
         if len(V_cat_xml) > 0:
-            cat_sort_idx = np.lexsort((np.abs(I_cat_xml), -V_cat_xml))
+            cat_sort_idx = np.lexsort((np.abs(I_cat_xml), V_cat_xml))
             V_cat_sorted = V_cat_xml[cat_sort_idx]
             abs_I_cat_sorted = np.abs(I_cat_xml[cat_sort_idx])
         else:
             V_cat_sorted = V_cat_xml
             abs_I_cat_sorted = np.abs(I_cat_xml)
 
-        # Cathodic branch first (downward from E_corr), then anodic (upward).
+        # Cathodic branch first (V_min upward toward E_corr), then anodic (upward from E_corr to V_max).
         x_xml = np.concatenate([abs_I_cat_sorted, I_an_sorted])
         y_xml = np.concatenate([V_cat_sorted, V_an_sorted])
 
