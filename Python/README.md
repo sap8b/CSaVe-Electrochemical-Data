@@ -45,11 +45,13 @@ omit the DTA arguments to plot only the XML trace.
 
 ### What the script produces
 
-* An **Evans/polarization diagram** (potential on Y-axis, current density on
-  X-axis with symmetric-log scale) showing:
+* An **Evans/polarization diagram** (potential on Y-axis, |current density| on
+  X-axis with log scale) showing:
   * Thin **blue dotted** line – anodic DTA branch
-  * Thin **red dotted** line – cathodic DTA branch
-  * Thick **black solid** line – merged XML data
+  * Thin **red dotted** line – cathodic DTA branch (absolute-valued)
+  * Thick **black solid** line – merged XML data (anodic and cathodic
+    sub-branches sorted to remove the quantization zigzag, cathodic
+    values absolute-valued)
   * Dashed **grey** horizontal line – E\_corr (OCP)
 
 * **Stdout diagnostics** including:
