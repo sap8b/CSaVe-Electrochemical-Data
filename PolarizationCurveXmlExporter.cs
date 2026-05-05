@@ -86,16 +86,21 @@ namespace CSaVe_Electrochemical_Data
         }
 
         /// <summary>
-        /// Exports a PolarizationCurve XML file from either a single cyclic polarization CSV
-        /// (single-file mode) or separate anodic and cathodic CSV files (two-file mode).
+        /// Exports a PolarizationCurve XML file from either a single CSV (single-file mode)
+        /// or separate anodic and cathodic CSV files (two-file mode).
         /// </summary>
         /// <param name="primaryCsvPath">
-        /// Required. Path to the anodic-only CSV, or to the full cyclic polarization CSV when
+        /// Required. Path to the anodic-only CSV, or to the single combined CSV when
         /// <paramref name="cathodicCsvPath"/> is null or empty.
         /// </param>
         /// <param name="cathodicCsvPath">
         /// Optional. Path to the cathodic CSV. Pass null or an empty string to use single-file mode,
         /// where both branches are extracted automatically from <paramref name="primaryCsvPath"/>.
+        /// In single-file mode the CSV may contain either a true cyclic potentiodynamic sweep or
+        /// two separate scans (anodic + cathodic) concatenated into one file.  All rows are sorted
+        /// by voltage so that the potential axis is monotonically increasing, OCP is located as the
+        /// point of minimum |I| in the sorted data, and the data are then split at OCP into the
+        /// anodic (V &gt;= V_ocp) and cathodic (V &lt; V_ocp) branches.
         /// </param>
         /// <param name="outputXmlPath">Destination XML file path.</param>
         /// <param name="metadata">Experiment metadata to embed in the XML.</param>
@@ -110,28 +115,23 @@ namespace CSaVe_Electrochemical_Data
 
             if (string.IsNullOrWhiteSpace(cathodicCsvPath))
             {
-                // ── Single-file mode ────────────────────────────────────────────────────
-                // The file contains a full cyclic polarization sweep (forward + return).
-                // Works for both anodic-first (sweep up to Vmax then down) and
-                // cathodic-first (sweep down to Vmin then up) scans.
+                // ── Single-file mode ─────────────────────────────────────────────────────
+                // The CSV may contain a true cyclic sweep OR two separate scans
+                // (anodic + cathodic) concatenated into one file.  In either case the
+                // correct approach is the same: sort all rows by voltage so that the
+                // potential axis is monotonically increasing, then locate OCP as the
+                // point of minimum |I|, and finally split the sorted data at OCP into
+                // the anodic (V >= V_ocp) and cathodic (V < V_ocp) branches.
 
                 // 1. Parse the single file.
                 List<(double I, double V)> allPoints = ParseCsv(primaryCsvPath);
                 if (allPoints.Count == 0)
                     throw new InvalidOperationException("CSV contains no data points.");
 
-                // 2. Find the global voltage apexes.
-                int apexMaxIndex = 0;
-                int apexMinIndex = 0;
-                for (int i = 1; i < allPoints.Count; i++)
-                {
-                    if (allPoints[i].V > allPoints[apexMaxIndex].V)
-                        apexMaxIndex = i;
-                    if (allPoints[i].V < allPoints[apexMinIndex].V)
-                        apexMinIndex = i;
-                }
+                // 2. Sort ascending by voltage to ensure a monotonic potential axis.
+                allPoints = allPoints.OrderBy(p => p.V).ToList();
 
-                // 3. Find OCP: index of minimum |I| across all points.
+                // 3. Find OCP: the point of minimum |I| in the sorted list.
                 int ocpIndex = 0;
                 double minAbsI = Math.Abs(allPoints[0].I);
                 for (int i = 1; i < allPoints.Count; i++)
@@ -145,29 +145,11 @@ namespace CSaVe_Electrochemical_Data
                 }
                 double vOcp = allPoints[ocpIndex].V;
 
-                // 4. Determine scan direction by which apex occurs first.
-                //    Extract the two monotone segments between the apexes; any data after
-                //    the second apex (return sweep) is discarded automatically.
-                List<(double I, double V)> anodicSegment;
-                List<(double I, double V)> cathodicSegment;
-
-                if (apexMaxIndex < apexMinIndex)
-                {
-                    // Anodic-first: data goes OCP → Vmax → Vmin
-                    anodicSegment   = allPoints.GetRange(0, apexMaxIndex + 1);
-                    cathodicSegment = allPoints.GetRange(apexMaxIndex + 1, apexMinIndex - apexMaxIndex);
-                }
-                else
-                {
-                    // Cathodic-first: data goes OCP → Vmin → Vmax
-                    cathodicSegment = allPoints.GetRange(0, apexMinIndex + 1);
-                    anodicSegment   = allPoints.GetRange(apexMinIndex + 1, apexMaxIndex - apexMinIndex);
-                }
-
-                // 5. Apply OCP boundary split: anodic branch keeps V >= V_ocp,
-                //    cathodic branch keeps V < V_ocp.
-                anodicTrimmed   = anodicSegment.Where(p => p.V >= vOcp).ToList();
-                cathodicTrimmed = cathodicSegment.Where(p => p.V < vOcp).ToList();
+                // 4. Split at OCP.
+                //    Anodic branch: oxidation region, keep V >= V_ocp.
+                //    Cathodic branch: reduction region, keep V < V_ocp.
+                anodicTrimmed   = allPoints.Where(p => p.V >= vOcp).ToList();
+                cathodicTrimmed = allPoints.Where(p => p.V <  vOcp).ToList();
             }
             else
             {
