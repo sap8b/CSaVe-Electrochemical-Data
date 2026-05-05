@@ -171,7 +171,25 @@ namespace CSaVe_Electrochemical_Data
             }
             else
             {
-                // ── Two-file mode (original behaviour) ──────────────────────────────────
+                // ── Two-file mode ────────────────────────────────────────────────────────
+                //
+                // The anodic and cathodic experiments are run in separate potentiostatic
+                // sessions and the open-circuit potential (OCP) can drift slightly between
+                // them.  To produce a well-aligned merged curve the following steps are
+                // applied after trimming each forward sweep to its apex:
+                //
+                //   a. OCP is found independently in each branch as the voltage at min |I|.
+                //   b. The half-difference between the two OCPs is computed.
+                //   c. The anodic branch potentials are shifted down by halfDiff and the
+                //      cathodic branch potentials are shifted up by halfDiff so that both
+                //      branches share a common aligned OCP (vOcpMid).
+                //   d. Both branches are then trimmed at vOcpMid to remove the small
+                //      "wrong-side" segment that each experiment starts on (typically the
+                //      instrument begins ~20 mV on the opposite side of OCP).
+                //
+                // This alignment eliminates the gap or step artefact visible near OCP in
+                // the merged XML when the two experiments are not perfectly matched.
+
                 // 1. Parse both CSV files.
                 List<(double I, double V)> anodicPoints   = ParseCsv(primaryCsvPath);
                 List<(double I, double V)> cathodicPoints = ParseCsv(cathodicCsvPath);
@@ -191,36 +209,69 @@ namespace CSaVe_Electrochemical_Data
                 }
                 anodicPoints = anodicPoints.GetRange(0, anodicApexIndex + 1);
 
-                // 3. Trim cathodic return sweep: keep only the forward sweep down to the apex (min voltage).
+                // 3. Trim cathodic return sweep using a noise-tolerant forward scan.
+                //    Scan forward tracking the running minimum.  Stop as soon as V rises
+                //    more than apexNoiseTolerance above the running minimum — this signals
+                //    the turn-around onto the return sweep, even if there is a fractional
+                //    overshoot at the true apex due to instrument noise.
+                const double apexNoiseTolerance = 0.005; // 5 mV
                 int cathodicApexIndex = 0;
+                double runningMinV = cathodicPoints[0].V;
                 for (int i = 1; i < cathodicPoints.Count; i++)
                 {
-                    if (cathodicPoints[i].V < cathodicPoints[cathodicApexIndex].V)
+                    if (cathodicPoints[i].V <= runningMinV)
+                    {
+                        runningMinV = cathodicPoints[i].V;
                         cathodicApexIndex = i;
+                    }
+                    else if (cathodicPoints[i].V > runningMinV + apexNoiseTolerance)
+                    {
+                        // V has risen clearly above the running minimum — we are on the return sweep.
+                        break;
+                    }
+                    // else: V is within the noise band above the running minimum — keep scanning.
                 }
                 cathodicPoints = cathodicPoints.GetRange(0, cathodicApexIndex + 1);
 
-                // 4. Find E_corr: index with minimum |I| in anodic CSV.
-                int ecorrIndex = 0;
-                double minAbsI = Math.Abs(anodicPoints[0].I);
+                // 4. Find OCP from the anodic branch: V at min |I|.
+                int anOcpIdx = 0;
+                double anMinAbsI = Math.Abs(anodicPoints[0].I);
                 for (int i = 1; i < anodicPoints.Count; i++)
                 {
                     double absI = Math.Abs(anodicPoints[i].I);
-                    if (absI < minAbsI)
-                    {
-                        minAbsI = absI;
-                        ecorrIndex = i;
-                    }
+                    if (absI < anMinAbsI) { anMinAbsI = absI; anOcpIdx = i; }
                 }
-                double vEcorr = anodicPoints[ecorrIndex].V;
+                double vOcpAnodic = anodicPoints[anOcpIdx].V;
 
-                // 5. Trim anodic branch: keep points where V >= V_ecorr.
-                //    The anodic (oxidation) sweep runs from E_corr upward in voltage.
-                anodicTrimmed = anodicPoints.Where(p => p.V >= vEcorr).ToList();
+                // 5. Find OCP from the cathodic branch: V at min |I|.
+                int catOcpIdx = 0;
+                double catMinAbsI = Math.Abs(cathodicPoints[0].I);
+                for (int i = 1; i < cathodicPoints.Count; i++)
+                {
+                    double absI = Math.Abs(cathodicPoints[i].I);
+                    if (absI < catMinAbsI) { catMinAbsI = absI; catOcpIdx = i; }
+                }
+                double vOcpCathodic = cathodicPoints[catOcpIdx].V;
 
-                // 6. Trim cathodic branch: keep points where V < V_ecorr (remove overlap near E_corr).
-                //    The cathodic (reduction) sweep runs from near E_corr downward in voltage.
-                cathodicTrimmed = cathodicPoints.Where(p => p.V < vEcorr).ToList();
+                // 6. Compute the aligned midpoint OCP and the per-branch shift.
+                //    Shift each branch toward the midpoint so they overlap near E_corr.
+                double halfDiff = (vOcpAnodic - vOcpCathodic) / 2.0;
+                double vOcpMid  = vOcpAnodic - halfDiff; // == (vOcpAnodic + vOcpCathodic) / 2
+
+                // 7. Apply the potential shift to every point in each branch.
+                //    Anodic branch shifts down by halfDiff; cathodic branch shifts up by halfDiff.
+                anodicPoints   = anodicPoints
+                    .Select(p => (p.I, p.V - halfDiff))
+                    .ToList();
+                cathodicPoints = cathodicPoints
+                    .Select(p => (p.I, p.V + halfDiff))
+                    .ToList();
+
+                // 8. Trim both branches at the aligned OCP boundary.
+                //    Anodic branch: oxidation data, keep V >= vOcpMid.
+                //    Cathodic branch: reduction data, keep V < vOcpMid.
+                anodicTrimmed   = anodicPoints.Where(p => p.V >= vOcpMid).ToList();
+                cathodicTrimmed = cathodicPoints.Where(p => p.V < vOcpMid).ToList();
             }
 
             // 7. Combine and sort ascending by voltage
