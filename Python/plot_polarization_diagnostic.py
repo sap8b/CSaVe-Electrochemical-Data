@@ -377,11 +377,11 @@ def print_diagnostics(V_an, I_an, V_cat, I_cat, v_ecorr, exp_area):
     # Suggestion
     if not np.isnan(gap) and abs(gap) > 0.005:
         print(
-            f"\n  ⚠  Gap |{gap*1000:.1f} mV| > 5 mV — consider applying a potential offset "
+            f"\n  !!  Gap |{gap*1000:.1f} mV| > 5 mV — consider applying a potential offset "
             "to one branch to close the gap near OCP before exporting."
         )
     else:
-        print("\n  ✓  Gap is within ±5 mV — branches link up well near OCP.")
+        print("\n  --> Gap is within ±5 mV — branches link up well near OCP.")
 
     print("=" * 60 + "\n")
 
