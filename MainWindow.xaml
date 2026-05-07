@@ -399,7 +399,7 @@
                                     <TextBox x:Name="MetaSurfacePrep" Width="180" Text="600 grit SiC" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,6,12,0">
-                                    <TextBlock Text="Exposed Area m²" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
+                                    <TextBlock Text="Exposed Area (m²)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
                                     <TextBox x:Name="MetaExpArea" Width="110" Text="1.000000E-04" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                             </WrapPanel>
@@ -413,7 +413,7 @@
                                        Margin="0,8,8,0"/>
                             <WrapPanel Grid.Row="2" Grid.Column="1">
                                 <StackPanel Margin="0,6,12,0">
-                                    <TextBlock Text="Cl⁻ M" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
+                                    <TextBlock Text="Cl⁻ (M)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
                                     <TextBox x:Name="MetaClConc" Width="55" Text="0.6" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,6,12,0">
@@ -421,23 +421,23 @@
                                     <TextBox x:Name="MetapH" Width="40" Text="8" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,6,12,0">
-                                    <TextBlock Text="O₂ M" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
+                                    <TextBlock Text="O₂ (M)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
                                     <TextBox x:Name="MetaO2Conc" Width="70" Text="2.5E-4" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,6,12,0">
-                                    <TextBlock Text="S²⁻ M" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
+                                    <TextBlock Text="S²⁻ (M)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
                                     <TextBox x:Name="MetaS2Conc" Width="60" Text="0.08" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,6,12,0">
-                                    <TextBlock Text="Temp °C" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
+                                    <TextBlock Text="Temp (°C)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
                                     <TextBox x:Name="MetaTemperature" Width="50" Text="25" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,6,12,0">
-                                    <TextBlock Text="Conductivity S/m" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
+                                    <TextBlock Text="Conductivity (S/m)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
                                     <TextBox x:Name="MetaConductivity" Width="55" Text="5" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,6,12,0">
-                                    <TextBlock Text="Flow m/s" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
+                                    <TextBlock Text="Flow (m/s)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
                                     <TextBox x:Name="MetaFlow" Width="50" Text="0" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                             </WrapPanel>
