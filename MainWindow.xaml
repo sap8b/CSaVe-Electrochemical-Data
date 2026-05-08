@@ -232,7 +232,7 @@
             </Grid>
         </TabItem>
 
-        <TabItem Header="Combine CSVs -> XML">
+        <TabItem Header="Convert CSVs -&gt; XML">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="14,10,14,10">
                     <GroupBox Header="Input / Output Files">
