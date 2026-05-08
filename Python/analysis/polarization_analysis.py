@@ -13,6 +13,10 @@ _BV_LOWER_OFFSET_V: float = 0.01
 _BV_UPPER_OFFSET_V: float = 0.15
 # Floor applied before log10 to avoid log(0) errors
 _LOG_FLOOR_A_CM2: float = 1e-20
+_EXP_CLIP_MIN: float = -50.0
+_EXP_CLIP_MAX: float = 50.0
+# Minimum cathodic points retained below E_corr for branch-aware fit before fallback to all points.
+_MIN_CATHODIC_POINTS: int = 10
 
 
 @dataclass
@@ -70,10 +74,10 @@ def _interp_current_density_at_potential(potential_v: np.ndarray, current_densit
 def _model_total_current_density(e: np.ndarray, p: np.ndarray) -> np.ndarray:
     i0a, ba, i0c, bc, ecorr, ilim_orr, e_orr, w_orr, i0_her, b_her, e_her = p
 
-    anodic = i0a * np.exp(np.clip((e - ecorr) / ba, -50, 50))
-    cathodic = i0c * np.exp(np.clip(-(e - ecorr) / bc, -50, 50))
+    anodic = i0a * np.exp(np.clip((e - ecorr) / ba, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
+    cathodic = i0c * np.exp(np.clip(-(e - ecorr) / bc, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
     orr = -ilim_orr / (1.0 + np.exp(np.clip((e - e_orr) / w_orr, -60, 60)))
-    her = -i0_her * np.exp(np.clip(-(e - e_her) / b_her, -50, 50))
+    her = -i0_her * np.exp(np.clip(-(e - e_her) / b_her, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
     return anodic - cathodic + orr + her
 
 
@@ -171,12 +175,12 @@ def _compute_component_curves(
     """
     i0a, ba, i0c, bc, ecorr, ilim_orr, e_orr, w_orr, i0_her, b_her, e_her = params
 
-    i_ox = i0a * np.exp(np.clip((e - ecorr) / ba, -50, 50))
+    i_ox = i0a * np.exp(np.clip((e - ecorr) / ba, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
 
-    i_act_orr = i0c * np.exp(np.clip(-(e - ecorr) / bc, -50, 50))
+    i_act_orr = i0c * np.exp(np.clip(-(e - ecorr) / bc, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
     i_orr = i_act_orr * ilim_orr / (i_act_orr + ilim_orr)
 
-    i_her = i0_her * np.exp(np.clip(-(e - e_her) / b_her, -50, 50))
+    i_her = i0_her * np.exp(np.clip(-(e - e_her) / b_her, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
 
     return {
         "i_ox_curve_a_cm2": i_ox.tolist(),
@@ -216,7 +220,7 @@ def run_polarization_analysis(request: dict[str, Any]) -> dict[str, Any]:
 
         # Branch-aware fitting dataset (no hysteresis contamination)
         cat_mask = cathodic_data.potential_v < ecorr_hint
-        if cat_mask.sum() < 10:
+        if cat_mask.sum() < _MIN_CATHODIC_POINTS:
             cat_mask = np.ones(len(cathodic_data.potential_v), dtype=bool)
         anodic_mask = anodic_data.potential_v >= ecorr_hint
 
