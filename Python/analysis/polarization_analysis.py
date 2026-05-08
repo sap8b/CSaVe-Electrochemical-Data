@@ -45,8 +45,10 @@ def _read_polarization_csv(path: Path) -> PolarizationData:
             except (ValueError, TypeError, KeyError):
                 continue
 
+    # Butler-Volmer + transport fitting is underdetermined on very short traces.
+    # Require at least ~20 points to ensure enough anodic/cathodic coverage.
     if len(potentials) < 20:
-        raise ValueError(f"Insufficient data rows in {path}")
+        raise ValueError(f"Insufficient data rows in {path}; at least 20 rows are required for BV fitting.")
 
     p = np.asarray(potentials, dtype=float)
     i = np.asarray(currents, dtype=float)
@@ -91,6 +93,7 @@ def _fit_bv_components(e: np.ndarray, i: np.ndarray) -> tuple[np.ndarray, np.nda
         0.06,
         ecorr0 - 0.15,
     ])
+    # Bounds order: [i0a, ba, i0c, bc, ecorr, ilim_orr, e_orr, w_orr, i0_her, b_her, e_her]
     lb = np.array([1e-12, 0.01, 1e-12, 0.01, -2.0, 1e-10, -2.0, 0.005, 1e-12, 0.01, -2.0])
     ub = np.array([1e-1, 0.5, 1e-1, 0.5, 0.5, 1.0, 0.2, 0.2, 1e-1, 0.5, 0.0])
 
@@ -99,6 +102,7 @@ def _fit_bv_components(e: np.ndarray, i: np.ndarray) -> tuple[np.ndarray, np.nda
     def residual(params: np.ndarray) -> np.ndarray:
         return (_model_total_current_density(e, params) - i) / scale
 
+    # 1200 evaluations balances convergence for 11-parameter BV/transport fits while keeping runtime interactive.
     result = least_squares(residual, p0, bounds=(lb, ub), max_nfev=1200, loss="soft_l1")
     return result.x, _model_total_current_density(e, result.x)
 

@@ -127,6 +127,7 @@ namespace CSaVe_Electrochemical_Data
         private readonly PlotModel polarizationPlotModel = new();
         private readonly PlotModel eisNyquistPlotModel = new();
         private readonly PlotModel eisBodePlotModel = new();
+        private static readonly Regex PdTokenRegex = new(@"(^|[^a-z])pd([^a-z]|$)", RegexOptions.Compiled);
 
         public MainWindow()
         {
@@ -1003,7 +1004,7 @@ namespace CSaVe_Electrochemical_Data
             string fileName = Path.GetFileNameWithoutExtension(csvPath).ToLowerInvariant();
             if (fileName.Contains("cycpol"))
                 return XmlEligibleCsvType.CYCPOL;
-            if (fileName.Contains("potentiodynamic") || Regex.IsMatch(fileName, @"(^|[^a-z])pd([^a-z]|$)"))
+            if (fileName.Contains("potentiodynamic") || PdTokenRegex.IsMatch(fileName))
                 return XmlEligibleCsvType.POTENTIODYNAMIC;
 
             string? header = File.ReadLines(csvPath).FirstOrDefault();

@@ -465,7 +465,7 @@
             </ScrollViewer>
         </TabItem>
 
-        <TabItem Header="Analyze CORPOT or POTDYN Files">
+        <TabItem Header="Analyze CYCPOL or POTENTIODYNAMIC Files">
             <Grid Margin="14,10,14,10">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>

@@ -40,8 +40,10 @@ def _read_eis_csv(path: Path) -> tuple[np.ndarray, np.ndarray]:
                 zre.append(r)
                 zim.append(im)
 
+    # Equivalent-circuit fits need multiple frequency decades; below ~8 points
+    # the parameter set becomes unstable for the supported models.
     if len(freq) < 8:
-        raise ValueError(f"Insufficient EIS rows in {path}")
+        raise ValueError(f"Insufficient EIS rows in {path}; at least 8 rows are required for circuit fitting.")
 
     freq_a = np.asarray(freq, dtype=float)
     z = np.asarray(zre, dtype=float) + 1j * np.asarray(zim, dtype=float)
@@ -145,6 +147,8 @@ def _model_spec(model_name: str) -> tuple[list[dict[str, Any]], np.ndarray, tupl
 def _fit_model(freq: np.ndarray, z_data: np.ndarray, model_name: str) -> tuple[np.ndarray, np.ndarray, list[str]]:
     branches, p0, bounds, n_nodes, source_node = _model_spec(model_name)
 
+    # Use a 30th-percentile floor so low-impedance points still influence the fit
+    # without allowing near-zero magnitudes to dominate residual weighting.
     scale = np.maximum(np.abs(z_data), np.percentile(np.abs(z_data), 30))
 
     def residual(p: np.ndarray) -> np.ndarray:
@@ -152,6 +156,7 @@ def _fit_model(freq: np.ndarray, z_data: np.ndarray, model_name: str) -> tuple[n
         d = (z_fit - z_data) / scale
         return np.hstack([d.real, d.imag])
 
+    # 2500 evaluations support stable convergence across supported equivalent-circuit models.
     result = least_squares(residual, p0, bounds=bounds, max_nfev=2500, loss="soft_l1")
     z_fit = _matrix_equivalent_impedance(freq, n_nodes, source_node, branches, result.x)
 

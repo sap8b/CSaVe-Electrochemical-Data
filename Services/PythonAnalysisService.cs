@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
+using System.Threading.Tasks;
 using CSaVe_Electrochemical_Data.Models;
 
 namespace CSaVe_Electrochemical_Data.Services;
@@ -60,12 +61,15 @@ public sealed class PythonAnalysisService
             };
 
             using var process = Process.Start(psi) ?? throw new InvalidOperationException("Failed to start Python process.");
-            string stdOut = process.StandardOutput.ReadToEnd();
-            string stdErr = process.StandardError.ReadToEnd();
+            Task<string> stdOutTask = process.StandardOutput.ReadToEndAsync();
+            Task<string> stdErrTask = process.StandardError.ReadToEndAsync();
             process.WaitForExit();
+            Task.WaitAll(stdOutTask, stdErrTask);
+            string stdOut = stdOutTask.Result;
+            string stdErr = stdErrTask.Result;
 
             if (!File.Exists(outputPath))
-                throw new InvalidOperationException("Python analysis did not produce an output file.");
+                throw new InvalidOperationException($"Python analysis did not produce an output file. ExitCode={process.ExitCode}. stderr={stdErr}");
 
             string json = File.ReadAllText(outputPath);
             T result = JsonSerializer.Deserialize<T>(json, _jsonOptions);
@@ -75,6 +79,8 @@ public sealed class PythonAnalysisService
             if (!result.Success)
             {
                 string details = string.IsNullOrWhiteSpace(result.Message) ? stdErr : result.Message;
+                if (!string.IsNullOrWhiteSpace(stdOut))
+                    details = $"{details} stdout={stdOut}";
                 throw new InvalidOperationException($"Python analysis failed: {details}");
             }
 
