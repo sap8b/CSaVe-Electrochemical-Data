@@ -8,6 +8,12 @@ from typing import Any
 import numpy as np
 from scipy.optimize import least_squares
 
+# Tafel / BV near-linear region boundaries relative to E_corr (V)
+_BV_LOWER_OFFSET_V: float = 0.01
+_BV_UPPER_OFFSET_V: float = 0.15
+# Floor applied before log10 to avoid log(0) errors
+_LOG_FLOOR_A_CM2: float = 1e-20
+
 
 @dataclass
 class PolarizationData:
@@ -112,12 +118,12 @@ def _tafel_i_ox(e: np.ndarray, current_density: np.ndarray, ecorr: float) -> flo
     and extrapolates back to E_corr to obtain i_ox.
     Returns NaN if fewer than 3 points fall in the window.
     """
-    mask = (e >= ecorr + 0.01) & (e <= ecorr + 0.15)
+    mask = (e >= ecorr + _BV_LOWER_OFFSET_V) & (e <= ecorr + _BV_UPPER_OFFSET_V)
     if np.sum(mask) < 3:
         return float("nan")
 
     e_win = e[mask]
-    log_i_win = np.log10(np.maximum(np.abs(current_density[mask]), 1e-20))
+    log_i_win = np.log10(np.maximum(np.abs(current_density[mask]), _LOG_FLOOR_A_CM2))
 
     coeffs = np.polyfit(e_win, log_i_win, 1)
     log_i_ox = np.polyval(coeffs, ecorr)
@@ -131,7 +137,7 @@ def _bv_region_points(
 ) -> tuple[list[float], list[float]]:
     """Return the subset of (E, |i|) points in the BV near-linear region
     (0.01 V <= |E - E_corr| <= 0.15 V) used to highlight the red fit region."""
-    mask = (np.abs(e - ecorr) >= 0.01) & (np.abs(e - ecorr) <= 0.15)
+    mask = (np.abs(e - ecorr) >= _BV_LOWER_OFFSET_V) & (np.abs(e - ecorr) <= _BV_UPPER_OFFSET_V)
     e_region = e[mask]
     i_region = np.abs(current_density[mask])
     order = np.argsort(e_region)
