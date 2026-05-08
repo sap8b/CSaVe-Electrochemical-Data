@@ -120,6 +120,8 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
     order = np.argsort(e)
     e_sorted = np.asarray(e[order], dtype=float)
     i_sorted = np.asarray(current_density[order], dtype=float)
+    if e_sorted.size == 0 or i_sorted.size == 0 or e_sorted.size != i_sorted.size:
+        raise ValueError("Polarization fitting requires non-empty potential/current arrays of equal length.")
 
     ecorr0 = float(ecorr_hint) if np.isfinite(ecorr_hint) else float(e_sorted[np.argmin(np.abs(i_sorted))])
     idx_ecorr = int(np.argmin(np.abs(e_sorted - ecorr0)))
