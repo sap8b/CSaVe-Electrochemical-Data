@@ -4,19 +4,15 @@ using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Forms;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using CSaVe_Electrochemical_Data.Models;
+using CSaVe_Electrochemical_Data.Services;
+using OxyPlot;
+using OxyPlot.Axes;
+using OxyPlot.Series;
 
 namespace CSaVe_Electrochemical_Data
 {
@@ -125,9 +121,24 @@ namespace CSaVe_Electrochemical_Data
         //Message window that displays the progress bar
         MessageWindowDialog mwd;
 
+        private readonly PythonAnalysisService pythonAnalysisService;
+        private readonly List<string> polarizationAnalysisFiles = new();
+        private readonly List<string> eisAnalysisFiles = new();
+        private readonly PlotModel polarizationPlotModel = new();
+        private readonly PlotModel eisNyquistPlotModel = new();
+        private readonly PlotModel eisBodePlotModel = new();
+
         public MainWindow()
         {
             InitializeComponent();
+
+            pythonAnalysisService = new PythonAnalysisService(FindRepositoryRoot());
+
+            AnodicCsvPath.TextChanged += (_, _) => UpdateXmlGenerationAvailability();
+            CathodicCsvPath.TextChanged += (_, _) => UpdateXmlGenerationAvailability();
+            UpdateXmlGenerationAvailability();
+
+            InitializePlotModels();
         }
         /// <summary>
         /// This method searches through the provided folder and subfolders or just through the provided folder to find all DTA files and then uses the Background Worker to call
@@ -926,6 +937,158 @@ namespace CSaVe_Electrochemical_Data
             return the_line2;
         }
 
+        private enum XmlEligibleCsvType
+        {
+            CYCPOL,
+            POTENTIODYNAMIC,
+            POLARIZATION_UNKNOWN,
+            UNSUPPORTED
+        }
+
+        private sealed class PolarizationResultRow
+        {
+            public string File { get; set; } = string.Empty;
+            public double Ecorr_mV { get; set; }
+            public double Icorr_uAcm2 { get; set; }
+            public double Ilim_uAcm2 { get; set; }
+            public double HER_Onset_mV { get; set; }
+            public double I_at_neg850mV_uAcm2 { get; set; }
+            public double I_at_neg1050mV_uAcm2 { get; set; }
+        }
+
+        private sealed class EisResultRow
+        {
+            public string File { get; set; } = string.Empty;
+            public string Model { get; set; } = string.Empty;
+            public string Parameters { get; set; } = string.Empty;
+        }
+
+        private static string FindRepositoryRoot()
+        {
+            var dir = new DirectoryInfo(AppContext.BaseDirectory);
+            while (dir is not null)
+            {
+                if (File.Exists(Path.Combine(dir.FullName, "CSaVe Electrochemical Data.csproj")))
+                    return dir.FullName;
+                dir = dir.Parent;
+            }
+
+            throw new DirectoryNotFoundException("Unable to locate repository root for Python analysis scripts.");
+        }
+
+        private void InitializePlotModels()
+        {
+            polarizationPlotModel.Title = "Polarization (|i| vs E)";
+            polarizationPlotModel.Axes.Add(new LogarithmicAxis { Position = AxisPosition.Bottom, Title = "Current Density (A/cm²)", Minimum = 1.0e-12 });
+            polarizationPlotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = "Potential (V)" });
+            PolarizationPlotView.Model = polarizationPlotModel;
+
+            eisNyquistPlotModel.Title = "Nyquist";
+            eisNyquistPlotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom, Title = "Z' (Ohm)" });
+            eisNyquistPlotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = "-Z'' (Ohm)" });
+            EisNyquistPlotView.Model = eisNyquistPlotModel;
+
+            eisBodePlotModel.Title = "Bode";
+            eisBodePlotModel.Axes.Add(new LogarithmicAxis { Position = AxisPosition.Bottom, Title = "Frequency (Hz)", Minimum = 1.0e-3 });
+            eisBodePlotModel.Axes.Add(new LogarithmicAxis { Position = AxisPosition.Left, Title = "|Z| (Ohm)", Key = "MagAxis", Minimum = 1.0e-3 });
+            eisBodePlotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Right, Title = "Phase (deg)", Key = "PhaseAxis" });
+            EisBodePlotView.Model = eisBodePlotModel;
+        }
+
+        private static XmlEligibleCsvType DetectXmlEligibleType(string csvPath)
+        {
+            if (string.IsNullOrWhiteSpace(csvPath) || !File.Exists(csvPath))
+                return XmlEligibleCsvType.UNSUPPORTED;
+
+            string fileName = Path.GetFileNameWithoutExtension(csvPath).ToLowerInvariant();
+            if (fileName.Contains("cycpol"))
+                return XmlEligibleCsvType.CYCPOL;
+            if (fileName.Contains("potentiodynamic") || Regex.IsMatch(fileName, @"(^|[^a-z])pd([^a-z]|$)"))
+                return XmlEligibleCsvType.POTENTIODYNAMIC;
+
+            string? header = File.ReadLines(csvPath).FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(header))
+                return XmlEligibleCsvType.UNSUPPORTED;
+
+            string[] cols = header.Split(',').Select(c => c.Trim().ToLowerInvariant()).ToArray();
+            bool hasVf = cols.Contains("vf");
+            bool hasIm = cols.Contains("im");
+            bool looksLikeEis = cols.Contains("freq") || cols.Contains("zreal") || cols.Contains("zimag");
+
+            if (looksLikeEis)
+                return XmlEligibleCsvType.UNSUPPORTED;
+            if (hasVf && hasIm)
+                return XmlEligibleCsvType.POLARIZATION_UNKNOWN;
+
+            return XmlEligibleCsvType.UNSUPPORTED;
+        }
+
+        private void UpdateXmlGenerationAvailability()
+        {
+            string anodicPath = AnodicCsvPath.Text?.Trim() ?? string.Empty;
+            string cathodicPath = CathodicCsvPath.Text?.Trim() ?? string.Empty;
+
+            if (string.IsNullOrWhiteSpace(anodicPath))
+            {
+                GenerateXmlButton.IsEnabled = false;
+                GenerateXmlButton.ToolTip = "Select a CYCPOL or POTENTIODYNAMIC-derived CSV file.";
+                XmlStatusBox.Text = "Select a polarization CSV to enable XML generation.";
+                return;
+            }
+
+            if (!File.Exists(anodicPath) || (!string.IsNullOrWhiteSpace(cathodicPath) && !File.Exists(cathodicPath)))
+            {
+                GenerateXmlButton.IsEnabled = false;
+                GenerateXmlButton.ToolTip = "Selected file path does not exist.";
+                XmlStatusBox.Text = "One or more selected files were not found.";
+                return;
+            }
+
+            XmlEligibleCsvType anodicType = DetectXmlEligibleType(anodicPath);
+            XmlEligibleCsvType cathodicType = string.IsNullOrWhiteSpace(cathodicPath)
+                ? anodicType
+                : DetectXmlEligibleType(cathodicPath);
+
+            bool anodicOk = anodicType is XmlEligibleCsvType.CYCPOL or XmlEligibleCsvType.POTENTIODYNAMIC;
+            bool cathodicOk = cathodicType is XmlEligibleCsvType.CYCPOL or XmlEligibleCsvType.POTENTIODYNAMIC;
+
+            if (anodicOk && cathodicOk)
+            {
+                GenerateXmlButton.IsEnabled = true;
+                GenerateXmlButton.ToolTip = "Generate XML from polarization CSV data.";
+                XmlStatusBox.Text = "Ready: CYCPOL/POTENTIODYNAMIC CSV detected.";
+            }
+            else
+            {
+                GenerateXmlButton.IsEnabled = false;
+                GenerateXmlButton.ToolTip = "XML generation supports only CYCPOL or POTENTIODYNAMIC-derived CSV files.";
+                XmlStatusBox.Text = "XML generation disabled: selected CSV is not identified as CYCPOL/POTENTIODYNAMIC-derived.";
+            }
+        }
+
+        private static string FormatMeanStd(IEnumerable<double> vals)
+        {
+            var arr = vals.Where(v => !double.IsNaN(v) && !double.IsInfinity(v)).ToArray();
+            if (arr.Length == 0)
+                return "n/a";
+
+            double mean = arr.Average();
+            double std = arr.Length > 1
+                ? Math.Sqrt(arr.Sum(v => (v - mean) * (v - mean)) / (arr.Length - 1))
+                : 0.0;
+            return $"{mean:F2} ± {std:F2}";
+        }
+
+        private static OxyColor GetSeriesColor(int index)
+        {
+            OxyColor[] colors =
+            {
+                OxyColors.DodgerBlue, OxyColors.Crimson, OxyColors.DarkOrange,
+                OxyColors.ForestGreen, OxyColors.Purple, OxyColors.Brown
+            };
+            return colors[index % colors.Length];
+        }
+
         // ─────────────────────────────────────────────────────────────────────────
         // Tab 2: Combine CSVs → XML  event handlers
         // ─────────────────────────────────────────────────────────────────────────
@@ -941,6 +1104,7 @@ namespace CSaVe_Electrochemical_Data
             {
                 AnodicCsvPath.Text = dlg.FileName;
                 AutoPopulateXmlFilename(dlg.FileName);
+                UpdateXmlGenerationAvailability();
             }
         }
 
@@ -952,7 +1116,10 @@ namespace CSaVe_Electrochemical_Data
                 Title = "Select Cathodic CSV file"
             };
             if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+            {
                 CathodicCsvPath.Text = dlg.FileName;
+                UpdateXmlGenerationAvailability();
+            }
         }
 
         private void BrowseXmlOutputFolderButton_Click(object sender, RoutedEventArgs e)
@@ -998,6 +1165,14 @@ namespace CSaVe_Electrochemical_Data
 
         private void GenerateXmlButton_Click(object sender, RoutedEventArgs e)
         {
+            UpdateXmlGenerationAvailability();
+            if (!GenerateXmlButton.IsEnabled)
+            {
+                System.Windows.MessageBox.Show("XML generation is only supported for CYCPOL or POTENTIODYNAMIC-derived CSV files.",
+                    "Unsupported File Type", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
             try
             {
                 string anodicPath = AnodicCsvPath.Text?.Trim();
@@ -1064,6 +1239,201 @@ namespace CSaVe_Electrochemical_Data
                 System.Windows.MessageBox.Show($"Error generating XML:\n{ex.Message}",
                     "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
+        }
+
+        private void BrowsePolarizationFilesButton_Click(object sender, RoutedEventArgs e)
+        {
+            using var dlg = new OpenFileDialog
+            {
+                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                Multiselect = true,
+                Title = "Select polarization CSV file(s)"
+            };
+            if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                return;
+
+            polarizationAnalysisFiles.Clear();
+            polarizationAnalysisFiles.AddRange(dlg.FileNames);
+            PolarizationFilesStatusText.Text = $"{polarizationAnalysisFiles.Count} polarization file(s) selected.";
+        }
+
+        private void RunPolarizationAnalysisButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (polarizationAnalysisFiles.Count == 0)
+            {
+                PolarizationAnalysisStatusBox.Text = "Select one or more polarization CSV files first.";
+                return;
+            }
+
+            if (!double.TryParse(PolarizationAreaText.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double areaCm2) || areaCm2 <= 0)
+            {
+                PolarizationAnalysisStatusBox.Text = "Invalid exposed area value.";
+                return;
+            }
+
+            PolarizationAnalysisStatusBox.Text = "Running polarization analysis in system Python...";
+            var response = pythonAnalysisService.RunPolarization(new PolarizationAnalysisRequest
+            {
+                Files = polarizationAnalysisFiles.ToList(),
+                Exposed_Area_Cm2 = areaCm2,
+                Protection_Potentials_Mv = new List<double> { -850.0, -1050.0 }
+            });
+
+            if (!response.Success)
+            {
+                PolarizationAnalysisStatusBox.Text = response.Message;
+                return;
+            }
+
+            var rows = response.Files.Select(f => new PolarizationResultRow
+            {
+                File = Path.GetFileName(f.File),
+                Ecorr_mV = f.Metrics.GetValueOrDefault("ecorr_mv", double.NaN),
+                Icorr_uAcm2 = f.Metrics.GetValueOrDefault("icorr_ua_cm2", double.NaN),
+                Ilim_uAcm2 = f.Metrics.GetValueOrDefault("ilim_orr_ua_cm2", double.NaN),
+                HER_Onset_mV = f.Metrics.GetValueOrDefault("her_onset_mv", double.NaN),
+                I_at_neg850mV_uAcm2 = f.Metrics.GetValueOrDefault("i_at_-850mv_ua_cm2", double.NaN),
+                I_at_neg1050mV_uAcm2 = f.Metrics.GetValueOrDefault("i_at_-1050mv_ua_cm2", double.NaN)
+            }).ToList();
+            PolarizationResultsGrid.ItemsSource = rows;
+
+            string summary = string.Join(Environment.NewLine, new[]
+            {
+                $"Replicates: {rows.Count}",
+                $"E_corr (mV): {FormatMeanStd(rows.Select(r => r.Ecorr_mV))}",
+                $"i_corr (uA/cm²): {FormatMeanStd(rows.Select(r => r.Icorr_uAcm2))}",
+                $"i_lim ORR (uA/cm²): {FormatMeanStd(rows.Select(r => r.Ilim_uAcm2))}",
+                $"HER onset (mV): {FormatMeanStd(rows.Select(r => r.HER_Onset_mV))}",
+                $"i@-850 mV (uA/cm²): {FormatMeanStd(rows.Select(r => r.I_at_neg850mV_uAcm2))}",
+                $"i@-1050 mV (uA/cm²): {FormatMeanStd(rows.Select(r => r.I_at_neg1050mV_uAcm2))}"
+            });
+            PolarizationSummaryBox.Text = summary;
+
+            polarizationPlotModel.Series.Clear();
+            for (int i = 0; i < response.Files.Count; i++)
+            {
+                var fileResult = response.Files[i];
+                var color = GetSeriesColor(i);
+
+                var dataSeries = new LineSeries
+                {
+                    Title = $"{Path.GetFileName(fileResult.File)} data",
+                    Color = color
+                };
+                int count = Math.Min(fileResult.Plot.Potential_V.Count, fileResult.Plot.Current_Density_A_Cm2.Count);
+                for (int j = 0; j < count; j++)
+                {
+                    double x = Math.Max(fileResult.Plot.Current_Density_A_Cm2[j], 1.0e-12);
+                    dataSeries.Points.Add(new DataPoint(x, fileResult.Plot.Potential_V[j]));
+                }
+                polarizationPlotModel.Series.Add(dataSeries);
+
+                var fitSeries = new LineSeries
+                {
+                    Title = $"{Path.GetFileName(fileResult.File)} fit",
+                    Color = OxyColor.FromAColor(170, color),
+                    LineStyle = LineStyle.Dash
+                };
+                int fitCount = Math.Min(fileResult.Plot.Potential_V.Count, fileResult.Plot.Model_Current_Density_A_Cm2.Count);
+                for (int j = 0; j < fitCount; j++)
+                {
+                    double x = Math.Max(fileResult.Plot.Model_Current_Density_A_Cm2[j], 1.0e-12);
+                    fitSeries.Points.Add(new DataPoint(x, fileResult.Plot.Potential_V[j]));
+                }
+                polarizationPlotModel.Series.Add(fitSeries);
+            }
+            polarizationPlotModel.InvalidatePlot(true);
+
+            PolarizationAnalysisStatusBox.Text = response.Message;
+        }
+
+        private void BrowseEisFilesButton_Click(object sender, RoutedEventArgs e)
+        {
+            using var dlg = new OpenFileDialog
+            {
+                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                Multiselect = true,
+                Title = "Select EIS CSV file(s)"
+            };
+            if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                return;
+
+            eisAnalysisFiles.Clear();
+            eisAnalysisFiles.AddRange(dlg.FileNames);
+            EisFilesStatusText.Text = $"{eisAnalysisFiles.Count} EIS file(s) selected.";
+        }
+
+        private void RunEisAnalysisButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (eisAnalysisFiles.Count == 0)
+            {
+                EisAnalysisStatusBox.Text = "Select one or more EIS CSV files first.";
+                return;
+            }
+
+            string model = (EisModelComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "randles_cpe_w";
+            EisAnalysisStatusBox.Text = $"Running EIS analysis ({model}) in system Python...";
+
+            var response = pythonAnalysisService.RunEis(new EisAnalysisRequest
+            {
+                Files = eisAnalysisFiles.ToList(),
+                Model = model
+            });
+
+            if (!response.Success)
+            {
+                EisAnalysisStatusBox.Text = response.Message;
+                return;
+            }
+
+            var rows = response.Files.Select(f => new EisResultRow
+            {
+                File = Path.GetFileName(f.File),
+                Model = f.Model,
+                Parameters = string.Join(", ", f.Fit_Parameters.Select(kv => $"{kv.Key}={kv.Value:G4}"))
+            }).ToList();
+            EisResultsGrid.ItemsSource = rows;
+
+            eisNyquistPlotModel.Series.Clear();
+            eisBodePlotModel.Series.Clear();
+
+            if (response.Files.Count > 0)
+            {
+                var first = response.Files[0];
+                var nyquistData = new LineSeries { Title = "Data", Color = OxyColors.DodgerBlue };
+                for (int i = 0; i < Math.Min(first.Plot.Zreal_Ohm.Count, first.Plot.Zimag_Ohm.Count); i++)
+                    nyquistData.Points.Add(new DataPoint(first.Plot.Zreal_Ohm[i], -first.Plot.Zimag_Ohm[i]));
+                eisNyquistPlotModel.Series.Add(nyquistData);
+
+                var nyquistFit = new LineSeries { Title = "Fit", Color = OxyColors.Crimson, LineStyle = LineStyle.Dash };
+                for (int i = 0; i < Math.Min(first.Plot.Zreal_Fit_Ohm.Count, first.Plot.Zimag_Fit_Ohm.Count); i++)
+                    nyquistFit.Points.Add(new DataPoint(first.Plot.Zreal_Fit_Ohm[i], -first.Plot.Zimag_Fit_Ohm[i]));
+                eisNyquistPlotModel.Series.Add(nyquistFit);
+
+                var bodeMag = new LineSeries { Title = "|Z| Data", Color = OxyColors.ForestGreen, YAxisKey = "MagAxis" };
+                var bodeMagFit = new LineSeries { Title = "|Z| Fit", Color = OxyColors.DarkOrange, LineStyle = LineStyle.Dash, YAxisKey = "MagAxis" };
+                var bodePhase = new LineSeries { Title = "Phase Data", Color = OxyColors.Purple, YAxisKey = "PhaseAxis" };
+                var bodePhaseFit = new LineSeries { Title = "Phase Fit", Color = OxyColors.Gray, LineStyle = LineStyle.Dash, YAxisKey = "PhaseAxis" };
+
+                int n = first.Plot.Freq_Hz.Count;
+                for (int i = 0; i < n; i++)
+                {
+                    double f = Math.Max(first.Plot.Freq_Hz[i], 1.0e-6);
+                    if (i < first.Plot.Zmod_Ohm.Count) bodeMag.Points.Add(new DataPoint(f, Math.Max(first.Plot.Zmod_Ohm[i], 1.0e-9)));
+                    if (i < first.Plot.Zmod_Fit_Ohm.Count) bodeMagFit.Points.Add(new DataPoint(f, Math.Max(first.Plot.Zmod_Fit_Ohm[i], 1.0e-9)));
+                    if (i < first.Plot.Phase_Deg.Count) bodePhase.Points.Add(new DataPoint(f, first.Plot.Phase_Deg[i]));
+                    if (i < first.Plot.Phase_Fit_Deg.Count) bodePhaseFit.Points.Add(new DataPoint(f, first.Plot.Phase_Fit_Deg[i]));
+                }
+
+                eisBodePlotModel.Series.Add(bodeMag);
+                eisBodePlotModel.Series.Add(bodeMagFit);
+                eisBodePlotModel.Series.Add(bodePhase);
+                eisBodePlotModel.Series.Add(bodePhaseFit);
+            }
+
+            eisNyquistPlotModel.InvalidatePlot(true);
+            eisBodePlotModel.InvalidatePlot(true);
+            EisAnalysisStatusBox.Text = response.Message;
         }
 
         private static double ParseDouble(string text, double defaultValue)
