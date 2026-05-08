@@ -25,11 +25,28 @@ _MAX_ILIM_WINDOW_POINTS: int = 20
 _POLISH_MAX_NFEV: int = 600
 _HER_ORR_WINDOW_DIVISOR: int = 4
 _ILIM_WINDOW_DIVISOR: int = 8
+_SEQUENTIAL_WINDOW_DIVISOR: int = 5
+_SAVGOL_WINDOW_DIVISOR: int = 4
 _SAVGOL_WINDOW_LENGTH: int = 11
+_MIN_SAVGOL_POINTS: int = 11
+_MAX_SAVGOL_WINDOW_LENGTH: int = 21
 _SAVGOL_POLYORDER: int = 3
 _ORR_ACTIVATION_UPPER_OFFSET_V: float = 0.02
+_MIDDLE_RANGE_LOWER_PERCENTILE: float = 20.0
+_MIDDLE_RANGE_UPPER_PERCENTILE: float = 80.0
 _EORR_SELECTION_OFFSET_V: float = 0.05
+_EORR_FALLBACK_OFFSET_V: float = 0.10
+_ECORR_LOWER_BOUND_OFFSET_V: float = 0.10
+_ECORR_UPPER_BOUND_OFFSET_V: float = 0.05
+_EHER_UPPER_BOUND_OFFSET_V: float = 0.01
 _ANODIC_TAFEL_EXPANDED_UPPER_OFFSET_V: float = 0.20
+_DEFAULT_B_HER_V: float = 0.12
+_DEFAULT_I0_HER_A_CM2: float = 1e-9
+_DEFAULT_E_HER_OFFSET_V: float = 0.30
+_DEFAULT_BC_V: float = 0.10
+_DEFAULT_BA_V: float = 0.06
+_DEFAULT_I0A_A_CM2: float = 1e-8
+_DEFAULT_I0C_FRACTION: float = 0.5
 _ILIM_FALLBACK_WINDOW_BEFORE: int = 1
 _ILIM_FALLBACK_WINDOW_AFTER: int = 2
 
@@ -132,8 +149,7 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
 
     cat_mask = e_sorted < ecorr0
     e_cat = e_sorted[cat_mask]
-    i_cat = i_sorted[cat_mask]
-    i_abs_cat = np.abs(i_cat)
+    i_abs_cat = np.abs(i_sorted[cat_mask])
     log_i_cat = np.log10(np.maximum(i_abs_cat, _LOG_FLOOR_A_CM2))
 
     def _window_around(center_idx: int, n_points: int, total: int) -> np.ndarray:
@@ -146,13 +162,14 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
     def _safe_derivative(x: np.ndarray, y: np.ndarray) -> np.ndarray:
         if x.size < 2:
             return np.zeros_like(y, dtype=float)
-        if x.size < 11:
+        if x.size < _MIN_SAVGOL_POINTS:
             return np.gradient(y, x)
         dx = np.diff(x)
         delta = float(np.mean(dx)) if dx.size > 0 else 1.0
         if not np.isfinite(delta) or delta == 0:
             delta = 1.0
-        window_length = min(21, (x.size // 4) * 2 + 1)
+        # Use approximately x.size / _SAVGOL_WINDOW_DIVISOR points and force odd length.
+        window_length = min(_MAX_SAVGOL_WINDOW_LENGTH, (x.size // _SAVGOL_WINDOW_DIVISOR) * 2 + 1)
         if window_length % 2 == 0:
             window_length -= 1
         if window_length < 5:
@@ -161,27 +178,26 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
         return savgol_filter(y, window_length=window_length, polyorder=polyorder, deriv=1, delta=delta)
 
     # Step 1: skip iR-loss, then fit HER around derivative minimum in middle 60%.
-    b_her = 0.12
-    i0_her_approx = 1e-9
-    e_her_approx = ecorr0 - 0.30
+    b_her = _DEFAULT_B_HER_V
+    i0_her_approx = _DEFAULT_I0_HER_A_CM2
+    e_her_approx = ecorr0 - _DEFAULT_E_HER_OFFSET_V
     idx_her = 0
     i_her_contribution = i0_her_approx * np.exp(np.clip(-(e_cat - ecorr0) / b_her, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
     if e_cat.size >= 5:
         try:
             d_log_i_cat_de = _safe_derivative(e_cat, log_i_cat)
-            p20, p80 = np.percentile(e_cat, [20.0, 80.0])
+            p20, p80 = np.percentile(e_cat, [_MIDDLE_RANGE_LOWER_PERCENTILE, _MIDDLE_RANGE_UPPER_PERCENTILE])
             middle_idx = np.where((e_cat >= p20) & (e_cat <= p80))[0]
             if middle_idx.size == 0:
                 middle_idx = np.arange(e_cat.size, dtype=int)
             idx_her = int(middle_idx[np.argmin(d_log_i_cat_de[middle_idx])])
-            n_her = int(np.clip(e_cat.size // 5, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
+            n_her = int(np.clip(e_cat.size // _SEQUENTIAL_WINDOW_DIVISOR, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
             idx_her_win = _window_around(idx_her, n_her, e_cat.size)
             if idx_her_win.size >= 2 and np.ptp(e_cat[idx_her_win]) > 0:
                 coeffs_her = np.polyfit(e_cat[idx_her_win], log_i_cat[idx_her_win], 1)
                 slope_her = float(coeffs_her[0])
                 if np.isfinite(slope_her) and abs(slope_her) > 0:
-                    beta_her_v_dec = 1.0 / abs(slope_her)
-                    b_her_fit = beta_her_v_dec / np.log10(np.e)
+                    b_her_fit = 1.0 / (abs(slope_her) * np.log(10.0))
                     i0_her_fit = float(10.0 ** np.polyval(coeffs_her, ecorr0))
                     e_her_fit = float(np.median(e_cat[idx_her_win]))
                     if np.isfinite(b_her_fit) and np.isfinite(i0_her_fit) and np.isfinite(e_her_fit):
@@ -189,9 +205,9 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
                         i0_her_approx = float(np.clip(i0_her_fit, 1e-12, 1e-1))
                         e_her_approx = e_her_fit
         except Exception:
-            b_her = 0.12
-            i0_her_approx = 1e-9
-            e_her_approx = ecorr0 - 0.30
+            b_her = _DEFAULT_B_HER_V
+            i0_her_approx = _DEFAULT_I0_HER_A_CM2
+            e_her_approx = ecorr0 - _DEFAULT_E_HER_OFFSET_V
         i_her_contribution = i0_her_approx * np.exp(np.clip(-(e_cat - ecorr0) / b_her, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
 
     # Step 2: subtract HER, then estimate i_lim from derivative maximum transition.
@@ -205,7 +221,8 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
             if lim_candidates.size == 0:
                 lim_candidates = np.arange(e_cat.size, dtype=int)
             idx_lim = int(lim_candidates[np.argmax(d_residual_de[lim_candidates])])
-            n_lim = int(np.clip(e_cat.size // 8, _MIN_ILIM_WINDOW_POINTS, _MAX_ILIM_WINDOW_POINTS))
+            n_lim = int(np.clip(e_cat.size // _ILIM_WINDOW_DIVISOR, _MIN_ILIM_WINDOW_POINTS, _MAX_ILIM_WINDOW_POINTS))
+            n_lim = max(1, n_lim)
             plateau_slice = i_residual[max(0, idx_lim - n_lim):idx_lim]
             if plateau_slice.size >= 3:
                 ilim0 = float(np.median(plateau_slice))
@@ -220,36 +237,38 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
     ilim0 = float(np.clip(max(ilim0, 1e-12), 1e-10, 1.0))
 
     # Step 3: fit ORR activation in anodic-of-transition region.
-    bc = 0.10
-    i0c = float(np.clip((np.max(i_abs_cat) / 2.0) if i_abs_cat.size > 0 else icorr0, 1e-12, 1e-1))
+    bc = _DEFAULT_BC_V
+    i_abs_max = np.max(i_abs_cat) if i_abs_cat.size > 0 else icorr0
+    i0c_fallback = float(np.clip(i_abs_max * _DEFAULT_I0C_FRACTION, 1e-12, 1e-1))
+    i0c = i0c_fallback
     if e_cat.size >= 5:
         try:
             i_residual = np.maximum(i_abs_cat - i_her_contribution, 1e-14)
             log_residual = np.log10(np.maximum(i_residual, _LOG_FLOOR_A_CM2))
             d_log_residual_de = _safe_derivative(e_cat, log_residual)
-            orr_candidates = np.where((np.arange(e_cat.size) > idx_lim) & (e_cat <= ecorr0 - 0.02))[0]
+            orr_candidates = np.where((np.arange(e_cat.size) > idx_lim) & (e_cat <= ecorr0 - _ORR_ACTIVATION_UPPER_OFFSET_V))[0]
             if orr_candidates.size > 0:
                 idx_orr = int(orr_candidates[np.argmin(np.abs(d_log_residual_de[orr_candidates]))])
-                n_orr = int(np.clip(e_cat.size // 5, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
+                n_orr = int(np.clip(e_cat.size // _SEQUENTIAL_WINDOW_DIVISOR, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
                 idx_orr_win = _window_around(idx_orr, n_orr, e_cat.size)
                 if idx_orr_win.size >= 2 and np.ptp(e_cat[idx_orr_win]) > 0:
                     coeffs_orr = np.polyfit(e_cat[idx_orr_win], log_residual[idx_orr_win], 1)
                     slope_orr = float(coeffs_orr[0])
                     if np.isfinite(slope_orr) and abs(slope_orr) > 0:
-                        bc_fit = 1.0 / (abs(slope_orr) * np.log10(np.e))
+                        bc_fit = 1.0 / (abs(slope_orr) * np.log(10.0))
                         i0c_fit = float(10.0 ** np.polyval(coeffs_orr, ecorr0))
                         if np.isfinite(bc_fit) and np.isfinite(i0c_fit):
                             bc = float(np.clip(bc_fit, 0.01, 0.5))
                             i0c = float(np.clip(i0c_fit, 1e-12, 1e-1))
         except Exception:
-            bc = 0.10
-            i0c = float(np.clip((np.max(i_abs_cat) / 2.0) if i_abs_cat.size > 0 else icorr0, 1e-12, 1e-1))
+            bc = _DEFAULT_BC_V
+            i0c = i0c_fallback
     bc = float(np.clip(bc, 0.01, 0.5))
     i0c = float(np.clip(i0c, 1e-12, 1e-1))
 
     # Step 4: Anodic Tafel fit (unchanged behavior).
-    ba = 0.06
-    i0a = 1e-8
+    ba = _DEFAULT_BA_V
+    i0a = _DEFAULT_I0A_A_CM2
     an_mask = (e_sorted >= ecorr0 + _BV_LOWER_OFFSET_V) & (e_sorted <= ecorr0 + _BV_UPPER_OFFSET_V)
     if np.sum(an_mask) < 5:
         an_mask = (e_sorted >= ecorr0) & (e_sorted <= ecorr0 + _ANODIC_TAFEL_EXPANDED_UPPER_OFFSET_V)
@@ -261,17 +280,17 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
                 coeffs_an = np.polyfit(e_an, log_i_an, 1)
                 slope_an = float(coeffs_an[0])
                 if np.isfinite(slope_an) and abs(slope_an) > 0:
-                    ba = 1.0 / (abs(slope_an) * np.log10(np.e))
+                    ba = 1.0 / (abs(slope_an) * np.log(10.0))
                     i0a = float(10.0 ** np.polyval(coeffs_an, ecorr0))
         except Exception:
-            ba = 0.06
-            i0a = 1e-8
+            ba = _DEFAULT_BA_V
+            i0a = _DEFAULT_I0A_A_CM2
     ba = float(np.clip(ba, 0.01, 0.5))
     i0a = float(np.clip(i0a, 1e-12, 1e-1))
 
     # Step 5: constrained polish around ecorr_hint.
-    eorr_candidates = e_cat[e_cat < ecorr0 - 0.05]
-    eorr0 = float(np.median(eorr_candidates)) if eorr_candidates.size >= 3 else ecorr0 - 0.10
+    eorr_candidates = e_cat[e_cat < ecorr0 - _EORR_SELECTION_OFFSET_V]
+    eorr0 = float(np.median(eorr_candidates)) if eorr_candidates.size >= 3 else ecorr0 - _EORR_FALLBACK_OFFSET_V
     p0 = np.array([
         i0a, ba,
         i0c, bc,
@@ -282,8 +301,8 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
         i0_her_approx, b_her, e_her_approx,
     ], dtype=float)
 
-    lb = np.array([1e-12, 0.01, 1e-12, 0.01, ecorr0 - 0.10, 1e-10, -2.0, 0.005, 1e-12, 0.01, -2.0])
-    ub = np.array([1e-1, 0.5, 1e-1, 0.5, ecorr0 + 0.05, 1.0, 0.2, 0.2, 1e-1, 0.5, ecorr0 - 0.01])
+    lb = np.array([1e-12, 0.01, 1e-12, 0.01, ecorr0 - _ECORR_LOWER_BOUND_OFFSET_V, 1e-10, -2.0, 0.005, 1e-12, 0.01, -2.0])
+    ub = np.array([1e-1, 0.5, 1e-1, 0.5, ecorr0 + _ECORR_UPPER_BOUND_OFFSET_V, 1.0, 0.2, 0.2, 1e-1, 0.5, ecorr0 - _EHER_UPPER_BOUND_OFFSET_V])
     p0 = np.clip(p0, lb, ub)
 
     scale = np.maximum(np.abs(i_sorted), np.percentile(np.abs(i_sorted), 20))
