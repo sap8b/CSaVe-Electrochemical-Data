@@ -122,7 +122,8 @@ namespace CSaVe_Electrochemical_Data
         MessageWindowDialog mwd;
 
         private readonly PythonAnalysisService pythonAnalysisService;
-        private readonly List<string> polarizationAnalysisFiles = new();
+        private string _anodicPolarizationFilePath = string.Empty;
+        private string _cathodicPolarizationFilePath = string.Empty;
         private readonly List<string> eisAnalysisFiles = new();
         private readonly PlotModel polarizationPlotModel = new();
         private readonly PlotModel eisNyquistPlotModel = new();
@@ -951,6 +952,7 @@ namespace CSaVe_Electrochemical_Data
             public string File { get; set; } = string.Empty;
             public double Ecorr_mV { get; set; }
             public double Icorr_uAcm2 { get; set; }
+            public double I_ox_uAcm2 { get; set; }
             public double Ilim_uAcm2 { get; set; }
             public double HER_Onset_mV { get; set; }
             public double I_at_neg850mV_uAcm2 { get; set; }
@@ -1242,27 +1244,39 @@ namespace CSaVe_Electrochemical_Data
             }
         }
 
-        private void BrowsePolarizationFilesButton_Click(object sender, RoutedEventArgs e)
+        private void BrowseAnodicPolarizationButton_Click(object sender, RoutedEventArgs e)
         {
             using var dlg = new OpenFileDialog
             {
                 Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
-                Multiselect = true,
-                Title = "Select polarization CSV file(s)"
+                Title = "Select anodic (or full) polarization CSV file"
             };
             if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
                 return;
 
-            polarizationAnalysisFiles.Clear();
-            polarizationAnalysisFiles.AddRange(dlg.FileNames);
-            PolarizationFilesStatusText.Text = $"{polarizationAnalysisFiles.Count} polarization file(s) selected.";
+            _anodicPolarizationFilePath = dlg.FileName;
+            AnodicPolarizationFilePath.Text = dlg.FileName;
+        }
+
+        private void BrowseCathodicPolarizationButton_Click(object sender, RoutedEventArgs e)
+        {
+            using var dlg = new OpenFileDialog
+            {
+                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                Title = "Select cathodic polarization CSV file (optional)"
+            };
+            if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                return;
+
+            _cathodicPolarizationFilePath = dlg.FileName;
+            CathodicPolarizationFilePath.Text = dlg.FileName;
         }
 
         private void RunPolarizationAnalysisButton_Click(object sender, RoutedEventArgs e)
         {
-            if (polarizationAnalysisFiles.Count == 0)
+            if (string.IsNullOrWhiteSpace(_anodicPolarizationFilePath))
             {
-                PolarizationAnalysisStatusBox.Text = "Select one or more polarization CSV files first.";
+                PolarizationAnalysisStatusBox.Text = "Select an anodic (or full) polarization CSV file first.";
                 return;
             }
 
@@ -1275,7 +1289,8 @@ namespace CSaVe_Electrochemical_Data
             PolarizationAnalysisStatusBox.Text = "Running polarization analysis in system Python...";
             var response = pythonAnalysisService.RunPolarization(new PolarizationAnalysisRequest
             {
-                Files = polarizationAnalysisFiles.ToList(),
+                Anodic_File = _anodicPolarizationFilePath,
+                Cathodic_File = _cathodicPolarizationFilePath,
                 Exposed_Area_Cm2 = areaCm2,
                 Protection_Potentials_Mv = new List<double> { -850.0, -1050.0 }
             });
@@ -1291,6 +1306,7 @@ namespace CSaVe_Electrochemical_Data
                 File = Path.GetFileName(f.File),
                 Ecorr_mV = f.Metrics.GetValueOrDefault("ecorr_mv", double.NaN),
                 Icorr_uAcm2 = f.Metrics.GetValueOrDefault("icorr_ua_cm2", double.NaN),
+                I_ox_uAcm2 = f.Metrics.GetValueOrDefault("i_ox_ua_cm2", double.NaN),
                 Ilim_uAcm2 = f.Metrics.GetValueOrDefault("ilim_orr_ua_cm2", double.NaN),
                 HER_Onset_mV = f.Metrics.GetValueOrDefault("her_onset_mv", double.NaN),
                 I_at_neg850mV_uAcm2 = f.Metrics.GetValueOrDefault("i_at_-850mv_ua_cm2", double.NaN),
@@ -1300,9 +1316,9 @@ namespace CSaVe_Electrochemical_Data
 
             string summary = string.Join(Environment.NewLine, new[]
             {
-                $"Replicates: {rows.Count}",
                 $"E_corr (mV): {FormatMeanStd(rows.Select(r => r.Ecorr_mV))}",
                 $"i_corr (uA/cm²): {FormatMeanStd(rows.Select(r => r.Icorr_uAcm2))}",
+                $"i_ox (uA/cm²): {FormatMeanStd(rows.Select(r => r.I_ox_uAcm2))}",
                 $"i_lim ORR (uA/cm²): {FormatMeanStd(rows.Select(r => r.Ilim_uAcm2))}",
                 $"HER onset (mV): {FormatMeanStd(rows.Select(r => r.HER_Onset_mV))}",
                 $"i@-850 mV (uA/cm²): {FormatMeanStd(rows.Select(r => r.I_at_neg850mV_uAcm2))}",
@@ -1311,15 +1327,15 @@ namespace CSaVe_Electrochemical_Data
             PolarizationSummaryBox.Text = summary;
 
             polarizationPlotModel.Series.Clear();
-            for (int i = 0; i < response.Files.Count; i++)
+            if (response.Files.Count > 0)
             {
-                var fileResult = response.Files[i];
-                var color = GetSeriesColor(i);
+                var fileResult = response.Files[0];
 
+                // Combined curve in black
                 var dataSeries = new LineSeries
                 {
-                    Title = $"{Path.GetFileName(fileResult.File)} data",
-                    Color = color
+                    Title = "Combined curve",
+                    Color = OxyColors.Black
                 };
                 int count = Math.Min(fileResult.Plot.Potential_V.Count, fileResult.Plot.Current_Density_A_Cm2.Count);
                 for (int j = 0; j < count; j++)
@@ -1329,10 +1345,26 @@ namespace CSaVe_Electrochemical_Data
                 }
                 polarizationPlotModel.Series.Add(dataSeries);
 
+                // BV fit region highlighted in red
+                var bvRegionSeries = new LineSeries
+                {
+                    Title = "BV fit region",
+                    Color = OxyColors.Red,
+                    StrokeThickness = 2.5
+                };
+                int bvCount = Math.Min(fileResult.Plot.Bv_Region_Potential_V.Count, fileResult.Plot.Bv_Region_Current_Density_A_Cm2.Count);
+                for (int j = 0; j < bvCount; j++)
+                {
+                    double x = Math.Max(fileResult.Plot.Bv_Region_Current_Density_A_Cm2[j], 1.0e-12);
+                    bvRegionSeries.Points.Add(new DataPoint(x, fileResult.Plot.Bv_Region_Potential_V[j]));
+                }
+                polarizationPlotModel.Series.Add(bvRegionSeries);
+
+                // Model fit in dashed dark gray
                 var fitSeries = new LineSeries
                 {
-                    Title = $"{Path.GetFileName(fileResult.File)} fit",
-                    Color = OxyColor.FromAColor(170, color),
+                    Title = "Model fit",
+                    Color = OxyColor.FromRgb(64, 64, 64),
                     LineStyle = LineStyle.Dash
                 };
                 int fitCount = Math.Min(fileResult.Plot.Potential_V.Count, fileResult.Plot.Model_Current_Density_A_Cm2.Count);

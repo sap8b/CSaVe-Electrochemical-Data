@@ -5,8 +5,10 @@ namespace CSaVe_Electrochemical_Data.Models;
 
 public sealed class PolarizationAnalysisRequest
 {
-    [JsonPropertyName("files")]
-    public List<string> Files { get; set; } = new();
+    [JsonPropertyName("anodic_file")]
+    public string Anodic_File { get; set; } = string.Empty;
+    [JsonPropertyName("cathodic_file")]
+    public string Cathodic_File { get; set; } = string.Empty;
     [JsonPropertyName("exposed_area_cm2")]
     public double Exposed_Area_Cm2 { get; set; } = 0.495;
     [JsonPropertyName("protection_potentials_mv")]
@@ -57,6 +59,10 @@ public sealed class PolarizationPlotData
     public List<double> Current_Density_A_Cm2 { get; set; } = new();
     [JsonPropertyName("model_current_density_a_cm2")]
     public List<double> Model_Current_Density_A_Cm2 { get; set; } = new();
+    [JsonPropertyName("bv_region_potential_v")]
+    public List<double> Bv_Region_Potential_V { get; set; } = new();
+    [JsonPropertyName("bv_region_current_density_a_cm2")]
+    public List<double> Bv_Region_Current_Density_A_Cm2 { get; set; } = new();
 }
 
 public sealed class EisAnalysisResponse : AnalysisResponseBase
