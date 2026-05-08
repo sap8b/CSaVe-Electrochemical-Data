@@ -29,6 +29,7 @@ _SAVGOL_WINDOW_LENGTH: int = 11
 _SAVGOL_POLYORDER: int = 3
 _ORR_ACTIVATION_UPPER_OFFSET_V: float = 0.02
 _EORR_SELECTION_OFFSET_V: float = 0.05
+_ANODIC_TAFEL_EXPANDED_UPPER_OFFSET_V: float = 0.20
 
 
 @dataclass
@@ -141,8 +142,9 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
     def _smoothed_derivative(x: np.ndarray, y: np.ndarray) -> np.ndarray:
         if x.size < 2:
             return np.zeros_like(y, dtype=float)
-        if y.size >= _SAVGOL_WINDOW_LENGTH:
-            y = savgol_filter(y, _SAVGOL_WINDOW_LENGTH, _SAVGOL_POLYORDER)
+        window = _SAVGOL_WINDOW_LENGTH if _SAVGOL_WINDOW_LENGTH % 2 == 1 else _SAVGOL_WINDOW_LENGTH - 1
+        if window >= 5 and y.size >= window:
+            y = savgol_filter(y, window, _SAVGOL_POLYORDER)
         return np.gradient(y, x)
 
     # Step 1: HER Tafel fit
@@ -182,7 +184,7 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
             start = max(0, idx_lim_transition - n_lim)
             idx_lim_win = np.arange(start, idx_lim_transition, dtype=int)
             if idx_lim_win.size == 0:
-                idx_lim_win = np.asarray([idx_lim_transition], dtype=int)
+                idx_lim_win = np.arange(max(0, idx_lim_transition - 1), min(e_cat.size, idx_lim_transition + 2), dtype=int)
             if idx_lim_win.size > 0:
                 ilim0 = float(np.median(i_residual[idx_lim_win]))
             if ilim0 < 1e-12:
@@ -220,9 +222,9 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
     # Step 4: Anodic Tafel fit
     ba = 0.08
     i0a = max(icorr0, 1e-12)
-    an_mask = (e_sorted >= ecorr0 + 0.01) & (e_sorted <= ecorr0 + 0.15)
+    an_mask = (e_sorted >= ecorr0 + _BV_LOWER_OFFSET_V) & (e_sorted <= ecorr0 + _BV_UPPER_OFFSET_V)
     if np.sum(an_mask) < 5:
-        an_mask = (e_sorted >= ecorr0) & (e_sorted <= ecorr0 + 0.20)
+        an_mask = (e_sorted >= ecorr0) & (e_sorted <= ecorr0 + _ANODIC_TAFEL_EXPANDED_UPPER_OFFSET_V)
     if np.sum(an_mask) >= 2:
         try:
             e_an = e_sorted[an_mask]
