@@ -18,6 +18,11 @@ _EXP_CLIP_MIN: float = -50.0
 _EXP_CLIP_MAX: float = 50.0
 # Minimum cathodic points retained below E_corr for branch-aware fit before fallback to all points.
 _MIN_CATHODIC_POINTS: int = 10
+_MIN_HER_ORR_WINDOW_POINTS: int = 20
+_MAX_HER_ORR_WINDOW_POINTS: int = 50
+_MIN_ILIM_WINDOW_POINTS: int = 10
+_MAX_ILIM_WINDOW_POINTS: int = 20
+_POLISH_MAX_NFEV: int = 400
 
 
 @dataclass
@@ -142,7 +147,7 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
             log_i_cat = np.log10(np.maximum(i_cat, _LOG_FLOOR_A_CM2))
             d1_log_i_cat = _smoothed_derivative(e_cat, log_i_cat)
             idx_her_center = int(np.argmin(d1_log_i_cat))
-            n_her = int(np.clip(e_cat.size // 4, 20, 50))
+            n_her = int(np.clip(e_cat.size // 4, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
             idx_her_win = _window_around(idx_her_center, n_her, e_cat.size)
             if idx_her_win.size >= 2 and np.ptp(e_cat[idx_her_win]) > 0:
                 coeffs_her = np.polyfit(e_cat[idx_her_win], log_i_cat[idx_her_win], 1)
@@ -165,7 +170,7 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
             i_residual = np.maximum(i_cat - i_her_contribution, 1e-14)
             d1_residual = _smoothed_derivative(e_cat, i_residual)
             idx_lim_transition = int(np.argmax(d1_residual))
-            n_lim = int(np.clip(e_cat.size // 8, 10, 20))
+            n_lim = int(np.clip(e_cat.size // 8, _MIN_ILIM_WINDOW_POINTS, _MAX_ILIM_WINDOW_POINTS))
             start = max(0, idx_lim_transition - n_lim)
             idx_lim_win = np.arange(start, idx_lim_transition, dtype=int)
             if idx_lim_win.size == 0:
@@ -191,7 +196,7 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
             idx_candidates = np.where((np.arange(e_cat.size) >= idx_lim_transition) & (e_cat <= upper_bound_v))[0]
             if idx_candidates.size > 0:
                 idx_orr_center = int(idx_candidates[np.argmin(np.abs(d1_log_residual[idx_candidates]))])
-                n_orr = int(np.clip(e_cat.size // 4, 20, 50))
+                n_orr = int(np.clip(e_cat.size // 4, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
                 idx_orr_win = _window_around(idx_orr_center, n_orr, e_cat.size)
                 if idx_orr_win.size >= 2 and np.ptp(e_cat[idx_orr_win]) > 0:
                     coeffs_orr = np.polyfit(e_cat[idx_orr_win], log_residual[idx_orr_win], 1)
@@ -247,7 +252,8 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
     def residual(params: np.ndarray) -> np.ndarray:
         return (_model_total_current_density(e_sorted, params) - i_sorted) / scale
 
-    result = least_squares(residual, p0, bounds=(lb, ub), max_nfev=400, loss="soft_l1")
+    # Sequential initialization is already close to physically meaningful regions, so a short polish is sufficient.
+    result = least_squares(residual, p0, bounds=(lb, ub), max_nfev=_POLISH_MAX_NFEV, loss="soft_l1")
     fitted_sorted = _model_total_current_density(e_sorted, result.x)
     fitted = np.empty_like(fitted_sorted)
     fitted[order] = fitted_sorted
