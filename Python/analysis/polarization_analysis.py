@@ -174,7 +174,7 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
             start = max(0, idx_lim_transition - n_lim)
             idx_lim_win = np.arange(start, idx_lim_transition, dtype=int)
             if idx_lim_win.size == 0:
-                idx_lim_win = np.arange(max(0, idx_lim_transition - n_lim), min(e_cat.size, idx_lim_transition + 1), dtype=int)
+                idx_lim_win = np.asarray([idx_lim_transition], dtype=int)
             if idx_lim_win.size > 0:
                 ilim0 = float(np.median(i_residual[idx_lim_win]))
             if ilim0 < 1e-12:
@@ -193,7 +193,7 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
             d1_log_residual = _smoothed_derivative(e_cat, log_residual)
 
             upper_bound_v = ecorr0 - 0.02
-            idx_candidates = np.where((np.arange(e_cat.size) >= idx_lim_transition) & (e_cat <= upper_bound_v))[0]
+            idx_candidates = np.where((e_cat >= e_cat[idx_lim_transition]) & (e_cat <= upper_bound_v))[0]
             if idx_candidates.size > 0:
                 idx_orr_center = int(idx_candidates[np.argmin(np.abs(d1_log_residual[idx_candidates]))])
                 n_orr = int(np.clip(e_cat.size // 4, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
