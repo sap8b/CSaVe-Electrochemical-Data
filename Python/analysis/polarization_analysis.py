@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 from scipy.optimize import least_squares
+from scipy.signal import savgol_filter
 
 # Tafel / BV near-linear region boundaries relative to E_corr (V)
 _BV_LOWER_OFFSET_V: float = 0.01
@@ -17,6 +18,20 @@ _EXP_CLIP_MIN: float = -50.0
 _EXP_CLIP_MAX: float = 50.0
 # Minimum cathodic points retained below E_corr for branch-aware fit before fallback to all points.
 _MIN_CATHODIC_POINTS: int = 10
+_MIN_HER_ORR_WINDOW_POINTS: int = 20
+_MAX_HER_ORR_WINDOW_POINTS: int = 50
+_MIN_ILIM_WINDOW_POINTS: int = 10
+_MAX_ILIM_WINDOW_POINTS: int = 20
+_POLISH_MAX_NFEV: int = 400
+_HER_ORR_WINDOW_DIVISOR: int = 4
+_ILIM_WINDOW_DIVISOR: int = 8
+_SAVGOL_WINDOW_LENGTH: int = 11
+_SAVGOL_POLYORDER: int = 3
+_ORR_ACTIVATION_UPPER_OFFSET_V: float = 0.02
+_EORR_SELECTION_OFFSET_V: float = 0.05
+_ANODIC_TAFEL_EXPANDED_UPPER_OFFSET_V: float = 0.20
+_ILIM_FALLBACK_WINDOW_BEFORE: int = 1
+_ILIM_FALLBACK_WINDOW_AFTER: int = 2
 
 
 @dataclass
@@ -104,42 +119,164 @@ def _estimate_ecorr_from_forward_scan(potential_v: np.ndarray, current_a: np.nda
     return float(e[np.argmin(np.abs(i))])
 
 
-def _fit_bv_components(e: np.ndarray, i: np.ndarray, ecorr_hint: float | None = None) -> tuple[np.ndarray, np.ndarray]:
-    if ecorr_hint is not None:
-        ecorr0 = ecorr_hint
-        idx_ecorr = int(np.argmin(np.abs(e - ecorr_hint)))
-    else:
-        idx_ecorr = int(np.argmin(np.abs(i)))
-        ecorr0 = float(e[idx_ecorr])
-    icorr0 = max(abs(i[idx_ecorr]), 1e-10)
+def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: float) -> tuple[np.ndarray, np.ndarray]:
+    order = np.argsort(e)
+    e_sorted = np.asarray(e[order], dtype=float)
+    i_sorted = np.asarray(current_density[order], dtype=float)
+    if e_sorted.size == 0 or i_sorted.size == 0 or e_sorted.size != i_sorted.size:
+        raise ValueError("Polarization fitting requires non-empty potential/current arrays of equal length.")
 
-    cathodic = i[e < ecorr0]
-    ilim0 = float(np.percentile(np.abs(cathodic), 75)) if cathodic.size > 5 else icorr0 * 3.0
-    eorr0 = float(np.median(e[e < ecorr0])) if np.any(e < ecorr0) else ecorr0 - 0.05
+    ecorr0 = float(ecorr_hint) if np.isfinite(ecorr_hint) else float(e_sorted[np.argmin(np.abs(i_sorted))])
+    idx_ecorr = int(np.argmin(np.abs(e_sorted - ecorr0)))
+    icorr0 = max(abs(i_sorted[idx_ecorr]), 1e-10)
 
+    cat_mask = e_sorted < ecorr0
+    e_cat = e_sorted[cat_mask]
+    i_cat = np.abs(i_sorted[cat_mask])
+
+    def _window_around(center_idx: int, n_points: int, total: int) -> np.ndarray:
+        if total <= 0:
+            return np.asarray([], dtype=int)
+        n = min(max(2, n_points), total)
+        start = max(0, min(center_idx - n // 2, total - n))
+        return np.arange(start, start + n, dtype=int)
+
+    def _smoothed_derivative(x: np.ndarray, y: np.ndarray) -> np.ndarray:
+        if x.size < 2:
+            return np.zeros_like(y, dtype=float)
+        window_length = min(_SAVGOL_WINDOW_LENGTH, y.size if y.size % 2 == 1 else y.size - 1)
+        if window_length % 2 == 0:
+            window_length = max(1, window_length - 1)
+        if window_length >= 5 and y.size >= window_length:
+            y = savgol_filter(y, window_length, _SAVGOL_POLYORDER)
+        return np.gradient(y, x)
+
+    # Step 1: HER Tafel fit
+    b_her = 0.06
+    i0_her_approx = max(icorr0 * 0.5, 1e-12)
+    e_her_approx = ecorr0 - 0.15
+    i_her_contribution = np.zeros_like(i_cat)
+    if e_cat.size >= 5:
+        try:
+            log_i_cat = np.log10(np.maximum(i_cat, _LOG_FLOOR_A_CM2))
+            d_log_i_cat_de = _smoothed_derivative(e_cat, log_i_cat)
+            idx_her_center = int(np.argmin(d_log_i_cat_de))
+            n_her = int(np.clip(e_cat.size // _HER_ORR_WINDOW_DIVISOR, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
+            idx_her_win = _window_around(idx_her_center, n_her, e_cat.size)
+            if idx_her_win.size >= 2 and np.ptp(e_cat[idx_her_win]) > 0:
+                coeffs_her = np.polyfit(e_cat[idx_her_win], log_i_cat[idx_her_win], 1)
+                slope_her = float(coeffs_her[0])
+                if abs(slope_her) > 0:
+                    b_her = 1.0 / (abs(slope_her) * np.log(10.0))
+                    i0_her_approx = float(10.0 ** np.polyval(coeffs_her, ecorr0))
+                    e_her_approx = float(np.median(e_cat[idx_her_win]))
+                    b_her = float(np.clip(b_her, 0.01, 0.5))
+                    i0_her_approx = float(np.clip(i0_her_approx, 1e-12, 1e-1))
+        except Exception:
+            pass
+        i_her_contribution = i0_her_approx * np.exp(np.clip(-(e_cat - ecorr0) / b_her, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
+
+    # Step 2: i_lim estimate
+    ilim0 = float(np.percentile(i_cat, 75)) if i_cat.size > 0 else icorr0 * 3.0
+    idx_lim_transition = 0
+    if e_cat.size >= 5:
+        try:
+            i_residual = np.maximum(i_cat - i_her_contribution, 1e-14)
+            d_residual_de = _smoothed_derivative(e_cat, i_residual)
+            idx_lim_transition = int(np.argmax(d_residual_de))
+            n_lim = int(np.clip(e_cat.size // _ILIM_WINDOW_DIVISOR, _MIN_ILIM_WINDOW_POINTS, _MAX_ILIM_WINDOW_POINTS))
+            start = max(0, idx_lim_transition - n_lim)
+            idx_lim_win = np.arange(start, idx_lim_transition, dtype=int)
+            if idx_lim_win.size == 0:
+                idx_lim_win = np.arange(
+                    max(0, idx_lim_transition - _ILIM_FALLBACK_WINDOW_BEFORE),
+                    min(e_cat.size, idx_lim_transition + _ILIM_FALLBACK_WINDOW_AFTER),
+                    dtype=int,
+                )
+            if idx_lim_win.size > 0:
+                ilim0 = float(np.median(i_residual[idx_lim_win]))
+            if ilim0 < 1e-12:
+                ilim0 = float(np.percentile(i_cat, 75))
+        except Exception:
+            ilim0 = float(np.percentile(i_cat, 75))
+    ilim0 = float(np.clip(max(ilim0, 1e-12), 1e-10, 1.0))
+
+    # Step 3: ORR activation BV fit
+    bc = 0.08
+    i0c = max(icorr0, 1e-12)
+    if e_cat.size >= 5:
+        try:
+            i_residual = np.maximum(i_cat - i_her_contribution, 1e-14)
+            log_residual = np.log10(np.maximum(i_residual, _LOG_FLOOR_A_CM2))
+            d_log_residual_de = _smoothed_derivative(e_cat, log_residual)
+
+            upper_bound_v = ecorr0 - _ORR_ACTIVATION_UPPER_OFFSET_V
+            idx_candidates = np.where((e_cat >= e_cat[idx_lim_transition]) & (e_cat <= upper_bound_v))[0]
+            if idx_candidates.size > 0:
+                idx_orr_center = int(idx_candidates[np.argmin(np.abs(d_log_residual_de[idx_candidates]))])
+                n_orr = int(np.clip(e_cat.size // _HER_ORR_WINDOW_DIVISOR, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
+                idx_orr_win = _window_around(idx_orr_center, n_orr, e_cat.size)
+                if idx_orr_win.size >= 2 and np.ptp(e_cat[idx_orr_win]) > 0:
+                    coeffs_orr = np.polyfit(e_cat[idx_orr_win], log_residual[idx_orr_win], 1)
+                    slope_orr = float(coeffs_orr[0])
+                    if abs(slope_orr) > 0:
+                        bc = 1.0 / (abs(slope_orr) * np.log(10.0))
+                        i0c = float(10.0 ** np.polyval(coeffs_orr, ecorr0))
+        except Exception:
+            pass
+    bc = float(np.clip(bc, 0.01, 0.5))
+    i0c = float(np.clip(i0c, 1e-12, 1e-1))
+
+    # Step 4: Anodic Tafel fit
+    ba = 0.08
+    i0a = max(icorr0, 1e-12)
+    an_mask = (e_sorted >= ecorr0 + _BV_LOWER_OFFSET_V) & (e_sorted <= ecorr0 + _BV_UPPER_OFFSET_V)
+    if np.sum(an_mask) < 5:
+        an_mask = (e_sorted >= ecorr0) & (e_sorted <= ecorr0 + _ANODIC_TAFEL_EXPANDED_UPPER_OFFSET_V)
+    if np.sum(an_mask) >= 2:
+        try:
+            e_an = e_sorted[an_mask]
+            log_i_an = np.log10(np.maximum(np.abs(i_sorted[an_mask]), _LOG_FLOOR_A_CM2))
+            if np.ptp(e_an) > 0:
+                coeffs_an = np.polyfit(e_an, log_i_an, 1)
+                slope_an = float(coeffs_an[0])
+                if abs(slope_an) > 0:
+                    ba = 1.0 / (abs(slope_an) * np.log(10.0))
+                    i0a = float(10.0 ** np.polyval(coeffs_an, ecorr0))
+        except Exception:
+            pass
+    ba = float(np.clip(ba, 0.01, 0.5))
+    i0a = float(np.clip(i0a, 1e-12, 1e-1))
+
+    # Step 5: short constrained polish
+    eorr_candidates = e_cat[e_cat < ecorr0 - _EORR_SELECTION_OFFSET_V]
+    eorr0 = float(np.median(eorr_candidates)) if eorr_candidates.size > 0 else ecorr0 - 0.10
     p0 = np.array([
-        icorr0, 0.08,
-        icorr0, 0.08,
+        i0a, ba,
+        i0c, bc,
         ecorr0,
-        max(ilim0, icorr0 * 1.5),
+        ilim0,
         eorr0,
         0.04,
-        icorr0 * 0.5,
-        0.06,
-        ecorr0 - 0.15,
-    ])
-    # Bounds order: [i0a, ba, i0c, bc, ecorr, ilim_orr, e_orr, w_orr, i0_her, b_her, e_her]
+        i0_her_approx, b_her, e_her_approx,
+    ], dtype=float)
+
     lb = np.array([1e-12, 0.01, 1e-12, 0.01, -2.0, 1e-10, -2.0, 0.005, 1e-12, 0.01, -2.0])
     ub = np.array([1e-1, 0.5, 1e-1, 0.5, 0.5, 1.0, 0.2, 0.2, 1e-1, 0.5, 0.0])
+    p0 = np.clip(p0, lb, ub)
 
-    scale = np.maximum(np.abs(i), np.percentile(np.abs(i), 20))
+    scale = np.maximum(np.abs(i_sorted), np.percentile(np.abs(i_sorted), 20))
 
     def residual(params: np.ndarray) -> np.ndarray:
-        return (_model_total_current_density(e, params) - i) / scale
+        return (_model_total_current_density(e_sorted, params) - i_sorted) / scale
 
-    # 1200 evaluations balances convergence for 11-parameter BV/transport fits while keeping runtime interactive.
-    result = least_squares(residual, p0, bounds=(lb, ub), max_nfev=1200, loss="soft_l1")
-    return result.x, _model_total_current_density(e, result.x)
+    # Sequential region-by-region initialization starts near a good local optimum, so 400 evaluations
+    # is typically sufficient for stable convergence while keeping analysis responsive.
+    result = least_squares(residual, p0, bounds=(lb, ub), max_nfev=_POLISH_MAX_NFEV, loss="soft_l1")
+    fitted_sorted = _model_total_current_density(e_sorted, result.x)
+    fitted = np.empty_like(fitted_sorted)
+    fitted[order] = fitted_sorted
+    return result.x, fitted
 
 
 def _tafel_i_ox(e: np.ndarray, current_density: np.ndarray, ecorr: float) -> float:
