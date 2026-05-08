@@ -23,6 +23,12 @@ _MAX_HER_ORR_WINDOW_POINTS: int = 50
 _MIN_ILIM_WINDOW_POINTS: int = 10
 _MAX_ILIM_WINDOW_POINTS: int = 20
 _POLISH_MAX_NFEV: int = 400
+_HER_ORR_WINDOW_DIVISOR: int = 4
+_ILIM_WINDOW_DIVISOR: int = 8
+_SAVGOL_WINDOW_LENGTH: int = 11
+_SAVGOL_POLYORDER: int = 3
+_ORR_ACTIVATION_UPPER_OFFSET_V: float = 0.02
+_EORR_SELECTION_OFFSET_V: float = 0.05
 
 
 @dataclass
@@ -133,8 +139,8 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
     def _smoothed_derivative(x: np.ndarray, y: np.ndarray) -> np.ndarray:
         if x.size < 2:
             return np.zeros_like(y, dtype=float)
-        if y.size >= 11:
-            y = savgol_filter(y, 11, 3)
+        if y.size >= _SAVGOL_WINDOW_LENGTH:
+            y = savgol_filter(y, _SAVGOL_WINDOW_LENGTH, _SAVGOL_POLYORDER)
         return np.gradient(y, x)
 
     # Step 1: HER Tafel fit
@@ -147,7 +153,7 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
             log_i_cat = np.log10(np.maximum(i_cat, _LOG_FLOOR_A_CM2))
             d1_log_i_cat = _smoothed_derivative(e_cat, log_i_cat)
             idx_her_center = int(np.argmin(d1_log_i_cat))
-            n_her = int(np.clip(e_cat.size // 4, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
+            n_her = int(np.clip(e_cat.size // _HER_ORR_WINDOW_DIVISOR, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
             idx_her_win = _window_around(idx_her_center, n_her, e_cat.size)
             if idx_her_win.size >= 2 and np.ptp(e_cat[idx_her_win]) > 0:
                 coeffs_her = np.polyfit(e_cat[idx_her_win], log_i_cat[idx_her_win], 1)
@@ -170,7 +176,7 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
             i_residual = np.maximum(i_cat - i_her_contribution, 1e-14)
             d1_residual = _smoothed_derivative(e_cat, i_residual)
             idx_lim_transition = int(np.argmax(d1_residual))
-            n_lim = int(np.clip(e_cat.size // 8, _MIN_ILIM_WINDOW_POINTS, _MAX_ILIM_WINDOW_POINTS))
+            n_lim = int(np.clip(e_cat.size // _ILIM_WINDOW_DIVISOR, _MIN_ILIM_WINDOW_POINTS, _MAX_ILIM_WINDOW_POINTS))
             start = max(0, idx_lim_transition - n_lim)
             idx_lim_win = np.arange(start, idx_lim_transition, dtype=int)
             if idx_lim_win.size == 0:
@@ -192,11 +198,11 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
             log_residual = np.log10(np.maximum(i_residual, _LOG_FLOOR_A_CM2))
             d1_log_residual = _smoothed_derivative(e_cat, log_residual)
 
-            upper_bound_v = ecorr0 - 0.02
+            upper_bound_v = ecorr0 - _ORR_ACTIVATION_UPPER_OFFSET_V
             idx_candidates = np.where((e_cat >= e_cat[idx_lim_transition]) & (e_cat <= upper_bound_v))[0]
             if idx_candidates.size > 0:
                 idx_orr_center = int(idx_candidates[np.argmin(np.abs(d1_log_residual[idx_candidates]))])
-                n_orr = int(np.clip(e_cat.size // 4, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
+                n_orr = int(np.clip(e_cat.size // _HER_ORR_WINDOW_DIVISOR, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
                 idx_orr_win = _window_around(idx_orr_center, n_orr, e_cat.size)
                 if idx_orr_win.size >= 2 and np.ptp(e_cat[idx_orr_win]) > 0:
                     coeffs_orr = np.polyfit(e_cat[idx_orr_win], log_residual[idx_orr_win], 1)
@@ -231,7 +237,7 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
     i0a = float(np.clip(i0a, 1e-12, 1e-1))
 
     # Step 5: short constrained polish
-    eorr_candidates = e_cat[e_cat < ecorr0 - 0.05]
+    eorr_candidates = e_cat[e_cat < ecorr0 - _EORR_SELECTION_OFFSET_V]
     eorr0 = float(np.median(eorr_candidates)) if eorr_candidates.size > 0 else ecorr0 - 0.10
     p0 = np.array([
         i0a, ba,
