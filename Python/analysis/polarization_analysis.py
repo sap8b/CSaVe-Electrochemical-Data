@@ -10,45 +10,56 @@ from scipy.optimize import least_squares
 from scipy.signal import savgol_filter
 
 # Tafel / BV near-linear region boundaries relative to E_corr (V)
-_BV_LOWER_OFFSET_V: float = 0.01
-_BV_UPPER_OFFSET_V: float = 0.15
+_BV_LOWER_OFFSET_V: float =                         0.01
+_BV_UPPER_OFFSET_V: float =                         0.15
 # Floor applied before log10 to avoid log(0) errors
-_LOG_FLOOR_A_CM2: float = 1e-20
-_EXP_CLIP_MIN: float = -50.0
-_EXP_CLIP_MAX: float = 50.0
+_LOG_FLOOR_A_CM2: float =                           1e-20
+_EXP_CLIP_MIN: float =                              -50.0
+_EXP_CLIP_MAX: float =                              50.0
+_ORR_ACTIVATION_UPPER_OFFSET_V: float =             0.02
+_MIDDLE_RANGE_LOWER_PERCENTILE: float =             20.0
+_MIDDLE_RANGE_UPPER_PERCENTILE: float =             80.0
+_EORR_SELECTION_OFFSET_V: float =                   0.05
+_EORR_FALLBACK_OFFSET_V: float =                    0.10
+_ECORR_LOWER_BOUND_OFFSET_V: float =                0.10
+_ECORR_UPPER_BOUND_OFFSET_V: float =                0.05
+_EHER_UPPER_BOUND_OFFSET_V: float =                 0.01
+_ANODIC_TAFEL_EXPANDED_UPPER_OFFSET_V: float =      0.20
+_DEFAULT_B_HER_V: float =                           0.12
+_DEFAULT_I0_HER_A_CM2: float =                      1e-9
+_DEFAULT_E_HER_OFFSET_V: float =                    0.30
+_DEFAULT_BC_V: float =                              0.10
+_DEFAULT_BA_V: float =                              0.06
+_DEFAULT_I0A_A_CM2: float =                         1e-8
+_DEFAULT_I0C_FRACTION: float =                      0.5
 # Minimum cathodic points retained below E_corr for branch-aware fit before fallback to all points.
-_MIN_CATHODIC_POINTS: int = 10
-_MIN_HER_ORR_WINDOW_POINTS: int = 20
-_MAX_HER_ORR_WINDOW_POINTS: int = 50
-_MIN_ILIM_WINDOW_POINTS: int = 10
-_MAX_ILIM_WINDOW_POINTS: int = 20
-_POLISH_MAX_NFEV: int = 600
-_HER_ORR_WINDOW_DIVISOR: int = 4
-_ILIM_WINDOW_DIVISOR: int = 8
-_SEQUENTIAL_WINDOW_DIVISOR: int = 5
-_SAVGOL_WINDOW_DIVISOR: int = 4
-_SAVGOL_WINDOW_LENGTH: int = 11
-_MIN_SAVGOL_POINTS: int = 11
-_MAX_SAVGOL_WINDOW_LENGTH: int = 21
-_SAVGOL_POLYORDER: int = 3
-_ORR_ACTIVATION_UPPER_OFFSET_V: float = 0.02
-_MIDDLE_RANGE_LOWER_PERCENTILE: float = 20.0
-_MIDDLE_RANGE_UPPER_PERCENTILE: float = 80.0
-_EORR_SELECTION_OFFSET_V: float = 0.05
-_EORR_FALLBACK_OFFSET_V: float = 0.10
-_ECORR_LOWER_BOUND_OFFSET_V: float = 0.10
-_ECORR_UPPER_BOUND_OFFSET_V: float = 0.05
-_EHER_UPPER_BOUND_OFFSET_V: float = 0.01
-_ANODIC_TAFEL_EXPANDED_UPPER_OFFSET_V: float = 0.20
-_DEFAULT_B_HER_V: float = 0.12
-_DEFAULT_I0_HER_A_CM2: float = 1e-9
-_DEFAULT_E_HER_OFFSET_V: float = 0.30
-_DEFAULT_BC_V: float = 0.10
-_DEFAULT_BA_V: float = 0.06
-_DEFAULT_I0A_A_CM2: float = 1e-8
-_DEFAULT_I0C_FRACTION: float = 0.5
-_ILIM_FALLBACK_WINDOW_BEFORE: int = 1
-_ILIM_FALLBACK_WINDOW_AFTER: int = 2
+_MIN_CATHODIC_POINTS: int =                         10
+_MIN_HER_ORR_WINDOW_POINTS: int =                   20
+_MAX_HER_ORR_WINDOW_POINTS: int =                   50
+_MIN_ILIM_WINDOW_POINTS: int =                      10
+_MAX_ILIM_WINDOW_POINTS: int =                      20
+_POLISH_MAX_NFEV: int =                             600
+_HER_ORR_WINDOW_DIVISOR: int =                      4
+_ILIM_WINDOW_DIVISOR: int =                         8
+_SEQUENTIAL_WINDOW_DIVISOR: int =                   5
+_SAVGOL_WINDOW_DIVISOR: int =                       4
+_SAVGOL_WINDOW_LENGTH: int =                        11
+_MIN_SAVGOL_POINTS: int =                           11
+_MAX_SAVGOL_WINDOW_LENGTH: int =                    21
+_SAVGOL_POLYORDER: int =                            3
+_ILIM_FALLBACK_WINDOW_BEFORE: int =                 1
+_ILIM_FALLBACK_WINDOW_AFTER: int =                  2
+
+R = 8.3145  # J/(mol*K)
+F = 96485.3329  # C/mol
+convertCtoK = lambda c: c + 273.15
+T = convertCtoK(25.0)
+z_ORR = 4
+beta_ORR = 0.5
+z_HER = 2
+beta_HER = 0.5
+z_Metal = 2
+beta_Metal = 0.5
 
 
 @dataclass
@@ -105,12 +116,20 @@ def _interp_current_density_at_potential(potential_v: np.ndarray, current_densit
 
 def _model_total_current_density(e: np.ndarray, p: np.ndarray) -> np.ndarray:
     i0a, ba, i0c, bc, ecorr, ilim_orr, e_orr, w_orr, i0_her, b_her, e_her = p
+    # The purpose of this function is to generate a smooth model curve for plotting and fitting, 
+    # not to perfectly capture the true mechanistic current contributions, so we use a simple sum 
+    # of components rather than the more correct BV + HER + ORR combination formula.
 
-    anodic = i0a * np.exp(np.clip((e - ecorr) / ba, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
-    cathodic = i0c * np.exp(np.clip(-(e - ecorr) / bc, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
-    orr = -ilim_orr / (1.0 + np.exp(np.clip((e - e_orr) / w_orr, -60, 60)))
-    her = -i0_her * np.exp(np.clip(-(e - e_her) / b_her, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
-    return anodic - cathodic + orr + her
+    #i_anodic = i0a * np.exp(np.clip((e - ecorr) / ba, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
+    eta = e - ecorr
+    expval = (eta*beta_Metal*z_Metal*F)/(R*T)
+    i_anodic = i0a * np.exp(expval)
+
+    i_cathodic = i0c * np.exp(np.clip(-(e - ecorr) / bc, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
+    i_orr = -ilim_orr / (1.0 + np.exp(np.clip((e - e_orr) / w_orr, -60, 60)))
+    i_her = -i0_her * np.exp(np.clip(-(e - e_her) / b_her, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
+
+    return i_anodic - i_cathodic + i_orr + i_her
 
 
 def _estimate_ecorr_from_forward_scan(potential_v: np.ndarray, current_a: np.ndarray) -> float:
