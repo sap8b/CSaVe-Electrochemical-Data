@@ -13,6 +13,10 @@ _BV_LOWER_OFFSET_V: float = 0.01
 _BV_UPPER_OFFSET_V: float = 0.15
 # Floor applied before log10 to avoid log(0) errors
 _LOG_FLOOR_A_CM2: float = 1e-20
+_EXP_CLIP_MIN: float = -50.0
+_EXP_CLIP_MAX: float = 50.0
+# Minimum cathodic points retained below E_corr for branch-aware fit before fallback to all points.
+_MIN_CATHODIC_POINTS: int = 10
 
 
 @dataclass
@@ -70,16 +74,43 @@ def _interp_current_density_at_potential(potential_v: np.ndarray, current_densit
 def _model_total_current_density(e: np.ndarray, p: np.ndarray) -> np.ndarray:
     i0a, ba, i0c, bc, ecorr, ilim_orr, e_orr, w_orr, i0_her, b_her, e_her = p
 
-    anodic = i0a * np.exp(np.clip((e - ecorr) / ba, -50, 50))
-    cathodic = i0c * np.exp(np.clip(-(e - ecorr) / bc, -50, 50))
+    anodic = i0a * np.exp(np.clip((e - ecorr) / ba, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
+    cathodic = i0c * np.exp(np.clip(-(e - ecorr) / bc, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
     orr = -ilim_orr / (1.0 + np.exp(np.clip((e - e_orr) / w_orr, -60, 60)))
-    her = -i0_her * np.exp(np.clip(-(e - e_her) / b_her, -50, 50))
+    her = -i0_her * np.exp(np.clip(-(e - e_her) / b_her, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
     return anodic - cathodic + orr + her
 
 
-def _fit_bv_components(e: np.ndarray, i: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    idx_ecorr = int(np.argmin(np.abs(i)))
-    ecorr0 = float(e[idx_ecorr])
+def _estimate_ecorr_from_forward_scan(potential_v: np.ndarray, current_a: np.ndarray) -> float:
+    """Estimate E_corr from the forward (anodic) scan data.
+
+    Looks for the first zero crossing of current as potential increases
+    (where net current transitions from negative to positive).
+    Falls back to the minimum |current| point if no zero crossing is found.
+    """
+    order = np.argsort(potential_v)
+    e = potential_v[order]
+    i = current_a[order]
+
+    sign_changes = np.where(np.diff(np.sign(i)))[0]
+    if len(sign_changes) > 0:
+        idx = sign_changes[0]
+        e1, e2 = e[idx], e[idx + 1]
+        i1, i2 = i[idx], i[idx + 1]
+        if (i2 - i1) != 0:
+            return float(e1 - i1 * (e2 - e1) / (i2 - i1))
+        return float((e1 + e2) / 2.0)
+
+    return float(e[np.argmin(np.abs(i))])
+
+
+def _fit_bv_components(e: np.ndarray, i: np.ndarray, ecorr_hint: float | None = None) -> tuple[np.ndarray, np.ndarray]:
+    if ecorr_hint is not None:
+        ecorr0 = ecorr_hint
+        idx_ecorr = int(np.argmin(np.abs(e - ecorr_hint)))
+    else:
+        idx_ecorr = int(np.argmin(np.abs(i)))
+        ecorr0 = float(e[idx_ecorr])
     icorr0 = max(abs(i[idx_ecorr]), 1e-10)
 
     cathodic = i[e < ecorr0]
@@ -130,18 +161,32 @@ def _tafel_i_ox(e: np.ndarray, current_density: np.ndarray, ecorr: float) -> flo
     return float(10.0 ** log_i_ox)
 
 
-def _bv_region_points(
+def _compute_component_curves(
     e: np.ndarray,
-    current_density: np.ndarray,
-    ecorr: float,
-) -> tuple[list[float], list[float]]:
-    """Return the subset of (E, |i|) points in the BV near-linear region
-    (0.01 V <= |E - E_corr| <= 0.15 V) used to highlight the red fit region."""
-    mask = (np.abs(e - ecorr) >= _BV_LOWER_OFFSET_V) & (np.abs(e - ecorr) <= _BV_UPPER_OFFSET_V)
-    e_region = e[mask]
-    i_region = np.abs(current_density[mask])
-    order = np.argsort(e_region)
-    return e_region[order].tolist(), i_region[order].tolist()
+    params: np.ndarray,
+) -> dict[str, list[float]]:
+    """Return |i| vs E for each electrochemical component from the fitted BV model.
+
+    Components:
+        i_ox   – anodic metal dissolution:  i0a * exp((E-Ecorr)/ba)
+        i_orr  – ORR mixed kinetics:        i_act_orr * ilim / (i_act_orr + ilim)
+                 where i_act_orr = i0c * exp(-(E-Ecorr)/bc)
+        i_her  – HER activation:            i0_her * exp(-(E-e_her)/b_her)
+    """
+    i0a, ba, i0c, bc, ecorr, ilim_orr, e_orr, w_orr, i0_her, b_her, e_her = params
+
+    i_ox = i0a * np.exp(np.clip((e - ecorr) / ba, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
+
+    i_act_orr = i0c * np.exp(np.clip(-(e - ecorr) / bc, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
+    i_orr = i_act_orr * ilim_orr / (i_act_orr + ilim_orr)
+
+    i_her = i0_her * np.exp(np.clip(-(e - e_her) / b_her, _EXP_CLIP_MIN, _EXP_CLIP_MAX))
+
+    return {
+        "i_ox_curve_a_cm2": i_ox.tolist(),
+        "i_orr_curve_a_cm2": i_orr.tolist(),
+        "i_her_curve_a_cm2": i_her.tolist(),
+    }
 
 
 def _safe_stats(values: list[float]) -> dict[str, float]:
@@ -160,20 +205,42 @@ def run_polarization_analysis(request: dict[str, Any]) -> dict[str, Any]:
 
     anodic_path = Path(anodic_path_str)
     anodic_data = _read_polarization_csv(anodic_path)
+    ecorr_hint = _estimate_ecorr_from_forward_scan(anodic_data.potential_v, anodic_data.current_a)
 
     if cathodic_path_str:
         cathodic_path = Path(cathodic_path_str)
         cathodic_data = _read_polarization_csv(cathodic_path)
-        combined_potential = np.concatenate([anodic_data.potential_v, cathodic_data.potential_v])
-        combined_current = np.concatenate([anodic_data.current_a, cathodic_data.current_a])
-    else:
-        combined_potential = anodic_data.potential_v
-        combined_current = anodic_data.current_a
 
-    # Sort by potential for a clean monotonic curve
-    order = np.argsort(combined_potential)
-    potential_v = combined_potential[order]
-    current_a = combined_current[order]
+        # Full combined data for display (shows hysteresis loop)
+        display_potential = np.concatenate([anodic_data.potential_v, cathodic_data.potential_v])
+        display_current = np.concatenate([anodic_data.current_a, cathodic_data.current_a])
+        disp_order = np.argsort(display_potential)
+        display_potential = display_potential[disp_order]
+        display_current = display_current[disp_order]
+
+        # Branch-aware fitting dataset (no hysteresis contamination)
+        cat_mask = cathodic_data.potential_v < ecorr_hint
+        if cat_mask.sum() < _MIN_CATHODIC_POINTS:
+            cat_mask = np.ones(len(cathodic_data.potential_v), dtype=bool)
+        anodic_mask = anodic_data.potential_v >= ecorr_hint
+
+        fit_potential = np.concatenate([
+            cathodic_data.potential_v[cat_mask],
+            anodic_data.potential_v[anodic_mask],
+        ])
+        fit_current = np.concatenate([
+            cathodic_data.current_a[cat_mask],
+            anodic_data.current_a[anodic_mask],
+        ])
+        fit_order = np.argsort(fit_potential)
+        potential_v = fit_potential[fit_order]
+        current_a = fit_current[fit_order]
+    else:
+        order = np.argsort(anodic_data.potential_v)
+        potential_v = anodic_data.potential_v[order]
+        current_a = anodic_data.current_a[order]
+        display_potential = potential_v
+        display_current = current_a
 
     area_cm2 = float(request.get("exposed_area_cm2", 0.495))
     if area_cm2 <= 0:
@@ -183,8 +250,9 @@ def run_polarization_analysis(request: dict[str, Any]) -> dict[str, Any]:
     target_vs = [float(v) / 1000.0 for v in target_mvs]
 
     current_density = current_a / area_cm2
+    display_current_density = display_current / area_cm2
 
-    fit_params, model_i = _fit_bv_components(potential_v, current_density)
+    fit_params, _ = _fit_bv_components(potential_v, current_density, ecorr_hint=ecorr_hint)
 
     ecorr = float(fit_params[4])
     icorr = float(max(fit_params[0], fit_params[2]))
@@ -209,13 +277,13 @@ def run_polarization_analysis(request: dict[str, Any]) -> dict[str, Any]:
     cp_values: dict[str, list[float]] = {str(int(v)): [] for v in target_mvs}
     cp_metric: dict[str, float] = {}
     for mv, tv in zip(target_mvs, target_vs):
-        val = _interp_current_density_at_potential(potential_v, current_density, tv)
+        val = _interp_current_density_at_potential(display_potential, display_current_density, tv)
         key = f"i_at_{int(mv)}mv_ua_cm2"
         cp_metric[key] = val * 1.0e6
         cp_values[str(int(mv))].append(cp_metric[key])
     metric.update(cp_metric)
 
-    bv_e, bv_i = _bv_region_points(potential_v, current_density, ecorr)
+    component_curves = _compute_component_curves(display_potential, fit_params)
 
     file_result = {
         "file": str(anodic_path),
@@ -234,11 +302,12 @@ def run_polarization_analysis(request: dict[str, Any]) -> dict[str, Any]:
             "e_her_onset_v": float(fit_params[10]),
         },
         "plot": {
-            "potential_v": potential_v.tolist(),
-            "current_density_a_cm2": np.abs(current_density).tolist(),
-            "model_current_density_a_cm2": np.abs(model_i).tolist(),
-            "bv_region_potential_v": bv_e,
-            "bv_region_current_density_a_cm2": bv_i,
+            "potential_v": display_potential.tolist(),
+            "current_density_a_cm2": np.abs(display_current_density).tolist(),
+            "model_current_density_a_cm2": np.abs(_model_total_current_density(display_potential, fit_params)).tolist(),
+            "i_ox_curve_a_cm2": component_curves["i_ox_curve_a_cm2"],
+            "i_orr_curve_a_cm2": component_curves["i_orr_curve_a_cm2"],
+            "i_her_curve_a_cm2": component_curves["i_her_curve_a_cm2"],
         },
     }
 
@@ -257,4 +326,3 @@ def run_polarization_analysis(request: dict[str, Any]) -> dict[str, Any]:
         "files": [file_result],
         "summary": summary,
     }
-

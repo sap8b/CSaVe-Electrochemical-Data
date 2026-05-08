@@ -59,10 +59,12 @@ public sealed class PolarizationPlotData
     public List<double> Current_Density_A_Cm2 { get; set; } = new();
     [JsonPropertyName("model_current_density_a_cm2")]
     public List<double> Model_Current_Density_A_Cm2 { get; set; } = new();
-    [JsonPropertyName("bv_region_potential_v")]
-    public List<double> Bv_Region_Potential_V { get; set; } = new();
-    [JsonPropertyName("bv_region_current_density_a_cm2")]
-    public List<double> Bv_Region_Current_Density_A_Cm2 { get; set; } = new();
+    [JsonPropertyName("i_ox_curve_a_cm2")]
+    public List<double> I_Ox_Curve_A_Cm2 { get; set; } = new();
+    [JsonPropertyName("i_orr_curve_a_cm2")]
+    public List<double> I_Orr_Curve_A_Cm2 { get; set; } = new();
+    [JsonPropertyName("i_her_curve_a_cm2")]
+    public List<double> I_Her_Curve_A_Cm2 { get; set; } = new();
 }
 
 public sealed class EisAnalysisResponse : AnalysisResponseBase
