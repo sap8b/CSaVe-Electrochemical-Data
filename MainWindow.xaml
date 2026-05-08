@@ -471,24 +471,52 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <DockPanel Grid.Row="0" Margin="0,0,0,8">
-                    <Button x:Name="BrowsePolarizationFilesButton"
-                            Width="220"
+                <Grid Grid.Row="0" Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="BrowseAnodicPolarizationButton"
+                            Grid.Column="0"
+                            Width="260"
                             Height="32"
-                            Margin="0,0,10,0"
                             Style="{StaticResource BrowseButton}"
-                            Content="Browse Polarization CSV(s)"
-                            Click="BrowsePolarizationFilesButton_Click"/>
-                    <TextBox x:Name="PolarizationFilesStatusText"
+                            Content="1. Import anodic curve (or full curve)"
+                            Click="BrowseAnodicPolarizationButton_Click"/>
+                    <TextBox x:Name="AnodicPolarizationFilePath"
+                             Grid.Column="2"
+                             VerticalAlignment="Center"
                              Style="{StaticResource ReadOnlyTextBox}"
-                             Text="No files selected"/>
-                </DockPanel>
+                             Text="No file selected"/>
+                </Grid>
 
-                <DockPanel Grid.Row="1" Margin="0,0,0,8">
+                <Grid Grid.Row="1" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="BrowseCathodicPolarizationButton"
+                            Grid.Column="0"
+                            Width="260"
+                            Height="32"
+                            Style="{StaticResource BrowseButton}"
+                            Content="2. Import cathodic curve (optional)"
+                            Click="BrowseCathodicPolarizationButton_Click"/>
+                    <TextBox x:Name="CathodicPolarizationFilePath"
+                             Grid.Column="2"
+                             VerticalAlignment="Center"
+                             Style="{StaticResource ReadOnlyTextBox}"
+                             Text="No file selected (optional)"/>
+                </Grid>
+
+                <DockPanel Grid.Row="2" Margin="0,0,0,8">
                     <TextBlock Text="Exposed area (cm²):" VerticalAlignment="Center" Margin="0,0,8,0"/>
                     <TextBox x:Name="PolarizationAreaText"
                              Width="80"
@@ -504,12 +532,12 @@
                 </DockPanel>
 
                 <TextBox x:Name="PolarizationAnalysisStatusBox"
-                         Grid.Row="2"
+                         Grid.Row="3"
                          Margin="0,0,0,8"
                          Style="{StaticResource ReadOnlyTextBox}"
                          Text="Status"/>
 
-                <Grid Grid.Row="3" Margin="0,0,0,8">
+                <Grid Grid.Row="4" Margin="0,0,0,8">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
@@ -522,7 +550,7 @@
                 </Grid>
 
                 <TextBox x:Name="PolarizationSummaryBox"
-                         Grid.Row="4"
+                         Grid.Row="5"
                          AcceptsReturn="True"
                          VerticalScrollBarVisibility="Auto"
                          TextWrapping="Wrap"
