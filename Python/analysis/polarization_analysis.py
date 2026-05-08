@@ -144,7 +144,9 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
     def _smoothed_derivative(x: np.ndarray, y: np.ndarray) -> np.ndarray:
         if x.size < 2:
             return np.zeros_like(y, dtype=float)
-        window_length = _SAVGOL_WINDOW_LENGTH if _SAVGOL_WINDOW_LENGTH % 2 == 1 else _SAVGOL_WINDOW_LENGTH - 1
+        window_length = min(_SAVGOL_WINDOW_LENGTH, y.size if y.size % 2 == 1 else y.size - 1)
+        if window_length % 2 == 0:
+            window_length = max(1, window_length - 1)
         if window_length >= 5 and y.size >= window_length:
             y = savgol_filter(y, window_length, _SAVGOL_POLYORDER)
         return np.gradient(y, x)
@@ -157,8 +159,8 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
     if e_cat.size >= 5:
         try:
             log_i_cat = np.log10(np.maximum(i_cat, _LOG_FLOOR_A_CM2))
-            d1_log_i_cat = _smoothed_derivative(e_cat, log_i_cat)
-            idx_her_center = int(np.argmin(d1_log_i_cat))
+            d_log_i_cat_de = _smoothed_derivative(e_cat, log_i_cat)
+            idx_her_center = int(np.argmin(d_log_i_cat_de))
             n_her = int(np.clip(e_cat.size // _HER_ORR_WINDOW_DIVISOR, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
             idx_her_win = _window_around(idx_her_center, n_her, e_cat.size)
             if idx_her_win.size >= 2 and np.ptp(e_cat[idx_her_win]) > 0:
@@ -180,8 +182,8 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
     if e_cat.size >= 5:
         try:
             i_residual = np.maximum(i_cat - i_her_contribution, 1e-14)
-            d1_residual = _smoothed_derivative(e_cat, i_residual)
-            idx_lim_transition = int(np.argmax(d1_residual))
+            d_residual_de = _smoothed_derivative(e_cat, i_residual)
+            idx_lim_transition = int(np.argmax(d_residual_de))
             n_lim = int(np.clip(e_cat.size // _ILIM_WINDOW_DIVISOR, _MIN_ILIM_WINDOW_POINTS, _MAX_ILIM_WINDOW_POINTS))
             start = max(0, idx_lim_transition - n_lim)
             idx_lim_win = np.arange(start, idx_lim_transition, dtype=int)
@@ -206,12 +208,12 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
         try:
             i_residual = np.maximum(i_cat - i_her_contribution, 1e-14)
             log_residual = np.log10(np.maximum(i_residual, _LOG_FLOOR_A_CM2))
-            d1_log_residual = _smoothed_derivative(e_cat, log_residual)
+            d_log_residual_de = _smoothed_derivative(e_cat, log_residual)
 
             upper_bound_v = ecorr0 - _ORR_ACTIVATION_UPPER_OFFSET_V
             idx_candidates = np.where((e_cat >= e_cat[idx_lim_transition]) & (e_cat <= upper_bound_v))[0]
             if idx_candidates.size > 0:
-                idx_orr_center = int(idx_candidates[np.argmin(np.abs(d1_log_residual[idx_candidates]))])
+                idx_orr_center = int(idx_candidates[np.argmin(np.abs(d_log_residual_de[idx_candidates]))])
                 n_orr = int(np.clip(e_cat.size // _HER_ORR_WINDOW_DIVISOR, _MIN_HER_ORR_WINDOW_POINTS, _MAX_HER_ORR_WINDOW_POINTS))
                 idx_orr_win = _window_around(idx_orr_center, n_orr, e_cat.size)
                 if idx_orr_win.size >= 2 and np.ptp(e_cat[idx_orr_win]) > 0:
