@@ -30,6 +30,8 @@ _SAVGOL_POLYORDER: int = 3
 _ORR_ACTIVATION_UPPER_OFFSET_V: float = 0.02
 _EORR_SELECTION_OFFSET_V: float = 0.05
 _ANODIC_TAFEL_EXPANDED_UPPER_OFFSET_V: float = 0.20
+_ILIM_FALLBACK_WINDOW_BEFORE: int = 1
+_ILIM_FALLBACK_WINDOW_AFTER: int = 2
 
 
 @dataclass
@@ -142,9 +144,9 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
     def _smoothed_derivative(x: np.ndarray, y: np.ndarray) -> np.ndarray:
         if x.size < 2:
             return np.zeros_like(y, dtype=float)
-        window = _SAVGOL_WINDOW_LENGTH if _SAVGOL_WINDOW_LENGTH % 2 == 1 else _SAVGOL_WINDOW_LENGTH - 1
-        if window >= 5 and y.size >= window:
-            y = savgol_filter(y, window, _SAVGOL_POLYORDER)
+        window_length = _SAVGOL_WINDOW_LENGTH if _SAVGOL_WINDOW_LENGTH % 2 == 1 else _SAVGOL_WINDOW_LENGTH - 1
+        if window_length >= 5 and y.size >= window_length:
+            y = savgol_filter(y, window_length, _SAVGOL_POLYORDER)
         return np.gradient(y, x)
 
     # Step 1: HER Tafel fit
@@ -184,7 +186,11 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
             start = max(0, idx_lim_transition - n_lim)
             idx_lim_win = np.arange(start, idx_lim_transition, dtype=int)
             if idx_lim_win.size == 0:
-                idx_lim_win = np.arange(max(0, idx_lim_transition - 1), min(e_cat.size, idx_lim_transition + 2), dtype=int)
+                idx_lim_win = np.arange(
+                    max(0, idx_lim_transition - _ILIM_FALLBACK_WINDOW_BEFORE),
+                    min(e_cat.size, idx_lim_transition + _ILIM_FALLBACK_WINDOW_AFTER),
+                    dtype=int,
+                )
             if idx_lim_win.size > 0:
                 ilim0 = float(np.median(i_residual[idx_lim_win]))
             if ilim0 < 1e-12:
@@ -262,7 +268,8 @@ def _fit_bv_components(e: np.ndarray, current_density: np.ndarray, ecorr_hint: f
     def residual(params: np.ndarray) -> np.ndarray:
         return (_model_total_current_density(e_sorted, params) - i_sorted) / scale
 
-    # Sequential initialization is already close to physically meaningful regions, so a short polish is sufficient.
+    # Sequential region-by-region initialization starts near a good local optimum, so 400 evaluations
+    # is typically sufficient for stable convergence while keeping analysis responsive.
     result = least_squares(residual, p0, bounds=(lb, ub), max_nfev=_POLISH_MAX_NFEV, loss="soft_l1")
     fitted_sorted = _model_total_current_density(e_sorted, result.x)
     fitted = np.empty_like(fitted_sorted)
