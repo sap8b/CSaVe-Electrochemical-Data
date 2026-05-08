@@ -1,5 +1,25 @@
 # Python Utilities – CSaVe Electrochemical Data
 
+## Analysis scripts used by the WPF app (system Python)
+
+The app invokes:
+
+- `analysis/run_analysis.py polarization <input.json> <output.json>`
+- `analysis/run_analysis.py eis <input.json> <output.json>`
+
+These scripts return JSON payloads used by:
+
+- Tab 3 polarization workflow (BV-oriented multi-reaction fitting scaffold)
+- Tab 4 EIS workflow (matrix-based equivalent-circuit fitting using NumPy/SciPy)
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
 ## `plot_polarization_diagnostic.py`
 
 Diagnostic script that plots raw Gamry DTA source data overlaid against the
@@ -10,10 +30,11 @@ discrepancies near OCP (E\_corr).
 
 ```
 numpy
+scipy
 matplotlib
 ```
 
-Both are available via `pip install numpy matplotlib`.
+All are available via `pip install -r requirements.txt`.
 The script also uses Python standard-library modules `argparse` and
 `xml.etree.ElementTree` (no extra install needed).
 

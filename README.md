@@ -1,7 +1,7 @@
 <img src = "https://github.com/sap8b/CSaVe-Electrochemical-Data/blob/master/CSaVe Electrochemical Data Logo.png" align = "left" width = "1024" height = "200">
 
 # 
-A utility for extracting data from electrochemical experimentation datafiles and saving them as CSV files for easier plotting.
+A utility for extracting, converting, and analyzing electrochemical corrosion data.
 
 ## Introduction
 * CSaVe-Electrochemical-Data is an x86 app utility that provides batch processing to extract impedance data and column names from DTA files and convert them to comma-separated-values (CSV) files.  
@@ -12,6 +12,26 @@ This project started as a Windows Presentation Foundation (WPF) project for use 
 
 ## Code
 This project was written in C# and XAML using Microsoft Visual Studio 2019. 
+
+## Current tabs
+- **Tab 1**: DTA → CSV conversion
+- **Tab 2**: CSVs → XML export (enabled only for CYCPOL/POTENTIODYNAMIC-derived CSV inputs)
+- **Tab 3**: Polarization analysis (Butler-Volmer-oriented fitting workflow scaffold with replicate summaries)
+- **Tab 4**: EIS analysis (matrix-based equivalent-circuit fitting via NumPy/SciPy)
+
+## Python requirements (system Python)
+The analysis tabs assume a system Python install available as `python` (or override with env var `CSAVE_PYTHON_EXECUTABLE`).
+
+Install dependencies:
+
+```bash
+pip install -r Python/requirements.txt
+```
+
+Required packages:
+- `numpy`
+- `scipy`
+- `matplotlib` (used by existing diagnostic utility)
 
 ## Installation
 The app is available here: https://www.microsoft.com/store/productId/9MWJ4GK6S7ZK

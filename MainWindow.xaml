@@ -1,6 +1,7 @@
-﻿<Window x:Class="CSaVe_Electrochemical_Data.MainWindow"
+<Window x:Class="CSaVe_Electrochemical_Data.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:oxy="http://oxyplot.org/wpf"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:CSaVe_Electrochemical_Data"
@@ -462,6 +463,132 @@
                     </DockPanel>
                 </StackPanel>
             </ScrollViewer>
+        </TabItem>
+
+        <TabItem Header="Analyze CYCPOL or POTENTIODYNAMIC Files">
+            <Grid Margin="14,10,14,10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                    <Button x:Name="BrowsePolarizationFilesButton"
+                            Width="220"
+                            Height="32"
+                            Margin="0,0,10,0"
+                            Style="{StaticResource BrowseButton}"
+                            Content="Browse Polarization CSV(s)"
+                            Click="BrowsePolarizationFilesButton_Click"/>
+                    <TextBox x:Name="PolarizationFilesStatusText"
+                             Style="{StaticResource ReadOnlyTextBox}"
+                             Text="No files selected"/>
+                </DockPanel>
+
+                <DockPanel Grid.Row="1" Margin="0,0,0,8">
+                    <TextBlock Text="Exposed area (cm²):" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBox x:Name="PolarizationAreaText"
+                             Width="80"
+                             Margin="0,0,8,0"
+                             Style="{StaticResource ModernTextBox}"
+                             Text="0.495"/>
+                    <Button x:Name="RunPolarizationAnalysisButton"
+                            Width="220"
+                            Height="36"
+                            Style="{StaticResource PrimaryButton}"
+                            Content="Run Butler-Volmer Analysis"
+                            Click="RunPolarizationAnalysisButton_Click"/>
+                </DockPanel>
+
+                <TextBox x:Name="PolarizationAnalysisStatusBox"
+                         Grid.Row="2"
+                         Margin="0,0,0,8"
+                         Style="{StaticResource ReadOnlyTextBox}"
+                         Text="Status"/>
+
+                <Grid Grid.Row="3" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <oxy:PlotView x:Name="PolarizationPlotView" Grid.Column="0" Margin="0,0,8,0"/>
+                    <DataGrid x:Name="PolarizationResultsGrid"
+                              Grid.Column="1"
+                              AutoGenerateColumns="True"
+                              IsReadOnly="True"/>
+                </Grid>
+
+                <TextBox x:Name="PolarizationSummaryBox"
+                         Grid.Row="4"
+                         AcceptsReturn="True"
+                         VerticalScrollBarVisibility="Auto"
+                         TextWrapping="Wrap"
+                         Style="{StaticResource ReadOnlyTextBox}"
+                         Text="Summary statistics will appear here."/>
+            </Grid>
+        </TabItem>
+
+        <TabItem Header="Analyze EIS Files">
+            <Grid Margin="14,10,14,10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                    <Button x:Name="BrowseEisFilesButton"
+                            Width="220"
+                            Height="32"
+                            Margin="0,0,10,0"
+                            Style="{StaticResource BrowseButton}"
+                            Content="Browse EIS CSV(s)"
+                            Click="BrowseEisFilesButton_Click"/>
+                    <TextBox x:Name="EisFilesStatusText"
+                             Style="{StaticResource ReadOnlyTextBox}"
+                             Text="No files selected"/>
+                </DockPanel>
+
+                <DockPanel Grid.Row="1" Margin="0,0,0,8">
+                    <TextBlock Text="Model:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <ComboBox x:Name="EisModelComboBox" Width="260" Margin="0,0,10,0">
+                        <ComboBoxItem Content="randles_cpe_w" IsSelected="True"/>
+                        <ComboBoxItem Content="randles_rc"/>
+                        <ComboBoxItem Content="coating_two_time_constants"/>
+                    </ComboBox>
+                    <Button x:Name="RunEisAnalysisButton"
+                            Width="180"
+                            Height="36"
+                            Style="{StaticResource PrimaryButton}"
+                            Content="Run EIS Fit"
+                            Click="RunEisAnalysisButton_Click"/>
+                </DockPanel>
+
+                <TextBox x:Name="EisAnalysisStatusBox"
+                         Grid.Row="2"
+                         Margin="0,0,0,8"
+                         Style="{StaticResource ReadOnlyTextBox}"
+                         Text="Status"/>
+
+                <Grid Grid.Row="3" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <oxy:PlotView x:Name="EisNyquistPlotView" Grid.Column="0" Margin="0,0,8,0"/>
+                    <oxy:PlotView x:Name="EisBodePlotView" Grid.Column="1"/>
+                </Grid>
+
+                <DataGrid x:Name="EisResultsGrid"
+                          Grid.Row="4"
+                          AutoGenerateColumns="True"
+                          IsReadOnly="True"/>
+            </Grid>
         </TabItem>
     </TabControl>
 </Window>

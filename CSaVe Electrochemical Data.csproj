@@ -19,4 +19,9 @@
     <Resource Include="CSaVE Electrochemical Data Icon.png" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="OxyPlot.Core" Version="2.1.2" />
+    <PackageReference Include="OxyPlot.Wpf" Version="2.1.2" />
+  </ItemGroup>
+
 </Project>
