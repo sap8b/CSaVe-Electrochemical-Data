@@ -2,7 +2,7 @@
   "profiles": {
     "CSaVe Electrochemical Data": {
       "commandName": "Project",
-      "nativeDebugging": true
+      "nativeDebugging": false
     }
   }
 }
