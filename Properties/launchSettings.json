@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CSaVe Electrochemical Data": {
+      "commandName": "Project",
+      "nativeDebugging": true
+    }
+  }
+}
