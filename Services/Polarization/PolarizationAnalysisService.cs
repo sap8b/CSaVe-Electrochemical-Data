@@ -227,6 +227,9 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
         if (areaR <= 0.0)
             return eApparent;
 
+        // A small derivative step keeps the numerical slope stable over clipped exponentials,
+        // while the tolerance/iteration cap are tight enough for sub-microvolt convergence
+        // without risking long-running iterations on nearly flat regions.
         const int maxIterations = 25;
         const double toleranceV = 1e-10;
         const double derivativeStepV = 1e-6;
