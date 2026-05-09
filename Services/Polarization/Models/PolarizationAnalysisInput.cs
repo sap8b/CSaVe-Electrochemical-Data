@@ -31,4 +31,7 @@ public sealed class PolarizationAnalysisInput
 
     /// <summary>Temperature in degrees Celsius used for Butler-Volmer calculations. Default 25 °C.</summary>
     public double TemperatureCelsius { get; set; } = 25.0;
+
+    /// <summary>Optional solution resistance in ohms for iR correction. Default 0 Ω (disabled).</summary>
+    public double RSolutionOhm { get; set; } = 0.0;
 }

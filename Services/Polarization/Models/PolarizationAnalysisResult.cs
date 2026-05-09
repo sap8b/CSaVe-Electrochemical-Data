@@ -34,6 +34,21 @@ public sealed class PolarizationAnalysisResult
     /// <summary>Anodic exchange current density from Tafel back-extrapolation (A/cm²).</summary>
     public double IOxAcm2 { get; init; }
 
+    /// <summary>Fitted anodic exchange current density (A/cm²).</summary>
+    public double I0AnodicAcm2 { get; init; }
+
+    /// <summary>Fitted cathodic exchange current density (A/cm²).</summary>
+    public double I0CathodicAcm2 { get; init; }
+
+    /// <summary>Fitted HER Tafel slope (V/decade).</summary>
+    public double BetaHerV { get; init; }
+
+    /// <summary>Fitted HER exchange current density (A/cm²).</summary>
+    public double I0HerAcm2 { get; init; }
+
+    /// <summary>Estimated ORR boundary-layer thickness (cm).</summary>
+    public double BoundaryLayerThicknessCm { get; init; }
+
     /// <summary>
     /// Current densities (A/cm²) at each requested protection potential.
     /// Keys are the requested potentials in mV formatted as integers (e.g. "-850").
@@ -48,16 +63,22 @@ public sealed class PolarizationAnalysisResult
     /// <summary>Measured current density (A/cm²) at each plot potential; signed.</summary>
     public IReadOnlyList<double> PlotCurrentDensityAcm2 { get; init; } = Array.Empty<double>();
 
-    /// <summary>BV model total current density (A/cm²) at each plot potential; signed.</summary>
+    /// <summary>Potentials (V) used to evaluate the fitted model curves.</summary>
+    public IReadOnlyList<double> PlotFitPotentialsV { get; init; } = Array.Empty<double>();
+
+    /// <summary>Optional iR-corrected model potential axis (V) for overlay plotting.</summary>
+    public IReadOnlyList<double> PlotIrCorrectedPotentialsV { get; init; } = Array.Empty<double>();
+
+    /// <summary>BV model total current density (A/cm²) at each model potential; signed.</summary>
     public IReadOnlyList<double> PlotModelCurrentDensityAcm2 { get; init; } = Array.Empty<double>();
 
-    /// <summary>Anodic dissolution component current density (A/cm²) at each plot potential.</summary>
+    /// <summary>Anodic dissolution component current density (A/cm²) at each model potential.</summary>
     public IReadOnlyList<double> PlotIoxAcm2 { get; init; } = Array.Empty<double>();
 
-    /// <summary>ORR component current density (A/cm²) at each plot potential.</summary>
+    /// <summary>ORR component current density (A/cm²) at each model potential.</summary>
     public IReadOnlyList<double> PlotIorrAcm2 { get; init; } = Array.Empty<double>();
 
-    /// <summary>HER component current density (A/cm²) at each plot potential.</summary>
+    /// <summary>HER component current density (A/cm²) at each model potential.</summary>
     public IReadOnlyList<double> PlotIherAcm2 { get; init; } = Array.Empty<double>();
 
     /// <summary>Fitted BV model parameters for advanced inspection.</summary>

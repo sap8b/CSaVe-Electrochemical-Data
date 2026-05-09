@@ -399,8 +399,8 @@ public sealed class BvCurveFitter : IBvCurveFitter
             return;
 
         double bHerFit  = 1.0 / (Math.Abs(slope) * Math.Log(10.0));
-        double i0HerFit = Math.Pow(10.0, slope * ecorr + intercept);
         double eHerFit  = Median(eWin);
+        double i0HerFit = Math.Pow(10.0, slope * eHerFit + intercept);
 
         if (double.IsFinite(bHerFit) && double.IsFinite(i0HerFit) && double.IsFinite(eHerFit))
         {
