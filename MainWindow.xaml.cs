@@ -1341,6 +1341,11 @@ namespace CSaVe_Electrochemical_Data
 
             polarizationPlotModel.Series.Clear();
 
+            IReadOnlyList<double> modelPotentials =
+                result.PlotIrCorrectedPotentialsV.Count > 0 ? result.PlotIrCorrectedPotentialsV :
+                result.PlotFitPotentialsV.Count > 0 ? result.PlotFitPotentialsV :
+                result.PlotPotentialsV;
+
             var dataSeries = new LineSeries { Title = "Data", Color = OxyColors.Black, StrokeThickness = 1.5 };
             int count = Math.Min(result.PlotPotentialsV.Count, result.PlotCurrentDensityAcm2.Count);
             for (int j = 0; j < count; j++)
@@ -1357,22 +1362,22 @@ namespace CSaVe_Electrochemical_Data
                 LineStyle = LineStyle.Dash,
                 StrokeThickness = 1.5
             };
-            int fitCount = Math.Min(result.PlotPotentialsV.Count, result.PlotModelCurrentDensityAcm2.Count);
+            int fitCount = Math.Min(modelPotentials.Count, result.PlotModelCurrentDensityAcm2.Count);
             for (int j = 0; j < fitCount; j++)
             {
                 double x = Math.Max(Math.Abs(result.PlotModelCurrentDensityAcm2[j]), 1.0e-12);
-                fitSeries.Points.Add(new DataPoint(x, result.PlotPotentialsV[j]));
+                fitSeries.Points.Add(new DataPoint(x, modelPotentials[j]));
             }
             polarizationPlotModel.Series.Add(fitSeries);
 
             if (result.PlotIoxAcm2.Count > 0)
             {
                 var ioxSeries = new LineSeries { Title = "i_ox (anodic)", Color = OxyColors.DodgerBlue, LineStyle = LineStyle.Solid, StrokeThickness = 1.2 };
-                int nc = Math.Min(result.PlotPotentialsV.Count, result.PlotIoxAcm2.Count);
+                int nc = Math.Min(modelPotentials.Count, result.PlotIoxAcm2.Count);
                 for (int j = 0; j < nc; j++)
                 {
                     double x = Math.Max(Math.Abs(result.PlotIoxAcm2[j]), 1.0e-12);
-                    ioxSeries.Points.Add(new DataPoint(x, result.PlotPotentialsV[j]));
+                    ioxSeries.Points.Add(new DataPoint(x, modelPotentials[j]));
                 }
                 polarizationPlotModel.Series.Add(ioxSeries);
             }
@@ -1380,11 +1385,11 @@ namespace CSaVe_Electrochemical_Data
             if (result.PlotIorrAcm2.Count > 0)
             {
                 var orrSeries = new LineSeries { Title = "i_ORR", Color = OxyColors.ForestGreen, LineStyle = LineStyle.Solid, StrokeThickness = 1.2 };
-                int nc = Math.Min(result.PlotPotentialsV.Count, result.PlotIorrAcm2.Count);
+                int nc = Math.Min(modelPotentials.Count, result.PlotIorrAcm2.Count);
                 for (int j = 0; j < nc; j++)
                 {
                     double x = Math.Max(Math.Abs(result.PlotIorrAcm2[j]), 1.0e-12);
-                    orrSeries.Points.Add(new DataPoint(x, result.PlotPotentialsV[j]));
+                    orrSeries.Points.Add(new DataPoint(x, modelPotentials[j]));
                 }
                 polarizationPlotModel.Series.Add(orrSeries);
             }
@@ -1392,11 +1397,11 @@ namespace CSaVe_Electrochemical_Data
             if (result.PlotIherAcm2.Count > 0)
             {
                 var herSeries = new LineSeries { Title = "i_HER", Color = OxyColors.DarkOrange, LineStyle = LineStyle.Solid, StrokeThickness = 1.2 };
-                int nc = Math.Min(result.PlotPotentialsV.Count, result.PlotIherAcm2.Count);
+                int nc = Math.Min(modelPotentials.Count, result.PlotIherAcm2.Count);
                 for (int j = 0; j < nc; j++)
                 {
                     double x = Math.Max(Math.Abs(result.PlotIherAcm2[j]), 1.0e-12);
-                    herSeries.Points.Add(new DataPoint(x, result.PlotPotentialsV[j]));
+                    herSeries.Points.Add(new DataPoint(x, modelPotentials[j]));
                 }
                 polarizationPlotModel.Series.Add(herSeries);
             }

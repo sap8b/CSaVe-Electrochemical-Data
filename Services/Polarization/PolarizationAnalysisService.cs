@@ -106,6 +106,9 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
             displayPoints = sorted;
         }
 
+        if (input.RSolutionOhm > 0.0)
+            fitPoints = ApplyIrCorrection(fitPoints, input.ExposedAreaCm2, input.RSolutionOhm);
+
         // ── Step 2: estimate Ecorr as the initial hint ────────────────────────────────────
         double[] ePot    = fitPoints.Select(p => p.PotentialV).ToArray();
         double[] iCurr   = fitPoints.Select(p => p.CurrentA).ToArray();
@@ -123,10 +126,23 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
             ePot.ToList(), iDensity.ToList(), ecorrHint, input.TemperatureCelsius);
 
         // ── Step 5: compute display-resolution model curves ───────────────────────────────
-        double[] modelCurve = ePotDisplay.Select(e => fitted.ComputeCurrentDensity(e)).ToArray();
-        double[] iOxCurve   = ePotDisplay.Select(e => fitted.ComputeAnodicComponent(e)).ToArray();
-        double[] iOrrCurve  = ePotDisplay.Select(e => fitted.ComputeOrrComponent(e)).ToArray();
-        double[] iHerCurve  = ePotDisplay.Select(e => fitted.ComputeHerComponent(e)).ToArray();
+        double[] ePotFit = fitPoints.Select(p => p.PotentialV).ToArray();
+        double[] ePotModel = ePotFit;
+        double[] ePotIrCorrected = Array.Empty<double>();
+
+        if (input.RSolutionOhm > 0.0)
+        {
+            double areaR = area * input.RSolutionOhm;
+            ePotIrCorrected = ePotDisplay
+                .Select(e => SolveIrCorrectedPotential(e, fitted, areaR))
+                .ToArray();
+            ePotModel = ePotIrCorrected;
+        }
+
+        double[] modelCurve = ePotModel.Select(e => fitted.ComputeCurrentDensity(e)).ToArray();
+        double[] iOxCurve   = ePotModel.Select(e => fitted.ComputeAnodicComponent(e)).ToArray();
+        double[] iOrrCurve  = ePotModel.Select(e => fitted.ComputeOrrComponent(e)).ToArray();
+        double[] iHerCurve  = ePotModel.Select(e => fitted.ComputeHerComponent(e)).ToArray();
 
         // ── Step 6: extract corrosion metrics from fitted model ───────────────────────────
         double ecorrV    = fitted.Ecorr;
@@ -156,11 +172,20 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
             IlimOrrAcm2  = fitted.IlimOrr,
             HerOnsetV    = fitted.EherOnset,
             IOxAcm2      = iOxAcm2,
+            I0AnodicAcm2 = fitted.I0Anodic,
+            I0CathodicAcm2 = fitted.I0Cathodic,
+            BetaHerV = fitted.BetaHer,
+            I0HerAcm2 = fitted.I0Her,
+            BoundaryLayerThicknessCm = fitted.IlimOrr > 0.0
+                ? (4.0 * 96485.0 * 1.8e-5 * 2.4e-7) / fitted.IlimOrr
+                : double.NaN,
 
             ProtectionCurrentDensitiesAcm2 = protectionCurrents,
 
             PlotPotentialsV              = ePotDisplay,
             PlotCurrentDensityAcm2       = iDensDisp,
+            PlotFitPotentialsV           = ePotFit,
+            PlotIrCorrectedPotentialsV   = ePotIrCorrected,
             PlotModelCurrentDensityAcm2  = modelCurve,
             PlotIoxAcm2                  = iOxCurve,
             PlotIorrAcm2                 = iOrrCurve,
@@ -171,6 +196,68 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Applies direct iR correction to measured polarization points using E_corrected = E_measured − I·R.
+    /// </summary>
+    private static IReadOnlyList<PolarizationPoint> ApplyIrCorrection(
+        IReadOnlyList<PolarizationPoint> points,
+        double exposedAreaCm2,
+        double rSolutionOhm)
+    {
+        if (rSolutionOhm <= 0.0)
+            return points;
+
+        double areaR = exposedAreaCm2 * rSolutionOhm;
+        return points
+            .Select(p => new PolarizationPoint
+            {
+                PotentialV = p.PotentialV - p.CurrentDensityAcm2(exposedAreaCm2) * areaR,
+                CurrentA = p.CurrentA
+            })
+            .OrderBy(p => p.PotentialV)
+            .ToArray();
+    }
+
+    /// <summary>
+    /// Solves for the iR-corrected potential E_true corresponding to an apparent potential E_apparent.
+    /// </summary>
+    private static double SolveIrCorrectedPotential(double eApparent, BvModelParameters model, double areaR)
+    {
+        if (areaR <= 0.0)
+            return eApparent;
+
+        const int maxIterations = 25;
+        const double toleranceV = 1e-10;
+        const double derivativeStepV = 1e-6;
+
+        double e = eApparent;
+        for (int iteration = 0; iteration < maxIterations; iteration++)
+        {
+            double iModel = model.ComputeCurrentDensity(e);
+            double residual = e + iModel * areaR - eApparent;
+            if (Math.Abs(residual) <= toleranceV)
+                return e;
+
+            double iForward = model.ComputeCurrentDensity(e + derivativeStepV);
+            double iBackward = model.ComputeCurrentDensity(e - derivativeStepV);
+            double diDe = (iForward - iBackward) / (2.0 * derivativeStepV);
+            double derivative = 1.0 + diDe * areaR;
+            if (!double.IsFinite(derivative) || Math.Abs(derivative) < 1e-12)
+                break;
+
+            double next = e - residual / derivative;
+            if (!double.IsFinite(next))
+                break;
+
+            if (Math.Abs(next - e) <= toleranceV)
+                return next;
+
+            e = next;
+        }
+
+        return e;
+    }
 
     /// <summary>
     /// Estimate Ecorr from the zero-crossing of the current array (sorted ascending by potential).

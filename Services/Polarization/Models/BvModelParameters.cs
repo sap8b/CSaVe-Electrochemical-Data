@@ -8,6 +8,8 @@ namespace CSaVe_Electrochemical_Data;
 /// </summary>
 public sealed class BvModelParameters
 {
+    private static readonly double Ln10 = Math.Log(10.0);
+
     // ── Anodic dissolution branch ─────────────────────────────────────────────────────────────
     /// <summary>Anodic exchange current density I₀ₐ (A/cm²).</summary>
     public double I0Anodic { get; init; }
@@ -61,10 +63,10 @@ public sealed class BvModelParameters
     {
         double eta = potentialV - Ecorr;
 
-        double iAnodic   = I0Anodic   * Math.Exp(Math.Clamp( eta / BetaAnodic,  ExpClipMin, ExpClipMax));
-        double iCathodic = I0Cathodic * Math.Exp(Math.Clamp(-eta / BetaCathodic, ExpClipMin, ExpClipMax));
+        double iAnodic   = I0Anodic   * Math.Exp(Math.Clamp( eta * Ln10 / BetaAnodic,  ExpClipMin, ExpClipMax));
+        double iCathodic = I0Cathodic * Math.Exp(Math.Clamp(-eta * Ln10 / BetaCathodic, ExpClipMin, ExpClipMax));
         double iOrr      = -IlimOrr   / (1.0 + Math.Exp(Math.Clamp((potentialV - EorrTransition) / WorrV, -50.0, 50.0)));
-        double iHer      = -I0Her     * Math.Exp(Math.Clamp(-(potentialV - EherOnset) / BetaHer, ExpClipMin, ExpClipMax));
+        double iHer      = -I0Her     * Math.Exp(Math.Clamp(-(potentialV - EherOnset) * Ln10 / BetaHer, ExpClipMin, ExpClipMax));
 
         return iAnodic - iCathodic + iOrr + iHer;
     }
@@ -77,7 +79,7 @@ public sealed class BvModelParameters
     public double ComputeAnodicComponent(double potentialV)
     {
         double eta = potentialV - Ecorr;
-        return I0Anodic * Math.Exp(Math.Clamp(eta / BetaAnodic, ExpClipMin, ExpClipMax));
+        return I0Anodic * Math.Exp(Math.Clamp(eta * Ln10 / BetaAnodic, ExpClipMin, ExpClipMax));
     }
 
     /// <summary>
@@ -97,6 +99,6 @@ public sealed class BvModelParameters
     /// <returns>HER current density (A/cm²); always non-positive.</returns>
     public double ComputeHerComponent(double potentialV)
     {
-        return -I0Her * Math.Exp(Math.Clamp(-(potentialV - EherOnset) / BetaHer, ExpClipMin, ExpClipMax));
+        return -I0Her * Math.Exp(Math.Clamp(-(potentialV - EherOnset) * Ln10 / BetaHer, ExpClipMin, ExpClipMax));
     }
 }
