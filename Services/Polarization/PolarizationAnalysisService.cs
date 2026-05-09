@@ -107,7 +107,7 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
         }
 
         if (input.RSolutionOhm > 0.0)
-            fitPoints = ApplyIrCorrection(fitPoints, input.ExposedAreaCm2, input.RSolutionOhm);
+            fitPoints = ApplyIrCorrection(fitPoints, input.RSolutionOhm);
 
         // ── Step 2: estimate Ecorr as the initial hint ────────────────────────────────────
         double[] ePot    = fitPoints.Select(p => p.PotentialV).ToArray();
@@ -202,17 +202,15 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
     /// </summary>
     private static IReadOnlyList<PolarizationPoint> ApplyIrCorrection(
         IReadOnlyList<PolarizationPoint> points,
-        double exposedAreaCm2,
         double rSolutionOhm)
     {
         if (rSolutionOhm <= 0.0)
             return points;
 
-        double areaR = exposedAreaCm2 * rSolutionOhm;
         return points
             .Select(p => new PolarizationPoint
             {
-                PotentialV = p.PotentialV - p.CurrentDensityAcm2(exposedAreaCm2) * areaR,
+                PotentialV = p.PotentialV - p.CurrentA * rSolutionOhm,
                 CurrentA = p.CurrentA
             })
             .OrderBy(p => p.PotentialV)
