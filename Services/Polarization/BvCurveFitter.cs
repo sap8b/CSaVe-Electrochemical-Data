@@ -204,7 +204,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
         ub[IdxWorrV]          = WorrMaxV;
         ub[IdxI0Her]          = I0MaxAcm2;
         ub[IdxBetaHer]        = BetaMaxV;
-        ub[IdxEherOnset]      = Math.Min(-0.01, ecorrHintV - EherOnsetUpperOffsetV);
+        ub[IdxEherOnset]      = ecorrHintV - EherOnsetUpperOffsetV;
 
         // Clamp initial guess to bounds.
         for (int j = 0; j < NumParams; j++)

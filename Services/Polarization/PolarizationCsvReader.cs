@@ -122,6 +122,8 @@ public sealed class PolarizationCsvReader : IPolarizationCsvReader
     private static void DetectColumns(string[] headerParts, out int potentialCol, out int currentCol)
     {
         // Build a map from lower-cased column name to its index.
+        // TryAdd intentionally takes the first occurrence when duplicate column names exist,
+        // which is the standard behaviour for CSV parsers.
         var colMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (int c = 0; c < headerParts.Length; c++)
         {

@@ -130,7 +130,9 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
 
         // ── Step 6: extract corrosion metrics from fitted model ───────────────────────────
         double ecorrV    = fitted.Ecorr;
-        double icorrAcm2 = Math.Max(fitted.I0Anodic, fitted.I0Cathodic);
+        // icorr: the anodic exchange current density I0Anodic from the Tafel back-extrapolation
+        // to Ecorr is the standard electrochemical definition used in polarization curve analysis.
+        double icorrAcm2 = fitted.I0Anodic;
         double iOxAcm2   = ComputeIOx(ePot, iDensity, ecorrV);
 
         // ── Step 7: interpolate protection current densities ─────────────────────────────

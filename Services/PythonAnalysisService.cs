@@ -12,7 +12,7 @@ namespace CSaVe_Electrochemical_Data.Services;
 /// </summary>
 /// <remarks>
 /// Polarization-curve analysis has been removed from the Python side and is now
-/// handled entirely by the native C# <see cref="CSaVe_Electrochemical_Data.PolarizationAnalysisService"/>,
+/// handled entirely by the native C# <see cref="PolarizationAnalysisService"/>,
 /// which is fully debuggable in Visual Studio and follows SOLID design principles.
 /// This class is retained only for EIS analysis via Python/scipy.
 /// </remarks>
