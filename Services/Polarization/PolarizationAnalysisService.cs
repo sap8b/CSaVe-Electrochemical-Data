@@ -12,6 +12,10 @@ namespace CSaVe_Electrochemical_Data;
 /// </summary>
 public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
 {
+    private const double FaradayConstantCmol = 96485.0;
+    private const double OxygenDiffusivityCm2s = 1.8e-5;
+    private const double OxygenConcentrationMolCm3 = 2.4e-7;
+
     private readonly IPolarizationCsvReader     _csvReader;
     private readonly IMonotonicityFilter        _monotonicityFilter;
     private readonly IPolarizationCurveJoiner   _curveJoiner;
@@ -177,7 +181,7 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
             BetaHerV = fitted.BetaHer,
             I0HerAcm2 = fitted.I0Her,
             BoundaryLayerThicknessCm = fitted.IlimOrr > 0.0
-                ? (4.0 * 96485.0 * 1.8e-5 * 2.4e-7) / fitted.IlimOrr
+                ? (4.0 * FaradayConstantCmol * OxygenDiffusivityCm2s * OxygenConcentrationMolCm3) / fitted.IlimOrr
                 : double.NaN,
 
             ProtectionCurrentDensitiesAcm2 = protectionCurrents,
@@ -226,10 +230,10 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
             return eApparent;
 
         // A small derivative step keeps the numerical slope stable over clipped exponentials,
-        // while the tolerance/iteration cap are tight enough for sub-microvolt convergence
-        // without risking long-running iterations on nearly flat regions.
+        // while a 0.1 µV tolerance is far below experimental resolution without forcing
+        // unnecessary extra iterations on flat regions.
         const int maxIterations = 25;
-        const double toleranceV = 1e-10;
+        const double toleranceV = 1e-7;
         const double derivativeStepV = 1e-6;
 
         double e = eApparent;
