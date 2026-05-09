@@ -38,22 +38,23 @@ public sealed class PolarizationCurveJoiner : IPolarizationCurveJoiner
         // ── Step 2: compute the half-difference shift ──────────────────────────────────────
         // halfDiff > 0 when the anodic OCP is above the cathodic OCP (the common case).
         double halfDiff = (vOcpAnodic - vOcpCathodic) / 2.0;
-        double vOcpMid  = vOcpAnodic - halfDiff; // == (vOcpAnodic + vOcpCathodic) / 2.0
+        double vOCPAnodic_Shifted = vOcpAnodic - halfDiff;
+        double vOCPCathodic_Shifted = vOcpCathodic + halfDiff;
+
+        //double vOcpMid  = vOcpAnodic - halfDiff; // == (vOcpAnodic + vOcpCathodic) / 2.0
 
         // ── Step 3: apply potential shift to each branch ──────────────────────────────────
-        var shiftedAnodic   = ShiftPotentials(anodicPoints,   -halfDiff);
-        var shiftedCathodic = ShiftPotentials(cathodicPoints, +halfDiff);
+        List<PolarizationPoint> shiftedAnodic   = ShiftPotentials(anodicPoints,   -halfDiff);
+        List<PolarizationPoint> shiftedCathodic = ShiftPotentials(cathodicPoints, +halfDiff);
 
         // ── Step 4: trim both branches at the aligned OCP boundary ────────────────────────
         // Anodic branch is the oxidation side: keep V >= alignedOcp.
         // Cathodic branch is the reduction side: keep V < alignedOcp.
-        var trimmedAnodic   = shiftedAnodic.Where(p => p.PotentialV >= vOcpMid).ToList();
-        var trimmedCathodic = shiftedCathodic.Where(p => p.PotentialV < vOcpMid).ToList();
+        List<PolarizationPoint> trimmedAnodic   = [.. shiftedAnodic.Where(p => p.PotentialV >= vOCPAnodic_Shifted)];
+        List<PolarizationPoint> trimmedCathodic = [.. shiftedCathodic.Where(p => p.PotentialV < vOCPCathodic_Shifted)];
 
         // ── Step 5: merge and sort by potential ascending ─────────────────────────────────
-        var merged = new List<PolarizationPoint>(trimmedAnodic.Count + trimmedCathodic.Count);
-        merged.AddRange(trimmedAnodic);
-        merged.AddRange(trimmedCathodic);
+        List<PolarizationPoint> merged = [.. trimmedAnodic, .. trimmedCathodic];
         merged.Sort((a, b) => a.PotentialV.CompareTo(b.PotentialV));
 
         return merged;
@@ -92,8 +93,8 @@ public sealed class PolarizationCurveJoiner : IPolarizationCurveJoiner
     /// <returns>New list with shifted potentials.</returns>
     private static List<PolarizationPoint> ShiftPotentials(IReadOnlyList<PolarizationPoint> points, double delta)
     {
-        var result = new List<PolarizationPoint>(points.Count);
-        foreach (var p in points)
+        List<PolarizationPoint> result = new(points.Count);
+        foreach (PolarizationPoint p in points)
             result.Add(new PolarizationPoint { PotentialV = p.PotentialV + delta, CurrentA = p.CurrentA });
         return result;
     }
