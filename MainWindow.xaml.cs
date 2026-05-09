@@ -122,6 +122,7 @@ namespace CSaVe_Electrochemical_Data
         MessageWindowDialog mwd;
 
         private readonly PythonAnalysisService pythonAnalysisService;
+        private readonly IPolarizationAnalysisService _polarizationAnalysisService;
         private string _anodicPolarizationFilePath = string.Empty;
         private string _cathodicPolarizationFilePath = string.Empty;
         private readonly List<string> eisAnalysisFiles = new();
@@ -135,6 +136,12 @@ namespace CSaVe_Electrochemical_Data
             InitializeComponent();
 
             pythonAnalysisService = new PythonAnalysisService(FindRepositoryRoot());
+
+            _polarizationAnalysisService = new PolarizationAnalysisService(
+                new PolarizationCsvReader(),
+                new MonotonicityFilter(),
+                new PolarizationCurveJoiner(),
+                new BvCurveFitter());
 
             AnodicCsvPath.TextChanged += (_, _) => UpdateXmlGenerationAvailability();
             CathodicCsvPath.TextChanged += (_, _) => UpdateXmlGenerationAvailability();
@@ -1286,32 +1293,38 @@ namespace CSaVe_Electrochemical_Data
                 return;
             }
 
-            PolarizationAnalysisStatusBox.Text = "Running polarization analysis in system Python...";
-            var response = pythonAnalysisService.RunPolarization(new PolarizationAnalysisRequest
+            PolarizationAnalysisStatusBox.Text = "Running polarization analysis...";
+            var result = _polarizationAnalysisService.Analyse(new PolarizationAnalysisInput
             {
-                Anodic_File = _anodicPolarizationFilePath,
-                Cathodic_File = _cathodicPolarizationFilePath,
-                Exposed_Area_Cm2 = areaCm2,
-                Protection_Potentials_Mv = new List<double> { -850.0, -1050.0 }
+                PrimaryFilePath          = _anodicPolarizationFilePath,
+                CathodicFilePath         = string.IsNullOrWhiteSpace(_cathodicPolarizationFilePath) ? string.Empty : _cathodicPolarizationFilePath,
+                ExposedAreaCm2           = areaCm2,
+                ProtectionPotentialsMv   = new[] { -850.0, -1050.0 }
             });
 
-            if (!response.Success)
+            if (!result.Success)
             {
-                PolarizationAnalysisStatusBox.Text = response.Message;
+                PolarizationAnalysisStatusBox.Text = result.Message;
                 return;
             }
 
-            var rows = response.Files.Select(f => new PolarizationResultRow
+            double iAt850  = result.ProtectionCurrentDensitiesAcm2.TryGetValue("-850",  out double v850)  ? v850  : double.NaN;
+            double iAt1050 = result.ProtectionCurrentDensitiesAcm2.TryGetValue("-1050", out double v1050) ? v1050 : double.NaN;
+
+            var rows = new List<PolarizationResultRow>
             {
-                File = Path.GetFileName(f.File),
-                Ecorr_mV = f.Metrics.GetValueOrDefault("ecorr_mv", double.NaN),
-                Icorr_uAcm2 = f.Metrics.GetValueOrDefault("icorr_ua_cm2", double.NaN),
-                I_ox_uAcm2 = f.Metrics.GetValueOrDefault("i_ox_ua_cm2", double.NaN),
-                Ilim_uAcm2 = f.Metrics.GetValueOrDefault("ilim_orr_ua_cm2", double.NaN),
-                HER_Onset_mV = f.Metrics.GetValueOrDefault("her_onset_mv", double.NaN),
-                I_at_neg850mV_uAcm2 = f.Metrics.GetValueOrDefault("i_at_-850mv_ua_cm2", double.NaN),
-                I_at_neg1050mV_uAcm2 = f.Metrics.GetValueOrDefault("i_at_-1050mv_ua_cm2", double.NaN)
-            }).ToList();
+                new PolarizationResultRow
+                {
+                    File                 = Path.GetFileName(_anodicPolarizationFilePath),
+                    Ecorr_mV             = result.EcorrV * 1000.0,
+                    Icorr_uAcm2          = result.IcorrAcm2 * 1.0e6,
+                    I_ox_uAcm2           = double.IsNaN(result.IOxAcm2) ? double.NaN : result.IOxAcm2 * 1.0e6,
+                    Ilim_uAcm2           = result.IlimOrrAcm2 * 1.0e6,
+                    HER_Onset_mV         = result.HerOnsetV * 1000.0,
+                    I_at_neg850mV_uAcm2  = iAt850  * 1.0e6,
+                    I_at_neg1050mV_uAcm2 = iAt1050 * 1.0e6
+                }
+            };
             PolarizationResultsGrid.ItemsSource = rows;
 
             string summary = string.Join(Environment.NewLine, new[]
@@ -1327,73 +1340,70 @@ namespace CSaVe_Electrochemical_Data
             PolarizationSummaryBox.Text = summary;
 
             polarizationPlotModel.Series.Clear();
-            if (response.Files.Count > 0)
+
+            var dataSeries = new LineSeries { Title = "Data", Color = OxyColors.Black, StrokeThickness = 1.5 };
+            int count = Math.Min(result.PlotPotentialsV.Count, result.PlotCurrentDensityAcm2.Count);
+            for (int j = 0; j < count; j++)
             {
-                var fileResult = response.Files[0];
-
-                var dataSeries = new LineSeries { Title = "Data", Color = OxyColors.Black, StrokeThickness = 1.5 };
-                int count = Math.Min(fileResult.Plot.Potential_V.Count, fileResult.Plot.Current_Density_A_Cm2.Count);
-                for (int j = 0; j < count; j++)
-                {
-                    double x = Math.Max(fileResult.Plot.Current_Density_A_Cm2[j], 1.0e-12);
-                    dataSeries.Points.Add(new DataPoint(x, fileResult.Plot.Potential_V[j]));
-                }
-                polarizationPlotModel.Series.Add(dataSeries);
-
-                var fitSeries = new LineSeries
-                {
-                    Title = "BV Fit (total)",
-                    Color = OxyColors.DarkGray,
-                    LineStyle = LineStyle.Dash,
-                    StrokeThickness = 1.5
-                };
-                int fitCount = Math.Min(fileResult.Plot.Potential_V.Count, fileResult.Plot.Model_Current_Density_A_Cm2.Count);
-                for (int j = 0; j < fitCount; j++)
-                {
-                    double x = Math.Max(fileResult.Plot.Model_Current_Density_A_Cm2[j], 1.0e-12);
-                    fitSeries.Points.Add(new DataPoint(x, fileResult.Plot.Potential_V[j]));
-                }
-                polarizationPlotModel.Series.Add(fitSeries);
-
-                if (fileResult.Plot.I_Ox_Curve_A_Cm2.Count > 0)
-                {
-                    var ioxSeries = new LineSeries { Title = "i_ox (anodic)", Color = OxyColors.DodgerBlue, LineStyle = LineStyle.Solid, StrokeThickness = 1.2 };
-                    int nc = Math.Min(fileResult.Plot.Potential_V.Count, fileResult.Plot.I_Ox_Curve_A_Cm2.Count);
-                    for (int j = 0; j < nc; j++)
-                    {
-                        double x = Math.Max(fileResult.Plot.I_Ox_Curve_A_Cm2[j], 1.0e-12);
-                        ioxSeries.Points.Add(new DataPoint(x, fileResult.Plot.Potential_V[j]));
-                    }
-                    polarizationPlotModel.Series.Add(ioxSeries);
-                }
-
-                if (fileResult.Plot.I_Orr_Curve_A_Cm2.Count > 0)
-                {
-                    var orrSeries = new LineSeries { Title = "i_ORR", Color = OxyColors.ForestGreen, LineStyle = LineStyle.Solid, StrokeThickness = 1.2 };
-                    int nc = Math.Min(fileResult.Plot.Potential_V.Count, fileResult.Plot.I_Orr_Curve_A_Cm2.Count);
-                    for (int j = 0; j < nc; j++)
-                    {
-                        double x = Math.Max(fileResult.Plot.I_Orr_Curve_A_Cm2[j], 1.0e-12);
-                        orrSeries.Points.Add(new DataPoint(x, fileResult.Plot.Potential_V[j]));
-                    }
-                    polarizationPlotModel.Series.Add(orrSeries);
-                }
-
-                if (fileResult.Plot.I_Her_Curve_A_Cm2.Count > 0)
-                {
-                    var herSeries = new LineSeries { Title = "i_HER", Color = OxyColors.DarkOrange, LineStyle = LineStyle.Solid, StrokeThickness = 1.2 };
-                    int nc = Math.Min(fileResult.Plot.Potential_V.Count, fileResult.Plot.I_Her_Curve_A_Cm2.Count);
-                    for (int j = 0; j < nc; j++)
-                    {
-                        double x = Math.Max(fileResult.Plot.I_Her_Curve_A_Cm2[j], 1.0e-12);
-                        herSeries.Points.Add(new DataPoint(x, fileResult.Plot.Potential_V[j]));
-                    }
-                    polarizationPlotModel.Series.Add(herSeries);
-                }
+                double x = Math.Max(Math.Abs(result.PlotCurrentDensityAcm2[j]), 1.0e-12);
+                dataSeries.Points.Add(new DataPoint(x, result.PlotPotentialsV[j]));
             }
+            polarizationPlotModel.Series.Add(dataSeries);
+
+            var fitSeries = new LineSeries
+            {
+                Title = "BV Fit (total)",
+                Color = OxyColors.DarkGray,
+                LineStyle = LineStyle.Dash,
+                StrokeThickness = 1.5
+            };
+            int fitCount = Math.Min(result.PlotPotentialsV.Count, result.PlotModelCurrentDensityAcm2.Count);
+            for (int j = 0; j < fitCount; j++)
+            {
+                double x = Math.Max(Math.Abs(result.PlotModelCurrentDensityAcm2[j]), 1.0e-12);
+                fitSeries.Points.Add(new DataPoint(x, result.PlotPotentialsV[j]));
+            }
+            polarizationPlotModel.Series.Add(fitSeries);
+
+            if (result.PlotIoxAcm2.Count > 0)
+            {
+                var ioxSeries = new LineSeries { Title = "i_ox (anodic)", Color = OxyColors.DodgerBlue, LineStyle = LineStyle.Solid, StrokeThickness = 1.2 };
+                int nc = Math.Min(result.PlotPotentialsV.Count, result.PlotIoxAcm2.Count);
+                for (int j = 0; j < nc; j++)
+                {
+                    double x = Math.Max(Math.Abs(result.PlotIoxAcm2[j]), 1.0e-12);
+                    ioxSeries.Points.Add(new DataPoint(x, result.PlotPotentialsV[j]));
+                }
+                polarizationPlotModel.Series.Add(ioxSeries);
+            }
+
+            if (result.PlotIorrAcm2.Count > 0)
+            {
+                var orrSeries = new LineSeries { Title = "i_ORR", Color = OxyColors.ForestGreen, LineStyle = LineStyle.Solid, StrokeThickness = 1.2 };
+                int nc = Math.Min(result.PlotPotentialsV.Count, result.PlotIorrAcm2.Count);
+                for (int j = 0; j < nc; j++)
+                {
+                    double x = Math.Max(Math.Abs(result.PlotIorrAcm2[j]), 1.0e-12);
+                    orrSeries.Points.Add(new DataPoint(x, result.PlotPotentialsV[j]));
+                }
+                polarizationPlotModel.Series.Add(orrSeries);
+            }
+
+            if (result.PlotIherAcm2.Count > 0)
+            {
+                var herSeries = new LineSeries { Title = "i_HER", Color = OxyColors.DarkOrange, LineStyle = LineStyle.Solid, StrokeThickness = 1.2 };
+                int nc = Math.Min(result.PlotPotentialsV.Count, result.PlotIherAcm2.Count);
+                for (int j = 0; j < nc; j++)
+                {
+                    double x = Math.Max(Math.Abs(result.PlotIherAcm2[j]), 1.0e-12);
+                    herSeries.Points.Add(new DataPoint(x, result.PlotPotentialsV[j]));
+                }
+                polarizationPlotModel.Series.Add(herSeries);
+            }
+
             polarizationPlotModel.InvalidatePlot(true);
 
-            PolarizationAnalysisStatusBox.Text = "Polarization analysis completed for 1 file.";
+            PolarizationAnalysisStatusBox.Text = "Polarization analysis completed.";
         }
 
         private void BrowseEisFilesButton_Click(object sender, RoutedEventArgs e)
