@@ -5,11 +5,12 @@ using System;
 namespace CSaVe_Electrochemical_Data
 {
     /// <summary>
-    /// Holds the seven-parameter Butler-Volmer model for polarization curve fitting.
-    /// All three half-reactions — metal oxidation, ORR, and HER — are represented by the
-    /// full Butler-Volmer equation using a Nernst-fixed equilibrium potential and a
-    /// symmetry factor β.  ORR additionally includes a Koutecky-Levich mass-transport
-    /// correction to capture the limiting-current plateau.
+    /// Holds the Butler-Volmer model for polarization curve fitting.
+    /// The fitter can activate any subset of the supported reactions, so the optimised
+    /// parameter vector is determined dynamically per analysis run.
+    /// Metal oxidation, ORR, and HER are represented by the full Butler-Volmer equation
+    /// using Nernst-fixed equilibrium potentials. ORR additionally includes a
+    /// Koutecky-Levich mass-transport correction to capture the limiting-current plateau.
     /// Equilibrium potentials for each reaction are fixed by the Nernst equation via
     /// <see cref="ElectrochemicalReaction"/> objects; they are not fit parameters.
     /// </summary>
@@ -132,6 +133,9 @@ namespace CSaVe_Electrochemical_Data
         /// <returns>Metal oxidation net current density (A/cm²); positive = anodic (dissolution).</returns>
         public double ComputeMetalOxidationComponent(double potentialV)
         {
+            if (!IncludeMetal)
+                return 0.0;
+
             double eta      = potentialV - EMetalEquilibriumV;
             double zFoverRT = _metalReaction.Z * ElectrochemicalConstants.F
                               / (ElectrochemicalConstants.R * _metalReaction.TemperatureKelvin);
@@ -153,6 +157,9 @@ namespace CSaVe_Electrochemical_Data
         /// <returns>ORR net current density (A/cm²); non-positive in the cathodic region.</returns>
         public double ComputeOrrComponent(double potentialV)
         {
+            if (!IncludeOrr)
+                return 0.0;
+
             double eta      = potentialV - EorrEquilibriumV;
             double zFoverRT = _orrReaction.Z * ElectrochemicalConstants.F
                               / (ElectrochemicalConstants.R * _orrReaction.TemperatureKelvin);
@@ -182,6 +189,9 @@ namespace CSaVe_Electrochemical_Data
         /// <returns>HER current density (A/cm²); non-positive in the cathodic region.</returns>
         public double ComputeHerComponent(double potentialV)
         {
+            if (!IncludeHer)
+                return 0.0;
+
             double eta      = potentialV - EherEquilibriumV;
             double zFoverRT = _herReaction.Z * ElectrochemicalConstants.F
                               / (ElectrochemicalConstants.R * _herReaction.TemperatureKelvin);

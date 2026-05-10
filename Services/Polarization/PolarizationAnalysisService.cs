@@ -160,19 +160,25 @@ namespace CSaVe_Electrochemical_Data
             double[] iHerCurve     = [.. ePotModel.Select(selector: e => fitted.ComputeHerComponent(e))];
 
             // ── Step 6: extract corrosion metrics from fitted model ───────────────────────────
-            double ecorrV    = fitted.Ecorr;
-            // icorr: the absolute value of the metal-oxidation BV component at Ecorr equals the
-            // cathodic (ORR + HER) current at Ecorr — the standard mixed-potential definition.
-            double icorrAcm2 = Math.Abs(fitted.ComputeMetalOxidationComponent(ecorrV));
-            double iOxAcm2   = ComputeIOx(ePot, iDensity, ecorrV);
+            double ecorrV = fitted.Ecorr;
+            double icorrAcm2 = fitted.IncludeMetal
+                ? Math.Abs(fitted.ComputeMetalOxidationComponent(ecorrV))
+                : double.NaN;
+            double iOxAcm2 = fitted.IncludeMetal
+                ? ComputeIOx(ePot, iDensity, ecorrV)
+                : double.NaN;
 
             // Effective Tafel slopes derived from BV symmetry factors for display.
             // ba (metal anodic) = 2.303 * R * T / (BetaMetal * z_metal * F)  with z_metal = 2
             // bc (ORR cathodic) = 2.303 * R * T / ((1-BetaOrr) * z_ORR * F) with z_ORR   = 4
             double temperatureKelvin = input.TemperatureCelsius + 273.15;
             double rtFactor          = 2.303 * ElectrochemicalConstants.R * temperatureKelvin / ElectrochemicalConstants.F;
-            double betaAnodicV       = rtFactor / (fitted.BetaMetal * 2.0);
-            double betaCathodicV     = rtFactor / ((1.0 - fitted.BetaOrr) * 4.0);
+            double betaAnodicV = fitted.IncludeMetal
+                ? rtFactor / (fitted.BetaMetal * 2.0)
+                : double.NaN;
+            double betaCathodicV = fitted.IncludeOrr
+                ? rtFactor / ((1.0 - fitted.BetaOrr) * 4.0)
+                : double.NaN;
 
             // ── Step 7: interpolate protection current densities ─────────────────────────────
             Dictionary<string, double> protectionCurrents = new Dictionary<string, double>();
@@ -195,14 +201,14 @@ namespace CSaVe_Electrochemical_Data
                 IcorrAcm2     = icorrAcm2,
                 BetaAnodicV   = betaAnodicV,
                 BetaCathodicV = betaCathodicV,
-                IlimOrrAcm2   = fitted.IlimOrr,
-                HerEquilibriumV = fitted.EherEquilibriumV,
+                IlimOrrAcm2   = fitted.IncludeOrr ? fitted.IlimOrr : double.NaN,
+                HerEquilibriumV = fitted.IncludeHer ? fitted.EherEquilibriumV : double.NaN,
                 IOxAcm2       = iOxAcm2,
-                I0AnodicAcm2  = fitted.I0Metal,
-                I0CathodicAcm2 = fitted.I0Orr,
-                BetaHer       = fitted.BetaHer,
-                I0HerAcm2     = fitted.I0Her,
-                BoundaryLayerThicknessCm = fitted.IlimOrr > 0.0
+                I0AnodicAcm2  = fitted.IncludeMetal ? fitted.I0Metal : double.NaN,
+                I0CathodicAcm2 = fitted.IncludeOrr ? fitted.I0Orr : double.NaN,
+                BetaHer       = fitted.IncludeHer ? fitted.BetaHer : double.NaN,
+                I0HerAcm2     = fitted.IncludeHer ? fitted.I0Her : double.NaN,
+                BoundaryLayerThicknessCm = fitted.IncludeOrr && fitted.IlimOrr > 0.0
                     ? (4.0 * FaradayConstantCmol * OxygenDiffusivityCm2s * OxygenConcentrationMolCm3) / fitted.IlimOrr
                     : double.NaN,
 
