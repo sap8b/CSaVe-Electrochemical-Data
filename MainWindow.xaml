@@ -560,7 +560,9 @@
                         <GroupBox Header="BV Starting Parameters" Grid.Row="0">
                             <Grid Margin="4,4,4,4">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="48"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="6"/>
+                                    <ColumnDefinition Width="55"/>
                                     <ColumnDefinition Width="6"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="6"/>
@@ -581,16 +583,17 @@
                                 </Grid.RowDefinitions>
 
                                 <!-- Column headers -->
-                                <TextBlock Grid.Row="0" Grid.Column="1"
-                                           Text="Include" FontSize="11"
-                                           FontWeight="SemiBold" Foreground="#475569"/>                                
                                 <TextBlock Grid.Row="0" Grid.Column="2"
-                                           Text="i0 (A/cm2)" FontSize="11"
-                                           FontWeight="SemiBold" Foreground="#475569"/>
+                                           Text="Include" FontSize="11"
+                                           FontWeight="SemiBold" Foreground="#475569"
+                                           HorizontalAlignment="Center"/>
                                 <TextBlock Grid.Row="0" Grid.Column="4"
-                                           Text="beta" FontSize="11"
+                                           Text="i0 (A/cm²)" FontSize="11"
                                            FontWeight="SemiBold" Foreground="#475569"/>
                                 <TextBlock Grid.Row="0" Grid.Column="6"
+                                           Text="beta" FontSize="11"
+                                           FontWeight="SemiBold" Foreground="#475569"/>
+                                <TextBlock Grid.Row="0" Grid.Column="8"
                                            Text="Fix" FontSize="11"
                                            FontWeight="SemiBold" Foreground="#475569"
                                            HorizontalAlignment="Center"/>
@@ -598,53 +601,54 @@
                                 <!-- HER row -->
                                 <TextBlock Grid.Row="2" Grid.Column="0"
                                            Text="HER" VerticalAlignment="Center"
-                                           FontSize="12" Foreground="#1E293B" Margin="-15,0,15,0"/>
-                                <CheckBox x:Name="HerIncluideCheckBox"
-                                          Grid.Row="2" Grid.Column="1"
+                                           FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"/>
+                                <CheckBox x:Name="HerIncludeCheckBox"
+                                          Grid.Row="2" Grid.Column="2"
+                                          IsChecked="True"
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Center"/>
                                 <TextBox x:Name="HerI0TextBox"
-                                         Grid.Row="2" Grid.Column="2"
+                                         Grid.Row="2" Grid.Column="4"
                                          Style="{StaticResource ModernTextBox}"
                                          Text="1.0e-14"/>
                                 <TextBox x:Name="HerBetaTextBox"
-                                         Grid.Row="2" Grid.Column="4"
+                                         Grid.Row="2" Grid.Column="6"
                                          Style="{StaticResource ModernTextBox}"
                                          Text="0.95"/>
                                 <CheckBox x:Name="HerFixCheckBox"
-                                          Grid.Row="2" Grid.Column="6"
+                                          Grid.Row="2" Grid.Column="8"
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Center"/>
 
                                 <!-- ORR row (i₀, β, Fix) -->
                                 <TextBlock Grid.Row="4" Grid.Column="0"
                                            Text="ORR" VerticalAlignment="Center"
-                                           FontSize="12" Foreground="#1E293B" Margin="-15,0,15,0"/>
+                                           FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"/>
                                 <CheckBox x:Name="OrrIncludeCheckBox"
-                                          Grid.Row="4" Grid.Column="1"
+                                          Grid.Row="4" Grid.Column="2"
+                                          IsChecked="True"
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Center"/>
                                 <TextBox x:Name="OrrI0TextBox"
-                                         Grid.Row="4" Grid.Column="2"
+                                         Grid.Row="4" Grid.Column="4"
                                          Style="{StaticResource ModernTextBox}"
                                          Text="1.0e-14"/>
                                 <TextBox x:Name="OrrBetaTextBox"
-                                         Grid.Row="4" Grid.Column="4"
+                                         Grid.Row="4" Grid.Column="6"
                                          Style="{StaticResource ModernTextBox}"
                                          Text="0.95"/>
                                 <CheckBox x:Name="OrrFixCheckBox"
-                                          Grid.Row="4" Grid.Column="6"
+                                          Grid.Row="4" Grid.Column="8"
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Center"/>
 
                                 <!-- ORR sub-row: i_lim (only ORR has a limiting current) -->
                                 <TextBlock Grid.Row="6" Grid.Column="0"
                                            Text="i_lim" VerticalAlignment="Center"
-                                           FontSize="11" Foreground="#64748B"
-                                           Margin="-9,0,15,0"
+                                           FontSize="11" Foreground="#64748B" Margin="0,0,8,0"
                                            ToolTip="ORR limiting current density (A/cm²)"/>
                                 <TextBox x:Name="OrrIlimTextBox"
-                                         Grid.Row="6" Grid.Column="2"
+                                         Grid.Row="6" Grid.Column="4"
                                          Style="{StaticResource ModernTextBox}"
                                          Text="1.0e-5"
                                          ToolTip="ORR limiting current density (A/cm²)"/>
@@ -652,21 +656,22 @@
                                 <!-- Metal Oxidation row -->
                                 <TextBlock Grid.Row="8" Grid.Column="0"
                                            Text="Me Ox" VerticalAlignment="Center"
-                                           FontSize="12" Foreground="#1E293B" Margin="-15,0,15,0"/>
-                                <CheckBox x:Name="MeOxIncluideCheckBox"
-                                          Grid.Row="8" Grid.Column="1"
+                                           FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"/>
+                                <CheckBox x:Name="MeOxIncludeCheckBox"
+                                          Grid.Row="8" Grid.Column="2"
+                                          IsChecked="True"
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Center"/>
                                 <TextBox x:Name="MetalI0TextBox"
-                                         Grid.Row="8" Grid.Column="2"
+                                         Grid.Row="8" Grid.Column="4"
                                          Style="{StaticResource ModernTextBox}"
                                          Text="1.0e-14"/>
                                 <TextBox x:Name="MetalBetaTextBox"
-                                         Grid.Row="8" Grid.Column="4"
+                                         Grid.Row="8" Grid.Column="6"
                                          Style="{StaticResource ModernTextBox}"
                                          Text="0.95"/>
                                 <CheckBox x:Name="MetalFixCheckBox"
-                                          Grid.Row="8" Grid.Column="6"
+                                          Grid.Row="8" Grid.Column="8"
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Center"/>
                             </Grid>

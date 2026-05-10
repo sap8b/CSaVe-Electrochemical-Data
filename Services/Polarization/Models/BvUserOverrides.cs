@@ -54,5 +54,27 @@ namespace CSaVe_Electrochemical_Data
         /// and are not adjusted by the LM optimiser.
         /// </summary>
         public bool FixHer { get; init; }
+
+        // ── Reaction inclusion flags ──────────────────────────────────────────────────────────────
+        /// <summary>
+        /// When <c>true</c> (default), the metal oxidation reaction is included in the fit.
+        /// When <c>false</c>, its contribution to the model current is zeroed and its parameters
+        /// are not optimised.
+        /// </summary>
+        public bool IncludeMetal { get; init; } = true;
+
+        /// <summary>
+        /// When <c>true</c> (default), ORR is included in the fit.
+        /// When <c>false</c>, its contribution to the model current is zeroed and its parameters
+        /// are not optimised.
+        /// </summary>
+        public bool IncludeOrr { get; init; } = true;
+
+        /// <summary>
+        /// When <c>true</c> (default), HER is included in the fit.
+        /// When <c>false</c>, its contribution to the model current is zeroed and its parameters
+        /// are not optimised.
+        /// </summary>
+        public bool IncludeHer { get; init; } = true;
     }
 }

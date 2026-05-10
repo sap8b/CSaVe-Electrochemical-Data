@@ -17,6 +17,6 @@ namespace CSaVe_Electrochemical_Data
         /// <param name="pH">Solution pH (default 8.0).</param>
         /// <param name="temperatureCelsius">Electrolyte temperature in °C (default 25.0).</param>
         public MetalOxidationReaction(double pH = 8.0, double temperatureCelsius = 25.0)
-            : base("Metal", e0Vshe: -0.54, z: 2, pH, temperatureCelsius) { }
+            : base(ReactionType.MetalOxidation, e0Vshe: -0.54, z: 2, pH, temperatureCelsius) { }
     }
 }

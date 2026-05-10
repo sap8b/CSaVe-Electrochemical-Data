@@ -51,6 +51,33 @@ namespace CSaVe_Electrochemical_Data.Services.Polarization.Reactions
         /// <summary>Thermal voltage V_T = R·T / (z·F) (V).</summary>
         public double ThermalVoltageV => ElectrochemicalConstants.R * TemperatureKelvin / (Z * ElectrochemicalConstants.F);
 
+        // ── Fitted-parameter box bounds for LM optimisation ──────────────────────────────────────────
+        /// <summary>Minimum physically meaningful exchange current density for LM box bounds (A/cm²).</summary>
+        public virtual double I0MinAcm2 => 1.0e-30;
+
+        /// <summary>Maximum exchange current density for LM box bounds (A/cm²).</summary>
+        public virtual double I0MaxAcm2 => 1.0e-1;
+
+        /// <summary>Minimum symmetry factor β for LM box bounds (dimensionless, 0 &lt; β &lt; 1).</summary>
+        public virtual double BetaMin => 0.01;
+
+        /// <summary>Maximum symmetry factor β for LM box bounds (dimensionless, 0 &lt; β &lt; 1).</summary>
+        public virtual double BetaMax => 0.99;
+
+        /// <summary>
+        /// Minimum limiting current density for LM box bounds (A/cm²).
+        /// Zero for reactions that do not have a mass-transport limiting current.
+        /// Overridden by <see cref="OrrReaction"/>.
+        /// </summary>
+        public virtual double IlimMinAcm2 => 0.0;
+
+        /// <summary>
+        /// Maximum limiting current density for LM box bounds (A/cm²).
+        /// Zero for reactions that do not have a mass-transport limiting current.
+        /// Overridden by <see cref="OrrReaction"/>.
+        /// </summary>
+        public virtual double IlimMaxAcm2 => 0.0;
+
         // ── Constructor ───────────────────────────────────────────────────────────────────────────
         /// <summary>
         /// Initialises a new <see cref="ElectrochemicalReaction"/>.

@@ -15,6 +15,12 @@ namespace CSaVe_Electrochemical_Data
         /// <param name="pH">Solution pH (default 8.0).</param>
         /// <param name="temperatureCelsius">Electrolyte temperature in °C (default 25.0).</param>
         public OrrReaction(double pH = 8.0, double temperatureCelsius = 25.0)
-            : base("ORR", e0Vshe: 1.229, z: 4, pH, temperatureCelsius) { }
+            : base(ReactionType.OxygenReduction, e0Vshe: 1.229, z: 4, pH, temperatureCelsius) { }
+
+        /// <summary>Minimum ORR limiting current density for LM box bounds (A/cm²).</summary>
+        public override double IlimMinAcm2 => 1.0e-10;
+
+        /// <summary>Maximum ORR limiting current density for LM box bounds (A/cm²).</summary>
+        public override double IlimMaxAcm2 => 1.0;
     }
 }
