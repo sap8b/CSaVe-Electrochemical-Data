@@ -560,7 +560,7 @@
                         <GroupBox Header="BV Starting Parameters" Grid.Row="0">
                             <Grid Margin="4,4,4,4">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="48"/>
                                     <ColumnDefinition Width="6"/>
                                     <ColumnDefinition Width="55"/>
                                     <ColumnDefinition Width="6"/>

@@ -165,9 +165,9 @@ namespace CSaVe_Electrochemical_Data
                 p0[j] = Math.Clamp(p0[j], lb[j], ub[j]);
 
             // ── Determine which reactions are active ──────────────────────────────────────────────
-            bool includeMetal = overrides == null || overrides.IncludeMetal;
-            bool includeOrr   = overrides == null || overrides.IncludeOrr;
-            bool includeHer   = overrides == null || overrides.IncludeHer;
+            bool includeMetal = overrides?.IncludeMetal ?? true;
+            bool includeOrr   = overrides?.IncludeOrr   ?? true;
+            bool includeHer   = overrides?.IncludeHer   ?? true;
 
             // ── Apply user overrides to initial guess and fix flags ───────────────────────────────
             if (overrides != null)
