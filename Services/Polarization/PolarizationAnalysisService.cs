@@ -174,7 +174,7 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
             BetaAnodicV  = fitted.BetaAnodic,
             BetaCathodicV = fitted.BetaCathodic,
             IlimOrrAcm2  = fitted.IlimOrr,
-            HerOnsetV    = fitted.EherOnset,
+            HerEquilibriumV    = fitted.EherEquilibriumV,
             IOxAcm2      = iOxAcm2,
             I0AnodicAcm2 = fitted.I0Anodic,
             I0CathodicAcm2 = fitted.I0Cathodic,

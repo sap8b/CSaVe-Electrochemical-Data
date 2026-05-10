@@ -3,12 +3,28 @@ using System;
 namespace CSaVe_Electrochemical_Data;
 
 /// <summary>
-/// Holds the 11-parameter Butler-Volmer model for polarization curve fitting.
+/// Holds the 10-parameter Butler-Volmer model for polarization curve fitting.
 /// Provides methods to evaluate the total and component current densities at a given potential.
+/// The HER half-reaction uses the full Butler-Volmer equation with a Nernst-fixed equilibrium
+/// potential supplied by an <see cref="ElectrochemicalReaction"/> object.
 /// </summary>
 public sealed class BvModelParameters
 {
     private static readonly double LogOf10 = Math.Log(10.0);
+
+    private readonly ElectrochemicalReaction _herReaction;
+
+    // ── Constructor ───────────────────────────────────────────────────────────────────────────
+    /// <summary>
+    /// Initialises a new <see cref="BvModelParameters"/> bound to the given HER reaction object.
+    /// All other parameters are set via object-initialiser syntax after construction.
+    /// </summary>
+    /// <param name="herReaction">Reaction object supplying z, R, F and T for the HER BV equation.</param>
+    public BvModelParameters(ElectrochemicalReaction herReaction)
+    {
+        _herReaction = herReaction
+            ?? throw new ArgumentNullException(nameof(herReaction));
+    }
 
     // ── Anodic dissolution branch ─────────────────────────────────────────────────────────────
     /// <summary>Anodic exchange current density I₀ₐ (A/cm²).</summary>
@@ -42,11 +58,11 @@ public sealed class BvModelParameters
     /// <summary>HER exchange current density I₀,ₕₑᵣ (A/cm²).</summary>
     public double I0Her { get; init; }
 
-    /// <summary>HER Tafel slope βₕₑᵣ (V/decade).</summary>
+    /// <summary>HER symmetry factor βₕₑᵣ (dimensionless, 0 &lt; β &lt; 1); governs the cathodic/anodic asymmetry of the BV equation.</summary>
     public double BetaHer { get; init; }
 
-    /// <summary>HER onset potential Eₕₑᵣ (V vs. reference); the potential at which HER becomes significant.</summary>
-    public double EherOnset { get; init; }
+    /// <summary>HER equilibrium potential Eₕₑᵣ (V vs. reference) fixed by the Nernst equation; not a fit parameter.</summary>
+    public double EherEquilibriumV { get; init; }
 
     // ── Exponential argument clip limits ─────────────────────────────────────────────────────
     // Clipping to [-50, 50] prevents overflow in exp() while retaining all physically meaningful values.
@@ -66,7 +82,7 @@ public sealed class BvModelParameters
         double iAnodic   = I0Anodic   * Math.Exp(Math.Clamp( eta * LogOf10 / BetaAnodic,  ExpClipMin, ExpClipMax));
         double iCathodic = I0Cathodic * Math.Exp(Math.Clamp(-eta * LogOf10 / BetaCathodic, ExpClipMin, ExpClipMax));
         double iOrr      = -IlimOrr   / (1.0 + Math.Exp(Math.Clamp((potentialV - EorrTransition) / WorrV, -50.0, 50.0)));
-        double iHer      = -I0Her     * Math.Exp(Math.Clamp(-(potentialV - EherOnset) * LogOf10 / BetaHer, ExpClipMin, ExpClipMax));
+        double iHer      = ComputeHerComponent(potentialV);
 
         return iAnodic - iCathodic + iOrr + iHer;
     }
@@ -93,12 +109,20 @@ public sealed class BvModelParameters
     }
 
     /// <summary>
-    /// Evaluates only the HER activation component at a single electrode potential.
+    /// Evaluates only the HER activation component at a single electrode potential using the
+    /// full Butler-Volmer equation. Net HER current is cathodic (negative) below E_eq.
     /// </summary>
     /// <param name="potentialV">Electrode potential (V vs. reference).</param>
-    /// <returns>HER current density (A/cm²); always non-positive.</returns>
+    /// <returns>HER current density (A/cm²); always non-positive in the cathodic region.</returns>
     public double ComputeHerComponent(double potentialV)
     {
-        return -I0Her * Math.Exp(Math.Clamp(-(potentialV - EherOnset) * LogOf10 / BetaHer, ExpClipMin, ExpClipMax));
+        double eta      = potentialV - EherEquilibriumV;
+        double zFoverRT = _herReaction.Z * ElectrochemicalReaction.F
+                          / (ElectrochemicalReaction.R * _herReaction.TemperatureKelvin);
+
+        double anodic   = Math.Exp(Math.Clamp( BetaHer         * zFoverRT * eta, ExpClipMin, ExpClipMax));
+        double cathodic = Math.Exp(Math.Clamp(-(1.0 - BetaHer) * zFoverRT * eta, ExpClipMin, ExpClipMax));
+
+        return -I0Her * (cathodic - anodic);
     }
 }
