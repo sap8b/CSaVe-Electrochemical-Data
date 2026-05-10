@@ -1099,6 +1099,17 @@ namespace CSaVe_Electrochemical_Data
             return $"{mean:F2} ± {std:F2}";
         }
 
+        /// <summary>
+        /// Parses <paramref name="text"/> as a positive <see cref="double"/> using invariant culture.
+        /// Returns <c>null</c> when the text is blank, unparseable, or non-positive.
+        /// </summary>
+        private static double? TryParsePositiveDouble(string text)
+        {
+            if (double.TryParse(text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double val) && val > 0)
+                return val;
+            return null;
+        }
+
         private static OxyColor GetSeriesColor(int index)
         {
             OxyColor[] colors =
@@ -1303,13 +1314,31 @@ namespace CSaVe_Electrochemical_Data
                 return;
             }
 
+            // ── Build BV user overrides from UI controls ───────────────────────────────────
+            var bvOverrides = new BvUserOverrides
+            {
+                I0Her    = TryParsePositiveDouble(HerI0TextBox.Text),
+                BetaHer  = TryParsePositiveDouble(HerBetaTextBox.Text),
+                FixHer   = HerFixCheckBox.IsChecked == true,
+
+                I0Orr    = TryParsePositiveDouble(OrrI0TextBox.Text),
+                BetaOrr  = TryParsePositiveDouble(OrrBetaTextBox.Text),
+                IlimOrr  = TryParsePositiveDouble(OrrIlimTextBox.Text),
+                FixOrr   = OrrFixCheckBox.IsChecked == true,
+
+                I0Metal   = TryParsePositiveDouble(MetalI0TextBox.Text),
+                BetaMetal = TryParsePositiveDouble(MetalBetaTextBox.Text),
+                FixMetal  = MetalFixCheckBox.IsChecked == true,
+            };
+
             PolarizationAnalysisStatusBox.Text = "Running polarization analysis...";
             var result = _polarizationAnalysisService.Analyse(new PolarizationAnalysisInput
             {
                 PrimaryFilePath          = _anodicPolarizationFilePath,
                 CathodicFilePath         = string.IsNullOrWhiteSpace(_cathodicPolarizationFilePath) ? string.Empty : _cathodicPolarizationFilePath,
                 ExposedAreaCm2           = areaCm2,
-                ProtectionPotentialsMv   = new[] { -850.0, -1050.0 }
+                ProtectionPotentialsMv   = new[] { -850.0, -1050.0 },
+                UserOverrides            = bvOverrides,
             });
 
             if (!result.Success)
@@ -1337,6 +1366,8 @@ namespace CSaVe_Electrochemical_Data
             };
             PolarizationResultsGrid.ItemsSource = rows;
 
+            // ── Build summary text ─────────────────────────────────────────────────────────
+            var fp = result.FittedParameters;
             string summary = string.Join(Environment.NewLine, new[]
             {
                 $"E_corr (mV): {FormatMeanStd(rows.Select(r => r.Ecorr_mV))}",
@@ -1345,7 +1376,18 @@ namespace CSaVe_Electrochemical_Data
                 $"i_lim ORR (uA/cm²): {FormatMeanStd(rows.Select(r => r.Ilim_uAcm2))}",
                 $"HER E_eq (mV): {FormatMeanStd(rows.Select(r => r.HER_Eeq_mV))}",
                 $"i@-850 mV (uA/cm²): {FormatMeanStd(rows.Select(r => r.I_at_neg850mV_uAcm2))}",
-                $"i@-1050 mV (uA/cm²): {FormatMeanStd(rows.Select(r => r.I_at_neg1050mV_uAcm2))}"
+                $"i@-1050 mV (uA/cm²): {FormatMeanStd(rows.Select(r => r.I_at_neg1050mV_uAcm2))}",
+                string.Empty,
+                "--- Fitted B-V Parameters ---",
+                $"I\u2080,metal (A/cm\u00B2): {fp.I0Metal:E3}",
+                $"\u03B2_metal: {fp.BetaMetal:F4}",
+                $"I\u2080,ORR (A/cm\u00B2): {fp.I0Orr:E3}",
+                $"\u03B2_ORR: {fp.BetaOrr:F4}",
+                $"i_lim,ORR (A/cm\u00B2): {fp.IlimOrr:E3}",
+                $"I\u2080,HER (A/cm\u00B2): {fp.I0Her:E3}",
+                $"\u03B2_HER: {fp.BetaHer:F4}",
+                string.Empty,
+                $"Weighted RMSE (A/cm\u00B2): {(double.IsNaN(result.WeightedRmse) ? "n/a" : result.WeightedRmse.ToString("E3"))}",
             });
             PolarizationSummaryBox.Text = summary;
 

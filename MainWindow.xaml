@@ -537,43 +537,144 @@
                          Style="{StaticResource ReadOnlyTextBox}"
                          Text="Status"/>
 
-                <Grid Grid.Row="4" Margin="0,0,0,8">
+                <!-- Row 4: Plot (left) + BV starting parameters and results (right) -->
+                <Grid Grid.Row="4" Margin="0,0,0,4">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="390"/>
                     </Grid.ColumnDefinitions>
-                    <oxy:PlotView x:Name="PolarizationPlotView" Grid.Column="0" Margin="463,0,10,0" Grid.ColumnSpan="2"/>
-                    <DataGrid x:Name="PolarizationResultsGrid"
-                              AutoGenerateColumns="True"
-                              IsReadOnly="True" Margin="0,221,0,-84" Grid.ColumnSpan="2"/>
-                    <Label Content="HER" HorizontalAlignment="Left" Height="31" Margin="10,10,0,0" VerticalAlignment="Top" Width="45"/>
-                    <Label Content="i0_HER" HorizontalAlignment="Left" Height="34" Margin="55,17,0,0" VerticalAlignment="Top" Width="56"/>
-                    <TextBox HorizontalAlignment="Left" Height="34" Margin="106,26,0,0" TextWrapping="Wrap" Text="1.0e-14" VerticalAlignment="Top" Width="80"/>
-                    <Label Content="beta_HER" HorizontalAlignment="Left" Height="34" Margin="197,26,0,0" VerticalAlignment="Top" Width="61"/>
-                    <TextBox HorizontalAlignment="Left" Height="34" Margin="263,26,0,0" TextWrapping="Wrap" Text="0.95" VerticalAlignment="Top" Width="94"/>
-                    <RadioButton Content="Fix" HorizontalAlignment="Left" Height="32" Margin="362,28,0,0" VerticalAlignment="Top" Width="53"/>
-                    <Label Content="ORR" HorizontalAlignment="Left" Height="31" Margin="10,55,0,0" VerticalAlignment="Top" Width="45"/>
-                    <Label Content="i0_ORR" HorizontalAlignment="Left" Height="34" Margin="55,62,0,0" VerticalAlignment="Top" Width="56"/>
-                    <TextBox HorizontalAlignment="Left" Height="34" Margin="106,71,0,0" TextWrapping="Wrap" Text="1.0e-14" VerticalAlignment="Top" Width="80"/>
-                    <Label Content="beta_ORR" HorizontalAlignment="Left" Height="34" Margin="197,71,0,0" VerticalAlignment="Top" Width="61"/>
-                    <TextBox HorizontalAlignment="Left" Height="34" Margin="263,71,0,0" TextWrapping="Wrap" Text="0.95" VerticalAlignment="Top" Width="94"/>
-                    <RadioButton Content="Fix" HorizontalAlignment="Left" Height="32" Margin="362,73,0,0" VerticalAlignment="Top" Width="53"/>
-                    <Label Content="Me Ox" HorizontalAlignment="Left" Height="31" Margin="10,0,0,0" VerticalAlignment="Center" Width="45"/>
-                    <Label Content="i0_MeOx" HorizontalAlignment="Left" Height="34" Margin="55,118,0,0" VerticalAlignment="Top" Width="56"/>
-                    <TextBox HorizontalAlignment="Left" Height="34" Margin="106,127,0,0" TextWrapping="Wrap" Text="1.0e-14" VerticalAlignment="Top" Width="80"/>
-                    <Label Content="beta_MeOx" HorizontalAlignment="Left" Height="34" Margin="197,127,0,0" VerticalAlignment="Top" Width="61"/>
-                    <TextBox HorizontalAlignment="Left" Height="34" Margin="263,127,0,0" TextWrapping="Wrap" Text="0.95" VerticalAlignment="Top" Width="94"/>
-                    <RadioButton Content="Fix" HorizontalAlignment="Left" Height="32" Margin="362,129,0,0" VerticalAlignment="Top" Width="53"/>
+
+                    <!-- OxyPlot polarization chart -->
+                    <oxy:PlotView x:Name="PolarizationPlotView" Grid.Column="0"/>
+
+                    <!-- Right panel: BV starting parameters + fit results DataGrid -->
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <!-- BV Starting Parameters GroupBox -->
+                        <GroupBox Header="BV Starting Parameters" Grid.Row="0">
+                            <Grid Margin="4,4,4,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="48"/>
+                                    <ColumnDefinition Width="6"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="6"/>
+                                    <ColumnDefinition Width="52"/>
+                                    <ColumnDefinition Width="6"/>
+                                    <ColumnDefinition Width="34"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="4"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="4"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="2"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="4"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Column headers -->
+                                <TextBlock Grid.Row="0" Grid.Column="2"
+                                           Text="i₀ (A/cm²)" FontSize="11"
+                                           FontWeight="SemiBold" Foreground="#475569"/>
+                                <TextBlock Grid.Row="0" Grid.Column="4"
+                                           Text="β" FontSize="11"
+                                           FontWeight="SemiBold" Foreground="#475569"/>
+                                <TextBlock Grid.Row="0" Grid.Column="6"
+                                           Text="Fix" FontSize="11"
+                                           FontWeight="SemiBold" Foreground="#475569"
+                                           HorizontalAlignment="Center"/>
+
+                                <!-- HER row -->
+                                <TextBlock Grid.Row="2" Grid.Column="0"
+                                           Text="HER" VerticalAlignment="Center"
+                                           FontSize="12" Foreground="#1E293B"/>
+                                <TextBox x:Name="HerI0TextBox"
+                                         Grid.Row="2" Grid.Column="2"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="1.0e-14"/>
+                                <TextBox x:Name="HerBetaTextBox"
+                                         Grid.Row="2" Grid.Column="4"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="0.95"/>
+                                <CheckBox x:Name="HerFixCheckBox"
+                                          Grid.Row="2" Grid.Column="6"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Center"/>
+
+                                <!-- ORR row (i₀, β, Fix) -->
+                                <TextBlock Grid.Row="4" Grid.Column="0"
+                                           Text="ORR" VerticalAlignment="Center"
+                                           FontSize="12" Foreground="#1E293B"/>
+                                <TextBox x:Name="OrrI0TextBox"
+                                         Grid.Row="4" Grid.Column="2"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="1.0e-14"/>
+                                <TextBox x:Name="OrrBetaTextBox"
+                                         Grid.Row="4" Grid.Column="4"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="0.95"/>
+                                <CheckBox x:Name="OrrFixCheckBox"
+                                          Grid.Row="4" Grid.Column="6"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Center"/>
+
+                                <!-- ORR sub-row: iₗᵢₘ (only ORR has a limiting current) -->
+                                <TextBlock Grid.Row="6" Grid.Column="0"
+                                           Text="iₗᵢₘ" VerticalAlignment="Center"
+                                           FontSize="11" Foreground="#64748B"
+                                           Margin="6,0,0,0"
+                                           ToolTip="ORR limiting current density (A/cm²)"/>
+                                <TextBox x:Name="OrrIlimTextBox"
+                                         Grid.Row="6" Grid.Column="2"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="1.0e-5"
+                                         ToolTip="ORR limiting current density (A/cm²)"/>
+
+                                <!-- Metal Oxidation row -->
+                                <TextBlock Grid.Row="8" Grid.Column="0"
+                                           Text="Me Ox" VerticalAlignment="Center"
+                                           FontSize="12" Foreground="#1E293B"/>
+                                <TextBox x:Name="MetalI0TextBox"
+                                         Grid.Row="8" Grid.Column="2"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="1.0e-14"/>
+                                <TextBox x:Name="MetalBetaTextBox"
+                                         Grid.Row="8" Grid.Column="4"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="0.95"/>
+                                <CheckBox x:Name="MetalFixCheckBox"
+                                          Grid.Row="8" Grid.Column="6"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Center"/>
+                            </Grid>
+                        </GroupBox>
+
+                        <!-- Fit results DataGrid -->
+                        <DataGrid x:Name="PolarizationResultsGrid"
+                                  Grid.Row="2"
+                                  AutoGenerateColumns="True"
+                                  IsReadOnly="True"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Auto"/>
+                    </Grid>
                 </Grid>
 
+                <!-- Row 5: Summary text -->
                 <TextBox x:Name="PolarizationSummaryBox"
                          Grid.Row="5"
                          AcceptsReturn="True"
                          VerticalScrollBarVisibility="Auto"
                          TextWrapping="Wrap"
                          Style="{StaticResource ReadOnlyTextBox}"
-                         Text="Summary statistics will appear here." Margin="0,91,0,0" HorizontalAlignment="Right" Width="930"/>
-                <Label Content="Label" HorizontalAlignment="Left" Height="3" Margin="401,91,0,0" Grid.Row="4" VerticalAlignment="Top" Width="4"/>
+                         Text="Summary statistics will appear here."/>
             </Grid>
         </TabItem>
 

@@ -114,4 +114,11 @@ public sealed class PolarizationAnalysisResult
 
     /// <summary>Fitted BV model parameters for advanced inspection.</summary>
     public BvModelParameters FittedParameters { get; init; }
+
+    /// <summary>
+    /// Weighted root-mean-square error of the fitted BV model vs. the merged polarization
+    /// curve, computed with weights 1/max(|i|, 20th-percentile(|i|)) to balance the large
+    /// current dynamic range.  Units: A/cm².
+    /// </summary>
+    public double WeightedRmse { get; init; } = double.NaN;
 }

@@ -139,7 +139,8 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
 
         // ── Step 4: BV fitting ────────────────────────────────────────────────────────────
         BvModelParameters fitted = _curveFitter.Fit(
-            ePot.ToList(), iDensity.ToList(), ecorrHint, input.TemperatureCelsius);
+            ePot.ToList(), iDensity.ToList(), ecorrHint, input.TemperatureCelsius,
+            input.UserOverrides);
 
         // ── Step 5: compute display-resolution model curves ───────────────────────────────
         double[] ePotFit = [.. fitPoints.Select(p => p.PotentialV)];
@@ -182,7 +183,10 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
             protectionCurrents[((int)mv).ToString()] = interpI;
         }
 
-        // ── Step 8: assemble result ───────────────────────────────────────────────────────
+        // ── Step 8: compute weighted RMSE of model vs merged data ────────────────────────
+        double wrmse = ComputeWeightedRmse(ePotDisplay, iDensDisp, fitted);
+
+        // ── Step 9: assemble result ───────────────────────────────────────────────────────
         return new PolarizationAnalysisResult
         {
             Success       = true,
@@ -218,10 +222,61 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
             PlotIherAcm2                       = iHerCurve,
 
             FittedParameters = fitted,
+            WeightedRmse     = wrmse,
         };
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Computes the weighted root-mean-square error between the fitted BV model and the
+    /// merged measured polarization curve.  Each residual (i_model − i_meas) is weighted
+    /// by 1 / max(|i_meas|, 20th-percentile(|i_meas|)) to balance contributions across the
+    /// large current dynamic range.
+    /// </summary>
+    private static double ComputeWeightedRmse(double[] ePot, double[] iMeas, BvModelParameters model)
+    {
+        int n = ePot.Length;
+        if (n == 0)
+            return double.NaN;
+
+        double[] absI = new double[n];
+        for (int k = 0; k < n; k++)
+            absI[k] = Math.Abs(iMeas[k]);
+
+        double p20 = Percentile20(absI);
+
+        double sumWr2 = 0.0;
+        double sumW   = 0.0;
+        for (int k = 0; k < n; k++)
+        {
+            double iModel   = model.ComputeCurrentDensity(ePot[k]);
+            double residual = iModel - iMeas[k];
+            double w        = 1.0 / Math.Max(absI[k], p20);
+            sumWr2 += w * residual * residual;
+            sumW   += w;
+        }
+
+        return sumW > 0.0 ? Math.Sqrt(sumWr2 / sumW) : double.NaN;
+    }
+
+    /// <summary>
+    /// Returns the 20th percentile of <paramref name="values"/> using linear interpolation.
+    /// Returns 0 when the array is empty.
+    /// </summary>
+    private static double Percentile20(double[] values)
+    {
+        if (values.Length == 0)
+            return 0.0;
+
+        double[] sorted = (double[])values.Clone();
+        Array.Sort(sorted);
+        double idx  = 0.20 * (sorted.Length - 1);
+        int    lo   = (int)Math.Floor(idx);
+        int    hi   = Math.Min(lo + 1, sorted.Length - 1);
+        double frac = idx - lo;
+        return sorted[lo] * (1.0 - frac) + sorted[hi] * frac;
+    }
 
     /// <summary>
     /// Applies direct iR correction to measured polarization points using E_corrected = E_measured − I·R.
