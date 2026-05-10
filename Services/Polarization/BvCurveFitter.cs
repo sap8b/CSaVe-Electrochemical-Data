@@ -678,6 +678,11 @@ namespace CSaVe_Electrochemical_Data
         {
             public List<ReactionFitState> Reactions { get; init; }
 
+            /// <summary>
+            /// Returns the ReactionFitState for the given reaction type.
+            /// Throws <see cref="InvalidOperationException"/> if not found; only call this
+            /// from closures that were created while the reaction is known to be in the list.
+            /// </summary>
             public ReactionFitState GetReaction(ReactionType name) =>
                 Reactions.First(r => r.Reaction.Name == name);
 
