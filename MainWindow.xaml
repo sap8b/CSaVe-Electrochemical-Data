@@ -582,10 +582,10 @@
 
                                 <!-- Column headers -->
                                 <TextBlock Grid.Row="0" Grid.Column="2"
-                                           Text="i₀ (A/cm²)" FontSize="11"
+                                           Text="i0 (A/cm2)" FontSize="11"
                                            FontWeight="SemiBold" Foreground="#475569"/>
                                 <TextBlock Grid.Row="0" Grid.Column="4"
-                                           Text="β" FontSize="11"
+                                           Text="beta" FontSize="11"
                                            FontWeight="SemiBold" Foreground="#475569"/>
                                 <TextBlock Grid.Row="0" Grid.Column="6"
                                            Text="Fix" FontSize="11"
@@ -626,9 +626,9 @@
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Center"/>
 
-                                <!-- ORR sub-row: iₗᵢₘ (only ORR has a limiting current) -->
+                                <!-- ORR sub-row: i_lim (only ORR has a limiting current) -->
                                 <TextBlock Grid.Row="6" Grid.Column="0"
-                                           Text="iₗᵢₘ" VerticalAlignment="Center"
+                                           Text="i_lim" VerticalAlignment="Center"
                                            FontSize="11" Foreground="#64748B"
                                            Margin="6,0,0,0"
                                            ToolTip="ORR limiting current density (A/cm²)"/>
