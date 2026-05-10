@@ -574,6 +574,8 @@
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="4"/>
                                     <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="2"/>
+                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="4"/>
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
@@ -607,7 +609,7 @@
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Center"/>
 
-                                <!-- ORR row -->
+                                <!-- ORR row (i₀, β, Fix) -->
                                 <TextBlock Grid.Row="4" Grid.Column="0"
                                            Text="ORR" VerticalAlignment="Center"
                                            FontSize="12" Foreground="#1E293B"/>
@@ -624,20 +626,32 @@
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Center"/>
 
-                                <!-- Metal Oxidation row -->
+                                <!-- ORR sub-row: iₗᵢₘ (only ORR has a limiting current) -->
                                 <TextBlock Grid.Row="6" Grid.Column="0"
+                                           Text="iₗᵢₘ" VerticalAlignment="Center"
+                                           FontSize="11" Foreground="#64748B"
+                                           Margin="6,0,0,0"
+                                           ToolTip="ORR limiting current density (A/cm²)"/>
+                                <TextBox x:Name="OrrIlimTextBox"
+                                         Grid.Row="6" Grid.Column="2"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="1.0e-5"
+                                         ToolTip="ORR limiting current density (A/cm²)"/>
+
+                                <!-- Metal Oxidation row -->
+                                <TextBlock Grid.Row="8" Grid.Column="0"
                                            Text="Me Ox" VerticalAlignment="Center"
                                            FontSize="12" Foreground="#1E293B"/>
                                 <TextBox x:Name="MetalI0TextBox"
-                                         Grid.Row="6" Grid.Column="2"
+                                         Grid.Row="8" Grid.Column="2"
                                          Style="{StaticResource ModernTextBox}"
                                          Text="1.0e-14"/>
                                 <TextBox x:Name="MetalBetaTextBox"
-                                         Grid.Row="6" Grid.Column="4"
+                                         Grid.Row="8" Grid.Column="4"
                                          Style="{StaticResource ModernTextBox}"
                                          Text="0.95"/>
                                 <CheckBox x:Name="MetalFixCheckBox"
-                                          Grid.Row="6" Grid.Column="6"
+                                          Grid.Row="8" Grid.Column="6"
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Center"/>
                             </Grid>

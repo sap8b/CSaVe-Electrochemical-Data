@@ -35,7 +35,10 @@ public sealed class BvUserOverrides
 
     /// <summary>
     /// When <c>true</c>, the ORR i₀, β, and iₗᵢₘ are held fixed at the user-specified
-    /// values and are not adjusted by the LM optimiser.
+    /// values and are not adjusted by the LM optimiser.  If <see cref="IlimOrr"/> is
+    /// <c>null</c> and this flag is <c>true</c>, the automatically computed initial
+    /// estimate for iₗᵢₘ,ORR will be frozen (the auto-estimate is still used as the
+    /// fixed value).
     /// </summary>
     public bool FixOrr { get; init; }
 

@@ -1323,6 +1323,7 @@ namespace CSaVe_Electrochemical_Data
 
                 I0Orr    = TryParsePositiveDouble(OrrI0TextBox.Text),
                 BetaOrr  = TryParsePositiveDouble(OrrBetaTextBox.Text),
+                IlimOrr  = TryParsePositiveDouble(OrrIlimTextBox.Text),
                 FixOrr   = OrrFixCheckBox.IsChecked == true,
 
                 I0Metal   = TryParsePositiveDouble(MetalI0TextBox.Text),
