@@ -10,7 +10,7 @@ namespace CSaVe_Electrochemical_Data.Services.Polarization.Reactions
     /// </summary>
     public abstract class ElectrochemicalReactionFactory
     {
-        public abstract bool canCreateReaction(ReactionType reactionName);
+        public abstract bool CanCreateReaction(ReactionType reactionName);
         public abstract ElectrochemicalReaction CreateReaction(double pH, double temperatureCelsius);
 
         // ── Convenience static factory methods ────────────────────────────────────────────────────

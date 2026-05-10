@@ -8,7 +8,7 @@ namespace CSaVe_Electrochemical_Data.Services.Polarization.Reactions
 {
     public class MetalOxidationFactory : ElectrochemicalReactionFactory
     {
-        public override bool canCreateReaction(ReactionType reactionName)
+        public override bool CanCreateReaction(ReactionType reactionName)
         {
             return reactionName == ReactionType.MetalOxidation;
         }

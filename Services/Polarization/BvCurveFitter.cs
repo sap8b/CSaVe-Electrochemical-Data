@@ -116,7 +116,7 @@ namespace CSaVe_Electrochemical_Data
         {
             foreach (ElectrochemicalReactionFactory factory in _reactionFactories)
             {
-                if (factory.canCreateReaction(reactionType))
+                if (factory.CanCreateReaction(reactionType))
                     return factory.CreateReaction(DefaultPh, temperatureCelsius);
             }
 
