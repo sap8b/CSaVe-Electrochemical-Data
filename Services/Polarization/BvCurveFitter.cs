@@ -5,114 +5,97 @@ using System.Linq;
 namespace CSaVe_Electrochemical_Data;
 
 /// <summary>
-/// Fits the 11-parameter Butler-Volmer model to a merged polarization curve using a
+/// Fits the seven-parameter Butler-Volmer model to a merged polarization curve using a
 /// multi-step initialisation followed by a Levenberg-Marquardt global polish.
+/// All three half-reactions — metal oxidation, ORR, and HER — use the full Butler-Volmer
+/// equation with Nernst-fixed equilibrium potentials supplied by <see cref="ElectrochemicalReaction"/>
+/// objects.  The ORR also includes a Koutecky-Levich mass-transport correction.
 /// All arithmetic uses <see cref="System.Math"/> only; no external libraries are required.
 /// </summary>
 public sealed class BvCurveFitter : IBvCurveFitter
 {
-    // ── Module-level HER reaction singleton ───────────────────────────────────────────────────
+    // ── Module-level reaction singletons ──────────────────────────────────────────────────────
+    /// <summary>Fixed thermodynamic constants for the metal oxidation half-reaction (Fe/Fe²⁺, E0 = −0.44 V vs. SHE).</summary>
+    private static readonly ElectrochemicalReaction MetalReaction =
+        new ElectrochemicalReaction(name: "Metal", e0Vshe: -0.44, z: 2, pH: 8.0, temperatureCelsius: 25.0);
+
+    /// <summary>Fixed thermodynamic constants for the ORR half-reaction (O₂/H₂O, E0 = 1.229 V vs. SHE at pH 0).</summary>
+    private static readonly ElectrochemicalReaction OrrReaction =
+        new ElectrochemicalReaction(name: "ORR", e0Vshe: 1.229, z: 4, pH: 8.0, temperatureCelsius: 25.0);
+
     /// <summary>Fixed thermodynamic constants for the HER half-reaction (E0 = 0 V vs. SHE at pH 0).</summary>
     private static readonly ElectrochemicalReaction HerReaction =
         new ElectrochemicalReaction(name: "HER", e0Vshe: 0.0, z: 2, pH: 8.0, temperatureCelsius: 25.0);
 
     // ── Tafel window offsets relative to Ecorr ────────────────────────────────────────────────
     // Lower offset: skip the near-linear mixed-potential zone where neither branch is dominant.
-    private const double TafelLowerOffsetV       = 0.01;   // 0.01 V below/above Ecorr
+    private const double TafelLowerOffsetV  = 0.01;   // 0.01 V below/above Ecorr
 
     // Upper offset: stay within the true Tafel region before diffusion effects set in.
-    private const double TafelUpperOffsetV       = 0.15;   // 0.15 V below/above Ecorr
+    private const double TafelUpperOffsetV  = 0.15;   // 0.15 V below/above Ecorr
 
     // ── Default fall-back values when regression windows have too few points ──────────────────
-    // Default anodic Tafel slope (V/decade) for steel in near-neutral chloride.
-    private const double DefaultBaV              = 0.060;
+    // Default metal symmetry factor — symmetric BV as default.
+    private const double DefaultBetaMetal   = 0.5;
 
-    // Default anodic exchange current density (A/cm²) – representative of mild steel at OCP.
-    private const double DefaultI0aAcm2          = 1e-8;
+    // Default metal exchange current density (A/cm²) — representative of mild steel at OCP.
+    private const double DefaultI0MetalAcm2 = 1e-8;
 
-    // Default cathodic Tafel slope (V/decade) – typical for ORR activation on steel.
-    private const double DefaultBcV              = 0.100;
+    // Default ORR symmetry factor — symmetric BV as default.
+    private const double DefaultBetaOrr     = 0.5;
 
-    // Default cathodic exchange current density (A/cm²).
-    private const double DefaultI0cFraction      = 0.5;    // fraction of max cathodic |I|
+    // Default ORR exchange current density (A/cm²).
+    private const double DefaultI0OrrAcm2   = 1e-8;
 
     // Default HER exchange current density (A/cm²).
-    private const double DefaultI0HerAcm2        = 1e-9;
+    private const double DefaultI0HerAcm2   = 1e-9;
 
     // ── Fitted-parameter box bounds ───────────────────────────────────────────────────────────
     // Minimum physically meaningful exchange current density (A/cm²).
-    private const double I0MinAcm2 = 1.0e-30; //1e-12;
+    private const double I0MinAcm2          = 1.0e-30;
 
     // Maximum exchange current density (A/cm²) before the solution is non-physical.
-    private const double I0MaxAcm2               = 1e-1;
+    private const double I0MaxAcm2          = 1e-1;
 
-    // Minimum Tafel slope (V/decade) – sharp activation.
-    private const double BetaMinV                = 0.01;
+    // Minimum symmetry factor (dimensionless, 0 < β < 1).
+    private const double BetaSymMin         = 0.01;
 
-    // Maximum Tafel slope (V/decade) — very sluggish kinetics.
-    private const double BetaMaxV                = 0.50;
+    // Maximum symmetry factor (dimensionless, 0 < β < 1).
+    private const double BetaSymMax         = 0.99;
 
-    // HER symmetry factor bounds (dimensionless, 0 < β < 1).
-    private const double BetaHerMin              = 0.01;
-    private const double BetaHerMax              = 0.99;
-
-    // Maximum ORR limiting current density (A/cm²) – generous upper bound.
-    private const double IlimOrrMaxAcm2          = 1.0;
+    // Maximum ORR limiting current density (A/cm²).
+    private const double IlimOrrMaxAcm2     = 1.0;
 
     // Minimum ORR limiting current density (A/cm²).
-    private const double IlimOrrMinAcm2          = 1e-10;
-
-    // Ecorr lower bound offset: allow Ecorr to move 100 mV below the hint.
-    private const double EcorrLowerOffsetV       = 0.10;
-
-    // Ecorr upper bound offset: allow Ecorr to move 50 mV above the hint.
-    private const double EcorrUpperOffsetV       = 0.05;
-
-    // EorrTransition absolute lower / upper bounds (V).
-    private const double EorrTransitionLowerV    = -2.0;
-    private const double EorrTransitionUpperV    =  0.2;
-
-    // WorrV (sigmoid width) bounds (V).
-    private const double WorrMinV                = 0.005;
-    private const double WorrMaxV                = 0.20;
-    private const double WorrDefault             = 0.04;   // typical sigmoidal width for ORR
-
-    // Offset used when selecting EorrTransition candidates (V below Ecorr).
-    private const double EorrSelectionOffsetV    = 0.05;
-
-    // Fall-back EorrTransition offset below Ecorr (V).
-    private const double EorrFallbackOffsetV     = 0.10;
+    private const double IlimOrrMinAcm2     = 1e-10;
 
     // Lowest cathodic potential fraction for ilim_orr estimation (bottom 20 % of range).
     // The ORR plateau is most clearly visible in the deepest cathodic region.
-    private const double IlimOrrDepthFraction    = 0.20;
+    private const double IlimOrrDepthFraction = 0.20;
 
     // Floor applied before log10 to prevent log(0) errors.
-    private const double LogFloorAcm2            = 1e-20;
+    private const double LogFloorAcm2       = 1e-20;
 
     // Exponential argument clip limits — prevents overflow in exp() while retaining all physically meaningful values.
-    private const double ExpClipMin              = -50.0;
-    private const double ExpClipMax              =  50.0;
+    private const double ExpClipMin         = -50.0;
+    private const double ExpClipMax         =  50.0;
 
     // Minimum number of Tafel-region points required before running OLS regression.
-    private const int MinTafelPoints             = 2;
+    private const int MinTafelPoints        = 2;
 
     // Minimum number of HER-region points required before running HER regression.
-    private const int MinHerPoints               = 5;
+    private const int MinHerPoints          = 5;
 
     // ── Parameter vector index constants ─────────────────────────────────────────────────────
-    // Maps the 10-element parameter array p[] to named model parameters.
-    private const int IdxI0Anodic      = 0;
-    private const int IdxBetaAnodic    = 1;
-    private const int IdxI0Cathodic    = 2;
-    private const int IdxBetaCathodic  = 3;
-    private const int IdxEcorr         = 4;
-    private const int IdxIlimOrr       = 5;
-    private const int IdxEorrTransition = 6;
-    private const int IdxWorrV         = 7;
-    private const int IdxI0Her         = 8;
-    private const int IdxBetaHer       = 9;
-    private const int NumParams        = 10;
+    // Maps the 7-element parameter array p[] to named model parameters.
+    private const int IdxI0Metal    = 0;
+    private const int IdxBetaMetal  = 1;
+    private const int IdxI0Orr      = 2;
+    private const int IdxBetaOrr    = 3;
+    private const int IdxIlimOrr    = 4;
+    private const int IdxI0Her      = 5;
+    private const int IdxBetaHer    = 6;
+    private const int NumParams     = 7;
 
     /// <summary>
     /// Fit the BV model to <paramref name="currentDensityAcm2"/> vs
@@ -142,69 +125,52 @@ public sealed class BvCurveFitter : IBvCurveFitter
         double[] e = [.. potentialV];
         double[] i = [.. currentDensityAcm2];
 
-        // ── Step 1: Ecorr from zero-crossing interpolation ────────────────────────────────
+        // ── Step 1: Ecorr from zero-crossing interpolation (for Tafel window selection) ──────
         double ecorr0 = EstimateEcorr(e, i, ecorrHintV);
-        int    idxEcorr = IndexOfNearest(e, ecorr0);
 
-        // ── Step 2: Anodic Tafel slope and i0_anodic ─────────────────────────────────────
-        FitAnodicTafel(e, i, ecorr0, out double ba, out double i0a);
+        // ── Step 2: Metal oxidation — symmetry factor and exchange current density ──────────
+        FitMetalOxidation(e, i, ecorr0, out double betaMetal, out double i0Metal);
 
-        // ── Step 3: Cathodic Tafel slope and i0_cathodic ─────────────────────────────────
-        FitCathodicTafel(e, i, ecorr0, out double bc, out double i0c);
-
-        // ── Step 4: ORR limiting current (ilim_orr) ───────────────────────────────────────
+        // ── Step 3: ORR limiting current, then ORR BV parameters ──────────────────────────
         double ilim0 = EstimateIlimOrr(e, i, ecorr0);
+        FitOrrBv(e, i, ecorr0, ilim0, out double betaOrr, out double i0Orr);
 
-        // ── Step 5: HER onset and slope ───────────────────────────────────────────────────
+        // ── Step 4: HER onset and slope ───────────────────────────────────────────────────────
         FitHer(e, i, ilim0, out double i0Her, out double betaHer);
 
-        // ── Build initial parameter vector and bounds ─────────────────────────────────────
-        double[] eorrCandidates = [.. e.Where(v => v < ecorr0 - EorrSelectionOffsetV)];
-        double eorr0 = eorrCandidates.Length >= 3
-            ? Median(eorrCandidates)
-            : ecorr0 - EorrFallbackOffsetV;
-
+        // ── Build initial parameter vector and bounds ─────────────────────────────────────────
         double[] p0 = new double[NumParams];
-        p0[IdxI0Anodic]       = i0a;
-        p0[IdxBetaAnodic]     = ba;
-        p0[IdxI0Cathodic]     = i0c;
-        p0[IdxBetaCathodic]   = bc;
-        p0[IdxEcorr]          = ecorr0;
-        p0[IdxIlimOrr]        = ilim0;
-        p0[IdxEorrTransition] = eorr0;
-        p0[IdxWorrV]          = WorrDefault;
-        p0[IdxI0Her]          = i0Her;
-        p0[IdxBetaHer]        = betaHer;
+        p0[IdxI0Metal]   = i0Metal;
+        p0[IdxBetaMetal] = betaMetal;
+        p0[IdxI0Orr]     = i0Orr;
+        p0[IdxBetaOrr]   = betaOrr;
+        p0[IdxIlimOrr]   = ilim0;
+        p0[IdxI0Her]     = i0Her;
+        p0[IdxBetaHer]   = betaHer;
 
         double[] lb = new double[NumParams];
-        lb[IdxI0Anodic]       = I0MinAcm2;
-        lb[IdxBetaAnodic]     = BetaMinV;
-        lb[IdxI0Cathodic]     = I0MinAcm2;
-        lb[IdxBetaCathodic]   = BetaMinV;
-        lb[IdxEcorr]          = ecorrHintV - EcorrLowerOffsetV;
-        lb[IdxIlimOrr]        = IlimOrrMinAcm2;
-        lb[IdxEorrTransition] = EorrTransitionLowerV;
-        lb[IdxWorrV]          = WorrMinV;
-        lb[IdxI0Her]          = I0MinAcm2;
-        lb[IdxBetaHer]        = BetaHerMin;
+        lb[IdxI0Metal]   = I0MinAcm2;
+        lb[IdxBetaMetal] = BetaSymMin;
+        lb[IdxI0Orr]     = I0MinAcm2;
+        lb[IdxBetaOrr]   = BetaSymMin;
+        lb[IdxIlimOrr]   = IlimOrrMinAcm2;
+        lb[IdxI0Her]     = I0MinAcm2;
+        lb[IdxBetaHer]   = BetaSymMin;
 
         double[] ub = new double[NumParams];
-        ub[IdxI0Anodic]       = I0MaxAcm2;
-        ub[IdxBetaAnodic]     = BetaMaxV;
-        ub[IdxI0Cathodic]     = I0MaxAcm2;
-        ub[IdxBetaCathodic]   = BetaMaxV;
-        ub[IdxEcorr]          = ecorrHintV + EcorrUpperOffsetV;
-        ub[IdxIlimOrr]        = IlimOrrMaxAcm2;
-        ub[IdxEorrTransition] = EorrTransitionUpperV;
-        ub[IdxWorrV]          = WorrMaxV;
-        ub[IdxI0Her]          = I0MaxAcm2;
-        ub[IdxBetaHer]        = BetaHerMax;
+        ub[IdxI0Metal]   = I0MaxAcm2;
+        ub[IdxBetaMetal] = BetaSymMax;
+        ub[IdxI0Orr]     = I0MaxAcm2;
+        ub[IdxBetaOrr]   = BetaSymMax;
+        ub[IdxIlimOrr]   = IlimOrrMaxAcm2;
+        ub[IdxI0Her]     = I0MaxAcm2;
+        ub[IdxBetaHer]   = BetaSymMax;
 
         // Clamp initial guess to bounds.
         for (int j = 0; j < NumParams; j++)
             p0[j] = Math.Clamp(p0[j], lb[j], ub[j]);
 
-        // ── Step 6: Levenberg-Marquardt polish ────────────────────────────────────────────
+        // ── Step 5: Levenberg-Marquardt polish ────────────────────────────────────────────────
         // Weight each residual by 1 / max(|I|, percentile_20(|I|)) to balance the fit
         // across the large dynamic range of electrochemical currents.
         double[] absI   = [.. i.Select(v => Math.Abs(v))];
@@ -215,7 +181,24 @@ public sealed class BvCurveFitter : IBvCurveFitter
             p => ComputeWeightedResiduals(e, i, weight, p),
             p0, lb, ub);
 
-        return ParametersToModel(pFitted);
+        // ── Step 6: compute Ecorr as the zero-crossing of the fitted model ───────────────────
+        BvModelParameters partialModel = ParametersToModel(pFitted);
+        double ecorrFitted = FindEcorr(e, partialModel, ecorr0);
+
+        return new BvModelParameters(MetalReaction, OrrReaction, HerReaction)
+        {
+            I0Metal            = partialModel.I0Metal,
+            BetaMetal          = partialModel.BetaMetal,
+            EMetalEquilibriumV = partialModel.EMetalEquilibriumV,
+            I0Orr              = partialModel.I0Orr,
+            BetaOrr            = partialModel.BetaOrr,
+            IlimOrr            = partialModel.IlimOrr,
+            EorrEquilibriumV   = partialModel.EorrEquilibriumV,
+            I0Her              = partialModel.I0Her,
+            BetaHer            = partialModel.BetaHer,
+            EherEquilibriumV   = partialModel.EherEquilibriumV,
+            Ecorr              = ecorrFitted,
+        };
     }
 
     // ── Step implementations ──────────────────────────────────────────────────────────────────
@@ -227,7 +210,6 @@ public sealed class BvCurveFitter : IBvCurveFitter
     /// </summary>
     private static double EstimateEcorr(double[] e, double[] i, double hint)
     {
-        // Use the hint directly if it is well inside the potential range.
         // First look for a sign change in current.
         for (int k = 0; k < i.Length - 1; k++)
         {
@@ -252,16 +234,18 @@ public sealed class BvCurveFitter : IBvCurveFitter
     }
 
     /// <summary>
-    /// Fit log10(|I|) vs E by ordinary least squares over the anodic Tafel window
+    /// Estimates the metal-oxidation Butler-Volmer symmetry factor βₘₑₜₐₗ and exchange current
+    /// density I₀,metal by fitting log10(|I|) vs E over the anodic Tafel window
     /// [Ecorr + <see cref="TafelLowerOffsetV"/>, Ecorr + <see cref="TafelUpperOffsetV"/>].
-    /// Sets <paramref name="ba"/> (V/decade) and <paramref name="i0a"/> (A/cm²).
+    /// In the anodic Tafel region the reverse (cathodic) metal-oxidation term is negligible,
+    /// so OLS regression on the forward exponential yields the symmetry factor and exchange current.
     /// </summary>
-    private static void FitAnodicTafel(
+    private static void FitMetalOxidation(
         double[] e, double[] i, double ecorr,
-        out double ba, out double i0a)
+        out double betaMetal, out double i0Metal)
     {
-        ba  = DefaultBaV;
-        i0a = DefaultI0aAcm2;
+        betaMetal = DefaultBetaMetal;
+        i0Metal   = DefaultI0MetalAcm2;
 
         double eMin = ecorr + TafelLowerOffsetV;
         double eMax = ecorr + TafelUpperOffsetV;
@@ -279,29 +263,36 @@ public sealed class BvCurveFitter : IBvCurveFitter
         if (!double.IsFinite(slope) || Math.Abs(slope) < 1e-30)
             return;
 
-        double baFit  = 1.0 / (Math.Abs(slope) * Math.Log(10.0));
-        double i0aFit = Math.Pow(10.0, slope * ecorr + intercept);
+        // slope = BetaMetal * z * F / (R * T * ln10)
+        // → BetaMetal = slope * R * T * ln10 / (z * F)
+        double zFoverRTln10 = MetalReaction.Z * ElectrochemicalReaction.F
+                              / (ElectrochemicalReaction.R * MetalReaction.TemperatureKelvin * Math.Log(10.0));
+        double betaFit = slope / zFoverRTln10;
 
-        if (double.IsFinite(baFit)  && double.IsFinite(i0aFit))
+        // I0Metal = 10^(slope * E_eq_metal + intercept) — extrapolated to the equilibrium potential.
+        double eEqMetal   = MetalReaction.EquilibriumPotentialVshe;
+        double i0MetalFit = Math.Pow(10.0, slope * eEqMetal + intercept);
+
+        if (double.IsFinite(betaFit) && double.IsFinite(i0MetalFit))
         {
-            ba  = Math.Clamp(baFit,  BetaMinV,   BetaMaxV);
-            i0a = Math.Clamp(i0aFit, I0MinAcm2, I0MaxAcm2);
+            betaMetal = Math.Clamp(betaFit, BetaSymMin, BetaSymMax);
+            i0Metal   = Math.Clamp(i0MetalFit, I0MinAcm2, I0MaxAcm2);
         }
     }
 
     /// <summary>
-    /// Fit log10(|I|) vs E by OLS over the cathodic Tafel window
+    /// Estimates the ORR Butler-Volmer symmetry factor βₒᵣᵣ and exchange current density I₀,ORR
+    /// by fitting log10(|I|) vs E over the cathodic Tafel window
     /// [Ecorr − <see cref="TafelUpperOffsetV"/>, Ecorr − <see cref="TafelLowerOffsetV"/>].
-    /// Sets <paramref name="bc"/> (V/decade) and <paramref name="i0c"/> (A/cm²).
+    /// In the cathodic Tafel region the anodic ORR term is negligible, so OLS regression on the
+    /// forward (cathodic) exponential yields the symmetry factor and exchange current.
     /// </summary>
-    private static void FitCathodicTafel(
-        double[] e, double[] i, double ecorr,
-        out double bc, out double i0c)
+    private static void FitOrrBv(
+        double[] e, double[] i, double ecorr, double ilimOrr,
+        out double betaOrr, out double i0Orr)
     {
-        bc  = DefaultBcV;
-
-        double iAbsMax  = i.Select(v => Math.Abs(v)).DefaultIfEmpty(1e-10).Max();
-        i0c = Math.Clamp(iAbsMax * DefaultI0cFraction, I0MinAcm2, I0MaxAcm2);
+        betaOrr = DefaultBetaOrr;
+        i0Orr   = DefaultI0OrrAcm2;
 
         double eMin = ecorr - TafelUpperOffsetV;
         double eMax = ecorr - TafelLowerOffsetV;
@@ -319,13 +310,22 @@ public sealed class BvCurveFitter : IBvCurveFitter
         if (!double.IsFinite(slope) || Math.Abs(slope) < 1e-30)
             return;
 
-        double bcFit  = 1.0 / (Math.Abs(slope) * Math.Log(10.0));
-        double i0cFit = Math.Pow(10.0, slope * ecorr + intercept);
+        // In cathodic Tafel region: log|i_kinetic| ≈ log(I0Orr) − (1−β)*z*F/(R*T*ln10) * (E − E_eq_ORR)
+        // slope of log|i| vs E = −(1−BetaOrr)*z*F / (R*T*ln10)  [typically negative]
+        // → (1−BetaOrr) = −slope * R*T*ln10 / (z*F)
+        double zFoverRTln10 = OrrReaction.Z * ElectrochemicalReaction.F
+                              / (ElectrochemicalReaction.R * OrrReaction.TemperatureKelvin * Math.Log(10.0));
+        double oneMinusBeta = -slope / zFoverRTln10;
+        double betaFit      = 1.0 - oneMinusBeta;
 
-        if (double.IsFinite(bcFit) && double.IsFinite(i0cFit))
+        // I0Orr = 10^(slope * E_eq_ORR + intercept) — extrapolated to the equilibrium potential.
+        double eEqOrr   = OrrReaction.EquilibriumPotentialVshe;
+        double i0OrrFit = Math.Pow(10.0, slope * eEqOrr + intercept);
+
+        if (double.IsFinite(betaFit) && double.IsFinite(i0OrrFit))
         {
-            bc  = Math.Clamp(bcFit,  BetaMinV,   BetaMaxV);
-            i0c = Math.Clamp(i0cFit, I0MinAcm2, I0MaxAcm2);
+            betaOrr = Math.Clamp(betaFit, BetaSymMin, BetaSymMax);
+            i0Orr   = Math.Clamp(i0OrrFit, I0MinAcm2, I0MaxAcm2);
         }
     }
 
@@ -410,7 +410,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
             double betaSeed = 1.0 + slope / zFoverRTln10;
             double i0Seed   = Math.Pow(10.0, intercept);
 
-            betaHer = Math.Clamp(betaSeed, BetaHerMin, BetaHerMax);
+            betaHer = Math.Clamp(betaSeed, BetaSymMin, BetaSymMax);
             i0Her   = Math.Clamp(i0Seed,  I0MinAcm2,  I0MaxAcm2);
         }
 
@@ -419,8 +419,8 @@ public sealed class BvCurveFitter : IBvCurveFitter
                           / (ElectrochemicalReaction.R * HerReaction.TemperatureKelvin);
 
         double[] p0Her = { i0Her, betaHer };
-        double[] lbHer = { I0MinAcm2, BetaHerMin };
-        double[] ubHer = { I0MaxAcm2, BetaHerMax };
+        double[] lbHer = { I0MinAcm2, BetaSymMin };
+        double[] ubHer = { I0MaxAcm2, BetaSymMax };
 
         double[] weightHer = [.. iArr.Select(v => 1.0 / Math.Max(Math.Abs(v), 1e-12))];
 
@@ -440,7 +440,42 @@ public sealed class BvCurveFitter : IBvCurveFitter
             p0Her, lbHer, ubHer);
 
         i0Her   = Math.Clamp(pHerFitted[0], I0MinAcm2, I0MaxAcm2);
-        betaHer = Math.Clamp(pHerFitted[1], BetaHerMin, BetaHerMax);
+        betaHer = Math.Clamp(pHerFitted[1], BetaSymMin, BetaSymMax);
+    }
+
+    /// <summary>
+    /// Finds Ecorr as the zero-crossing of the fitted model's net current density,
+    /// using a linear scan followed by linear interpolation over the experimental potential range.
+    /// Falls back to <paramref name="ecorrHint"/> if no sign change is found.
+    /// </summary>
+    private static double FindEcorr(double[] e, BvModelParameters model, double ecorrHint)
+    {
+        if (e.Length == 0)
+            return ecorrHint;
+
+        double eMin = e.Min();
+        double eMax = e.Max();
+
+        // Scan for a sign change in the model current over the experimental range.
+        const int scanSteps = 500;
+        double step = (eMax - eMin) / scanSteps;
+        double ePrev = eMin;
+        double iPrev = model.ComputeCurrentDensity(eMin);
+
+        for (int k = 1; k <= scanSteps; k++)
+        {
+            double eCurr = eMin + k * step;
+            double iCurr = model.ComputeCurrentDensity(eCurr);
+            if (iPrev * iCurr < 0.0)
+            {
+                double dI = iCurr - iPrev;
+                return dI != 0.0 ? ePrev - iPrev * (eCurr - ePrev) / dI : (ePrev + eCurr) / 2.0;
+            }
+            ePrev = eCurr;
+            iPrev = iCurr;
+        }
+
+        return ecorrHint;
     }
 
     // ── Mathematical utilities ────────────────────────────────────────────────────────────────
@@ -462,34 +497,28 @@ public sealed class BvCurveFitter : IBvCurveFitter
     }
 
     /// <summary>
-    /// Convert a raw 10-element parameter vector to a <see cref="BvModelParameters"/> object.
+    /// Convert a raw 7-element parameter vector to a <see cref="BvModelParameters"/> object.
+    /// Ecorr defaults to 0 and is set post-fit by <see cref="FindEcorr"/>.
     /// </summary>
     private static BvModelParameters ParametersToModel(double[] p) =>
-        new BvModelParameters(HerReaction)
+        new BvModelParameters(MetalReaction, OrrReaction, HerReaction)
         {
-            I0Anodic       = p[IdxI0Anodic],
-            BetaAnodic     = p[IdxBetaAnodic],
-            I0Cathodic     = p[IdxI0Cathodic],
-            BetaCathodic   = p[IdxBetaCathodic],
-            Ecorr          = p[IdxEcorr],
-            IlimOrr        = p[IdxIlimOrr],
-            EorrTransition = p[IdxEorrTransition],
-            WorrV          = p[IdxWorrV],
-            I0Her          = p[IdxI0Her],
-            BetaHer        = p[IdxBetaHer],
-            // EherEquilibriumV is fixed by the Nernst equation — not a fit parameter.
-            EherEquilibriumV = HerReaction.EquilibriumPotentialVshe,
+            I0Metal            = p[IdxI0Metal],
+            BetaMetal          = p[IdxBetaMetal],
+            EMetalEquilibriumV = MetalReaction.EquilibriumPotentialVshe,
+            I0Orr              = p[IdxI0Orr],
+            BetaOrr            = p[IdxBetaOrr],
+            IlimOrr            = p[IdxIlimOrr],
+            EorrEquilibriumV   = OrrReaction.EquilibriumPotentialVshe,
+            I0Her              = p[IdxI0Her],
+            BetaHer            = p[IdxBetaHer],
+            EherEquilibriumV   = HerReaction.EquilibriumPotentialVshe,
         };
 
     /// <summary>
     /// Ordinary least-squares fit of y = slope·x + intercept.
     /// Returns <c>false</c> if the regression cannot be computed (e.g., zero variance in x).
     /// </summary>
-    /// <param name="x">Independent variable values.</param>
-    /// <param name="y">Dependent variable values.</param>
-    /// <param name="slope">Fitted slope.</param>
-    /// <param name="intercept">Fitted intercept.</param>
-    /// <returns><c>true</c> if the fit succeeded; <c>false</c> otherwise.</returns>
     private static bool OlsFit(double[] x, double[] y, out double slope, out double intercept)
     {
         slope     = 0.0;
@@ -511,19 +540,6 @@ public sealed class BvCurveFitter : IBvCurveFitter
         slope     = (n * sumXY - sumX * sumY) / denom;
         intercept = (sumY - slope * sumX) / n;
         return true;
-    }
-
-    /// <summary>Returns the index of the element in <paramref name="arr"/> nearest to <paramref name="target"/>.</summary>
-    private static int IndexOfNearest(double[] arr, double target)
-    {
-        int    best    = 0;
-        double bestDist = Math.Abs(arr[0] - target);
-        for (int k = 1; k < arr.Length; k++)
-        {
-            double d = Math.Abs(arr[k] - target);
-            if (d < bestDist) { bestDist = d; best = k; }
-        }
-        return best;
     }
 
     /// <summary>Returns the median of <paramref name="values"/> (does not modify the input).</summary>

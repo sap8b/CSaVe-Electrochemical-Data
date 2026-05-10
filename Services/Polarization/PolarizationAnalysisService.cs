@@ -78,6 +78,10 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
         IReadOnlyList<PolarizationPoint> fitPoints;
         IReadOnlyList<PolarizationPoint> displayPoints;
 
+        // Separate per-file data kept for split plotting in two-file mode.
+        IReadOnlyList<PolarizationPoint> anodicFilePoints   = Array.Empty<PolarizationPoint>();
+        IReadOnlyList<PolarizationPoint> cathodicFilePoints = Array.Empty<PolarizationPoint>();
+
         bool twoFileMode = !string.IsNullOrWhiteSpace(input.CathodicFilePath);
 
         if (twoFileMode)
@@ -90,6 +94,10 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
             IReadOnlyList<PolarizationPoint> fwdCathodic = _monotonicityFilter.Filter(rawCathodic, isAnodic: false);
 
             fitPoints = _curveJoiner.Join(fwdAnodic, fwdCathodic);
+
+            // Preserve per-file raw data for split plotting.
+            anodicFilePoints   = rawAnodic.OrderBy(p => p.PotentialV).ToList();
+            cathodicFilePoints = rawCathodic.OrderBy(p => p.PotentialV).ToList();
 
             // Display curve: all raw points sorted by potential (shows hysteresis loop).
             List<PolarizationPoint> allDisplay = [.. rawAnodic, .. rawCathodic];
@@ -123,6 +131,12 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
         double[] ePotDisplay = [.. displayPoints.Select(selector: p => p.PotentialV)];
         double[] iDensDisp   = [.. displayPoints.Select(selector: p => p.CurrentA / area)];
 
+        // Per-file current density arrays for split plotting.
+        double[] ePotAnodic    = [.. anodicFilePoints.Select(p => p.PotentialV)];
+        double[] iDensAnodic   = [.. anodicFilePoints.Select(p => p.CurrentA / area)];
+        double[] ePotCathodic  = [.. cathodicFilePoints.Select(p => p.PotentialV)];
+        double[] iDensCathodic = [.. cathodicFilePoints.Select(p => p.CurrentA / area)];
+
         // ── Step 4: BV fitting ────────────────────────────────────────────────────────────
         BvModelParameters fitted = _curveFitter.Fit(
             ePot.ToList(), iDensity.ToList(), ecorrHint, input.TemperatureCelsius);
@@ -139,17 +153,25 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
             ePotModel = ePotIrCorrected;
         }
 
-        double[] modelCurve = [.. ePotModel.Select(selector: e => fitted.ComputeCurrentDensity(e))];
-        double[] iOxCurve   = [.. ePotModel.Select(selector: e => fitted.ComputeAnodicComponent(e))];
-        double[] iOrrCurve  = [.. ePotModel.Select(selector: e => fitted.ComputeOrrComponent(e))];
-        double[] iHerCurve  = [.. ePotModel.Select(selector: e => fitted.ComputeHerComponent(e))];
+        double[] modelCurve    = [.. ePotModel.Select(selector: e => fitted.ComputeCurrentDensity(e))];
+        double[] iMetalBvCurve = [.. ePotModel.Select(selector: e => fitted.ComputeMetalOxidationComponent(e))];
+        double[] iOrrCurve     = [.. ePotModel.Select(selector: e => fitted.ComputeOrrComponent(e))];
+        double[] iHerCurve     = [.. ePotModel.Select(selector: e => fitted.ComputeHerComponent(e))];
 
         // ── Step 6: extract corrosion metrics from fitted model ───────────────────────────
         double ecorrV    = fitted.Ecorr;
-        // icorr: the anodic exchange current density I0Anodic from the Tafel back-extrapolation
-        // to Ecorr is the standard electrochemical definition used in polarization curve analysis.
-        double icorrAcm2 = fitted.I0Anodic;
+        // icorr: the absolute value of the metal-oxidation BV component at Ecorr equals the
+        // cathodic (ORR + HER) current at Ecorr — the standard mixed-potential definition.
+        double icorrAcm2 = Math.Abs(fitted.ComputeMetalOxidationComponent(ecorrV));
         double iOxAcm2   = ComputeIOx(ePot, iDensity, ecorrV);
+
+        // Effective Tafel slopes derived from BV symmetry factors for display.
+        // ba (metal anodic) = 2.303 * R * T / (BetaMetal * z_metal * F)  with z_metal = 2
+        // bc (ORR cathodic) = 2.303 * R * T / ((1-BetaOrr) * z_ORR * F) with z_ORR   = 4
+        double tK             = input.TemperatureCelsius + 273.15;
+        double rtFactor       = 2.303 * ElectrochemicalReaction.R * tK / ElectrochemicalReaction.F;
+        double betaAnodicV    = rtFactor / (fitted.BetaMetal * 2.0);
+        double betaCathodicV  = rtFactor / ((1.0 - fitted.BetaOrr) * 4.0);
 
         // ── Step 7: interpolate protection current densities ─────────────────────────────
         var protectionCurrents = new Dictionary<string, double>();
@@ -163,33 +185,37 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
         // ── Step 8: assemble result ───────────────────────────────────────────────────────
         return new PolarizationAnalysisResult
         {
-            Success      = true,
-            Message      = $"Polarization analysis completed ({(twoFileMode ? "two-file" : "single-file")} mode).",
-            EcorrV       = ecorrV,
-            IcorrAcm2    = icorrAcm2,
-            BetaAnodicV  = fitted.BetaAnodic,
-            BetaCathodicV = fitted.BetaCathodic,
-            IlimOrrAcm2  = fitted.IlimOrr,
-            HerEquilibriumV    = fitted.EherEquilibriumV,
-            IOxAcm2      = iOxAcm2,
-            I0AnodicAcm2 = fitted.I0Anodic,
-            I0CathodicAcm2 = fitted.I0Cathodic,
-            BetaHer = fitted.BetaHer,
-            I0HerAcm2 = fitted.I0Her,
+            Success       = true,
+            Message       = $"Polarization analysis completed ({(twoFileMode ? "two-file" : "single-file")} mode).",
+            EcorrV        = ecorrV,
+            IcorrAcm2     = icorrAcm2,
+            BetaAnodicV   = betaAnodicV,
+            BetaCathodicV = betaCathodicV,
+            IlimOrrAcm2   = fitted.IlimOrr,
+            HerEquilibriumV = fitted.EherEquilibriumV,
+            IOxAcm2       = iOxAcm2,
+            I0AnodicAcm2  = fitted.I0Metal,
+            I0CathodicAcm2 = fitted.I0Orr,
+            BetaHer       = fitted.BetaHer,
+            I0HerAcm2     = fitted.I0Her,
             BoundaryLayerThicknessCm = fitted.IlimOrr > 0.0
                 ? (4.0 * FaradayConstantCmol * OxygenDiffusivityCm2s * OxygenConcentrationMolCm3) / fitted.IlimOrr
                 : double.NaN,
 
             ProtectionCurrentDensitiesAcm2 = protectionCurrents,
 
-            PlotPotentialsV              = ePotDisplay,
-            PlotCurrentDensityAcm2       = iDensDisp,
-            PlotFitPotentialsV           = ePotFit,
-            PlotIrCorrectedPotentialsV   = ePotIrCorrected,
-            PlotModelCurrentDensityAcm2  = modelCurve,
-            PlotIoxAcm2                  = iOxCurve,
-            PlotIorrAcm2                 = iOrrCurve,
-            PlotIherAcm2                 = iHerCurve,
+            PlotPotentialsV                    = ePotDisplay,
+            PlotCurrentDensityAcm2             = iDensDisp,
+            PlotAnodicFilePotentialsV          = ePotAnodic,
+            PlotAnodicFileCurrentDensityAcm2   = iDensAnodic,
+            PlotCathodicFilePotentialsV        = ePotCathodic,
+            PlotCathodicFileCurrentDensityAcm2 = iDensCathodic,
+            PlotFitPotentialsV                 = ePotFit,
+            PlotIrCorrectedPotentialsV         = ePotIrCorrected,
+            PlotModelCurrentDensityAcm2        = modelCurve,
+            PlotIMetalBvAcm2                   = iMetalBvCurve,
+            PlotIorrAcm2                       = iOrrCurve,
+            PlotIherAcm2                       = iHerCurve,
 
             FittedParameters = fitted,
         };

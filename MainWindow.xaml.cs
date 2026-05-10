@@ -12,6 +12,7 @@ using CSaVe_Electrochemical_Data.Models;
 using CSaVe_Electrochemical_Data.Services;
 using OxyPlot;
 using OxyPlot.Axes;
+using OxyPlot.Legends;
 using OxyPlot.Series;
 
 namespace CSaVe_Electrochemical_Data
@@ -991,6 +992,15 @@ namespace CSaVe_Electrochemical_Data
             polarizationPlotModel.Title = "Polarization (|i| vs E)";
             polarizationPlotModel.Axes.Add(new LogarithmicAxis { Position = AxisPosition.Bottom, Title = "Current Density (A/cm²)", Minimum = 1.0e-12 });
             polarizationPlotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = "Potential (V)" });
+            polarizationPlotModel.Legends.Add(new Legend
+            {
+                LegendPosition      = LegendPosition.TopRight,
+                LegendPlacement     = LegendPlacement.Inside,
+                LegendBackground    = OxyColor.FromAColor(200, OxyColors.White),
+                LegendBorder        = OxyColors.Gray,
+                LegendBorderThickness = 0.5,
+                LegendFontSize      = 10.0,
+            });
             PolarizationPlotView.Model = polarizationPlotModel;
 
             eisNyquistPlotModel.Title = "Nyquist";
@@ -1347,103 +1357,118 @@ namespace CSaVe_Electrochemical_Data
                 result.PlotFitPotentialsV.Count         > 0 ? result.PlotFitPotentialsV :
                 result.PlotPotentialsV;
 
-            // ── Split raw data into anodic (i > 0) and cathodic (i < 0) branches for separate styling ────
-            var anodicSeries = new LineSeries
+            // ── 1) Anodic file raw data — light gray dotted ───────────────────────────────────────────
+            bool twoFileMode = result.PlotAnodicFilePotentialsV.Count > 0;
+            if (twoFileMode)
             {
-                Title           = "Anodic branch",
-                Color           = OxyColors.Gray,
-                LineStyle       = LineStyle.Dash,
-                StrokeThickness = 0.8
-            };
+                var anodicFileSeries = new LineSeries
+                {
+                    Title           = "Anodic file",
+                    Color           = OxyColor.FromAColor(160, OxyColors.Gray),
+                    LineStyle       = LineStyle.Dot,
+                    StrokeThickness = 1.0
+                };
+                int n = Math.Min(result.PlotAnodicFilePotentialsV.Count, result.PlotAnodicFileCurrentDensityAcm2.Count);
+                for (int j = 0; j < n; j++)
+                {
+                    double x = Math.Max(Math.Abs(result.PlotAnodicFileCurrentDensityAcm2[j]), 1.0e-12);
+                    anodicFileSeries.Points.Add(new DataPoint(x, result.PlotAnodicFilePotentialsV[j]));
+                }
+                if (anodicFileSeries.Points.Count > 0)
+                    polarizationPlotModel.Series.Add(anodicFileSeries);
 
-            var cathodicSeries = new LineSeries
-            {
-                Title           = "Cathodic branch",
-                Color           = OxyColors.Gray,
-                LineStyle       = LineStyle.Dot,
-                StrokeThickness = 0.8
-            };
-
-            int dataCount = Math.Min(result.PlotPotentialsV.Count, result.PlotCurrentDensityAcm2.Count);
-            for (int j = 0; j < dataCount; j++)
-            {
-                double x = Math.Max(Math.Abs(result.PlotCurrentDensityAcm2[j]), 1.0e-12);
-                double y = result.PlotPotentialsV[j];
-
-                if (result.PlotCurrentDensityAcm2[j] >= 0)
-                    anodicSeries.Points.Add(new DataPoint(x, y));
-                else
-                    cathodicSeries.Points.Add(new DataPoint(x, y));
+                var cathodicFileSeries = new LineSeries
+                {
+                    Title           = "Cathodic file",
+                    Color           = OxyColor.FromAColor(160, OxyColors.Gray),
+                    LineStyle       = LineStyle.Dot,
+                    StrokeThickness = 1.0
+                };
+                int nc2 = Math.Min(result.PlotCathodicFilePotentialsV.Count, result.PlotCathodicFileCurrentDensityAcm2.Count);
+                for (int j = 0; j < nc2; j++)
+                {
+                    double x = Math.Max(Math.Abs(result.PlotCathodicFileCurrentDensityAcm2[j]), 1.0e-12);
+                    cathodicFileSeries.Points.Add(new DataPoint(x, result.PlotCathodicFilePotentialsV[j]));
+                }
+                if (cathodicFileSeries.Points.Count > 0)
+                    polarizationPlotModel.Series.Add(cathodicFileSeries);
             }
-            polarizationPlotModel.Series.Add(anodicSeries);
-            polarizationPlotModel.Series.Add(cathodicSeries);
 
-            // ── Merged / combined data trace: gray solid line (all |i| vs E) ─────────────────────────────
+            // ── 2) Combined anodic + cathodic polarization curve — light gray dashed ─────────────────
             var mergedSeries = new LineSeries
             {
-                Title           = "Merged data",
-                Color           = OxyColors.Gray,
-                LineStyle       = LineStyle.Solid,
+                Title           = "Combined data",
+                Color           = OxyColor.FromAColor(160, OxyColors.Gray),
+                LineStyle       = LineStyle.Dash,
                 StrokeThickness = 1.5
             };
+            int dataCount = Math.Min(result.PlotPotentialsV.Count, result.PlotCurrentDensityAcm2.Count);
             for (int j = 0; j < dataCount; j++)
             {
                 double x = Math.Max(Math.Abs(result.PlotCurrentDensityAcm2[j]), 1.0e-12);
                 mergedSeries.Points.Add(new DataPoint(x, result.PlotPotentialsV[j]));
             }
-            polarizationPlotModel.Series.Add(mergedSeries);
+            if (mergedSeries.Points.Count > 0)
+                polarizationPlotModel.Series.Add(mergedSeries);
 
-            // ── Modeled / fitted curve: thick black dashed line ───────────────────────────────────────────
-            var fitSeries = new LineSeries
+            // ── 3) Metal oxidation BV component — light blue ──────────────────────────────────────────
+            if (result.PlotIMetalBvAcm2.Count > 0)
             {
-                Title           = "BV model",
-                Color           = OxyColors.Black,
-                LineStyle       = LineStyle.Dash,
-                StrokeThickness = 2.5
-            };
-            int fitCount = Math.Min(modelPotentials.Count, result.PlotModelCurrentDensityAcm2.Count);
-            for (int j = 0; j < fitCount; j++)
-            {
-                double x = Math.Max(Math.Abs(result.PlotModelCurrentDensityAcm2[j]), 1.0e-12);
-                fitSeries.Points.Add(new DataPoint(x, modelPotentials[j]));
-            }
-            polarizationPlotModel.Series.Add(fitSeries);
-
-            // ── Component curves (i_ox, i_ORR, i_HER) — keep existing styling, omit if empty ─────────────
-            if (result.PlotIoxAcm2.Count > 0)
-            {
-                var ioxSeries = new LineSeries { Title = "i_ox (anodic)", Color = OxyColors.DodgerBlue, LineStyle = LineStyle.Solid, StrokeThickness = 1.2 };
-                int nc = Math.Min(modelPotentials.Count, result.PlotIoxAcm2.Count);
-                for (int j = 0; j < nc; j++)
+                var metalSeries = new LineSeries
                 {
-                    double x = Math.Max(Math.Abs(result.PlotIoxAcm2[j]), 1.0e-12);
-                    ioxSeries.Points.Add(new DataPoint(x, modelPotentials[j]));
+                    Title           = "Metal oxidation BV",
+                    Color           = OxyColors.LightBlue,
+                    LineStyle       = LineStyle.Solid,
+                    StrokeThickness = 1.5
+                };
+                int n = Math.Min(modelPotentials.Count, result.PlotIMetalBvAcm2.Count);
+                for (int j = 0; j < n; j++)
+                {
+                    double x = Math.Max(Math.Abs(result.PlotIMetalBvAcm2[j]), 1.0e-12);
+                    metalSeries.Points.Add(new DataPoint(x, modelPotentials[j]));
                 }
-                polarizationPlotModel.Series.Add(ioxSeries);
+                if (metalSeries.Points.Count > 0)
+                    polarizationPlotModel.Series.Add(metalSeries);
             }
 
+            // ── 4) ORR BV component — green ───────────────────────────────────────────────────────────
             if (result.PlotIorrAcm2.Count > 0)
             {
-                var orrSeries = new LineSeries { Title = "i_ORR", Color = OxyColors.ForestGreen, LineStyle = LineStyle.Solid, StrokeThickness = 1.2 };
-                int nc = Math.Min(modelPotentials.Count, result.PlotIorrAcm2.Count);
-                for (int j = 0; j < nc; j++)
+                var orrSeries = new LineSeries
+                {
+                    Title           = "ORR BV",
+                    Color           = OxyColors.ForestGreen,
+                    LineStyle       = LineStyle.Solid,
+                    StrokeThickness = 1.5
+                };
+                int n = Math.Min(modelPotentials.Count, result.PlotIorrAcm2.Count);
+                for (int j = 0; j < n; j++)
                 {
                     double x = Math.Max(Math.Abs(result.PlotIorrAcm2[j]), 1.0e-12);
                     orrSeries.Points.Add(new DataPoint(x, modelPotentials[j]));
                 }
-                polarizationPlotModel.Series.Add(orrSeries);
+                if (orrSeries.Points.Count > 0)
+                    polarizationPlotModel.Series.Add(orrSeries);
             }
 
+            // ── 5) HER BV component — orange ─────────────────────────────────────────────────────────
             if (result.PlotIherAcm2.Count > 0)
             {
-                var herSeries = new LineSeries { Title = "i_HER", Color = OxyColors.DarkOrange, LineStyle = LineStyle.Solid, StrokeThickness = 1.2 };
-                int nc = Math.Min(modelPotentials.Count, result.PlotIherAcm2.Count);
-                for (int j = 0; j < nc; j++)
+                var herSeries = new LineSeries
+                {
+                    Title           = "HER BV",
+                    Color           = OxyColors.DarkOrange,
+                    LineStyle       = LineStyle.Solid,
+                    StrokeThickness = 1.5
+                };
+                int n = Math.Min(modelPotentials.Count, result.PlotIherAcm2.Count);
+                for (int j = 0; j < n; j++)
                 {
                     double x = Math.Max(Math.Abs(result.PlotIherAcm2[j]), 1.0e-12);
                     herSeries.Points.Add(new DataPoint(x, modelPotentials[j]));
                 }
-                polarizationPlotModel.Series.Add(herSeries);
+                if (herSeries.Points.Count > 0)
+                    polarizationPlotModel.Series.Add(herSeries);
             }
 
             polarizationPlotModel.InvalidatePlot(true);
