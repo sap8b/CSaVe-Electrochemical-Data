@@ -1371,7 +1371,7 @@ namespace CSaVe_Electrochemical_Data
 
             // ── Build summary text ─────────────────────────────────────────────────────────
             var fp = result.FittedParameters;
-            string summary = string.Join(Environment.NewLine, new[]
+            var summaryLines = new List<string>
             {
                 $"E_corr (mV): {FormatMeanStd(rows.Select(r => r.Ecorr_mV))}",
                 $"i_corr (uA/cm²): {FormatMeanStd(rows.Select(r => r.Icorr_uAcm2))}",
@@ -1382,16 +1382,41 @@ namespace CSaVe_Electrochemical_Data
                 $"i@-1050 mV (uA/cm²): {FormatMeanStd(rows.Select(r => r.I_at_neg1050mV_uAcm2))}",
                 string.Empty,
                 "--- Fitted B-V Parameters ---",
-                $"I\u2080,metal (A/cm\u00B2): {fp.I0Metal:E3}",
-                $"\u03B2_metal: {fp.BetaMetal:F4}",
-                $"I\u2080,ORR (A/cm\u00B2): {fp.I0Orr:E3}",
-                $"\u03B2_ORR: {fp.BetaOrr:F4}",
-                $"i_lim,ORR (A/cm\u00B2): {fp.IlimOrr:E3}",
-                $"I\u2080,HER (A/cm\u00B2): {fp.I0Her:E3}",
-                $"\u03B2_HER: {fp.BetaHer:F4}",
-                string.Empty,
-                $"Weighted RMSE (A/cm\u00B2): {(double.IsNaN(result.WeightedRmse) ? "n/a" : result.WeightedRmse.ToString("E3"))}",
-            });
+            };
+            if (fp.IncludeMetal)
+            {
+                summaryLines.Add($"I\u2080,metal (A/cm\u00B2): {fp.I0Metal:E3}");
+                summaryLines.Add($"\u03B2_metal: {fp.BetaMetal:F4}");
+            }
+            else
+            {
+                summaryLines.Add("Metal oxidation: excluded");
+            }
+
+            if (fp.IncludeOrr)
+            {
+                summaryLines.Add($"I\u2080,ORR (A/cm\u00B2): {fp.I0Orr:E3}");
+                summaryLines.Add($"\u03B2_ORR: {fp.BetaOrr:F4}");
+                summaryLines.Add($"i_lim,ORR (A/cm\u00B2): {fp.IlimOrr:E3}");
+            }
+            else
+            {
+                summaryLines.Add("ORR: excluded");
+            }
+
+            if (fp.IncludeHer)
+            {
+                summaryLines.Add($"I\u2080,HER (A/cm\u00B2): {fp.I0Her:E3}");
+                summaryLines.Add($"\u03B2_HER: {fp.BetaHer:F4}");
+            }
+            else
+            {
+                summaryLines.Add("HER: excluded");
+            }
+
+            summaryLines.Add(string.Empty);
+            summaryLines.Add($"Weighted RMSE (A/cm\u00B2): {(double.IsNaN(result.WeightedRmse) ? "n/a" : result.WeightedRmse.ToString("E3"))}");
+            string summary = string.Join(Environment.NewLine, summaryLines);
             PolarizationSummaryBox.Text = summary;
 
             polarizationPlotModel.Series.Clear();
