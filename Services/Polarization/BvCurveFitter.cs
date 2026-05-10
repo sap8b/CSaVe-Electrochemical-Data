@@ -379,7 +379,7 @@ namespace CSaVe_Electrochemical_Data
 
             if (deepI.Length == 0)
             {
-                double[] cathodicI = [.. i.Where((_, k) => e[k] < ecorr).Select(selectov => Math.Abs(v))];
+                double[] cathodicI = [.. i.Where((_, k) => e[k] < ecorr).Select(selector: v => Math.Abs(v))];
                 if (cathodicI.Length == 0)
                     return Math.Clamp(DefaultIlimOrrAcm2, reaction.IlimMinAcm2, reaction.IlimMaxAcm2);
 
