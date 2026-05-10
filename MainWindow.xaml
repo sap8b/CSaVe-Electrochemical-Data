@@ -546,6 +546,12 @@
                     <DataGrid x:Name="PolarizationResultsGrid"
                               AutoGenerateColumns="True"
                               IsReadOnly="True" Margin="0,221,0,-84" Grid.ColumnSpan="2"/>
+                    <Label Content="HER" HorizontalAlignment="Left" Height="31" Margin="10,20,0,0" VerticalAlignment="Top" Width="132"/>
+                    <Label Content="i0_HER" HorizontalAlignment="Left" Height="34" Margin="10,56,0,0" VerticalAlignment="Top" Width="56"/>
+                    <TextBox HorizontalAlignment="Left" Height="34" Margin="84,56,0,0" TextWrapping="Wrap" Text="1.0e-14" VerticalAlignment="Top" Width="126"/>
+                    <Label Content="beta_HER" HorizontalAlignment="Left" Height="34" Margin="314,56,0,0" VerticalAlignment="Top" Width="99"/>
+                    <TextBox Grid.ColumnSpan="2" HorizontalAlignment="Left" Height="34" Margin="428,56,0,0" TextWrapping="Wrap" Text="0.95" VerticalAlignment="Top" Width="94"/>
+                    <RadioButton Grid.Column="1" Content="Fix" HorizontalAlignment="Left" Height="32" Margin="227,56,0,0" VerticalAlignment="Top" Width="70"/>
                 </Grid>
 
                 <TextBox x:Name="PolarizationSummaryBox"
@@ -555,6 +561,7 @@
                          TextWrapping="Wrap"
                          Style="{StaticResource ReadOnlyTextBox}"
                          Text="Summary statistics will appear here." Margin="0,91,0,0" HorizontalAlignment="Right" Width="930"/>
+                <Label Content="Label" HorizontalAlignment="Left" Height="3" Margin="401,91,0,0" Grid.Row="4" VerticalAlignment="Top" Width="4"/>
             </Grid>
         </TabItem>
 
