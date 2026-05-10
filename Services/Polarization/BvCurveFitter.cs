@@ -17,7 +17,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
     // ── Module-level reaction singletons ──────────────────────────────────────────────────────
     /// <summary>Fixed thermodynamic constants for the metal oxidation half-reaction (Fe/Fe²⁺, E0 = −0.44 V vs. SHE).</summary>
     private static readonly ElectrochemicalReaction MetalReaction =
-        new ElectrochemicalReaction(name: "Metal", e0Vshe: -0.44, z: 2, pH: 8.0, temperatureCelsius: 25.0);
+        new ElectrochemicalReaction(name: "Metal", e0Vshe: -0.54, z: 2, pH: 8.0, temperatureCelsius: 25.0);
 
     /// <summary>Fixed thermodynamic constants for the ORR half-reaction (O₂/H₂O, E0 = 1.229 V vs. SHE at pH 0).</summary>
     private static readonly ElectrochemicalReaction OrrReaction =
@@ -144,32 +144,36 @@ public sealed class BvCurveFitter : IBvCurveFitter
         FitHer(e, i, ilim0, out double i0Her, out double betaHer);
 
         // ── Build initial parameter vector and bounds ─────────────────────────────────────────
-        double[] p0 = new double[NumParams];
-        p0[IdxI0Metal]   = i0Metal;
-        p0[IdxBetaMetal] = betaMetal;
-        p0[IdxI0Orr]     = i0Orr;
-        p0[IdxBetaOrr]   = betaOrr;
-        p0[IdxIlimOrr]   = ilim0;
-        p0[IdxI0Her]     = i0Her;
-        p0[IdxBetaHer]   = betaHer;
-
-        double[] lb = new double[NumParams];
-        lb[IdxI0Metal]   = I0MinAcm2;
-        lb[IdxBetaMetal] = BetaSymMin;
-        lb[IdxI0Orr]     = I0MinAcm2;
-        lb[IdxBetaOrr]   = BetaSymMin;
-        lb[IdxIlimOrr]   = IlimOrrMinAcm2;
-        lb[IdxI0Her]     = I0MinAcm2;
-        lb[IdxBetaHer]   = BetaSymMin;
-
-        double[] ub = new double[NumParams];
-        ub[IdxI0Metal]   = I0MaxAcm2;
-        ub[IdxBetaMetal] = BetaSymMax;
-        ub[IdxI0Orr]     = I0MaxAcm2;
-        ub[IdxBetaOrr]   = BetaSymMax;
-        ub[IdxIlimOrr]   = IlimOrrMaxAcm2;
-        ub[IdxI0Her]     = I0MaxAcm2;
-        ub[IdxBetaHer]   = BetaSymMax;
+        double[] p0 =
+        [
+            i0Metal,
+            betaMetal,
+            i0Orr,
+            betaOrr,
+            ilim0,
+            i0Her,
+            betaHer,
+        ];
+        double[] lb =
+        [
+            I0MinAcm2,
+            BetaSymMin,
+            I0MinAcm2,
+            BetaSymMin,
+            IlimOrrMinAcm2,
+            I0MinAcm2,
+            BetaSymMin,
+        ];
+        double[] ub =
+        [
+            I0MaxAcm2,
+            BetaSymMax,
+            I0MaxAcm2,
+            BetaSymMax,
+            IlimOrrMaxAcm2,
+            I0MaxAcm2,
+            BetaSymMax,
+        ];
 
         // Clamp initial guess to bounds.
         for (int j = 0; j < NumParams; j++)
@@ -444,7 +448,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
 
         // Seed β from the Tafel-slope OLS approach:
         // log|i| = log(i0) − (1−β)·z·F·η / (R·T·ln10)
-        double[] eta         = [.. eArr.Select(v => v - eEq)];
+        double[] eta         = [.. eArr.Select(selector: v => v - eEq)];
         double[] logI        = [.. iArr.Select(v => Math.Log10(Math.Max(Math.Abs(v), LogFloorAcm2)))];
         double zFoverRTln10  = HerReaction.Z * ElectrochemicalReaction.F
                                / (ElectrochemicalReaction.R * HerReaction.TemperatureKelvin * Math.Log(10.0));
@@ -531,7 +535,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
     /// </summary>
     private static double[] ComputeWeightedResiduals(double[] e, double[] iMeasured, double[] weight, double[] p)
     {
-        var model = ParametersToModel(p);
+        BvModelParameters model = ParametersToModel(p);
         double[] residuals = new double[e.Length];
         for (int k = 0; k < e.Length; k++)
         {
