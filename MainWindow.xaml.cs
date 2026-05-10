@@ -1513,6 +1513,26 @@ namespace CSaVe_Electrochemical_Data
                     polarizationPlotModel.Series.Add(herSeries);
             }
 
+            // ── 6) Total BV model curve (HER + ORR + Metal) — solid black ─────────────────────────────
+            if (result.PlotModelCurrentDensityAcm2.Count > 0)
+            {
+                var modelSeries = new LineSeries
+                {
+                    Title           = "BV model (total)",
+                    Color           = OxyColors.Black,
+                    LineStyle       = LineStyle.Solid,
+                    StrokeThickness = 2.0
+                };
+                int n = Math.Min(modelPotentials.Count, result.PlotModelCurrentDensityAcm2.Count);
+                for (int j = 0; j < n; j++)
+                {
+                    double x = Math.Max(Math.Abs(result.PlotModelCurrentDensityAcm2[j]), 1.0e-12);
+                    modelSeries.Points.Add(new DataPoint(x, modelPotentials[j]));
+                }
+                if (modelSeries.Points.Count > 0)
+                    polarizationPlotModel.Series.Add(modelSeries);
+            }
+
             polarizationPlotModel.InvalidatePlot(true);
 
             PolarizationAnalysisStatusBox.Text = "Polarization analysis completed.";

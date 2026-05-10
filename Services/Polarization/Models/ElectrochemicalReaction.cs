@@ -3,18 +3,16 @@ using System;
 namespace CSaVe_Electrochemical_Data;
 
 /// <summary>
-/// Stores all thermodynamic and kinetic constants for a single electrochemical half-reaction.
-/// Provides derived thermodynamic quantities via computed properties.
+/// Base class storing all thermodynamic and kinetic data for a single electrochemical half-reaction.
+/// Provides derived thermodynamic quantities via computed properties and implements
+/// <see cref="IBvReaction"/> so that reaction objects are interchangeable through the interface.
+/// Universal physical constants are defined in <see cref="ElectrochemicalConstants"/>.
+/// Derive from this class (e.g. <see cref="HerReaction"/>, <see cref="OrrReaction"/>,
+/// <see cref="MetalOxidationReaction"/>) to add a new reaction without modifying
+/// <see cref="BvCurveFitter"/> (Open/Closed Principle).
 /// </summary>
-public sealed class ElectrochemicalReaction
+public class ElectrochemicalReaction : IBvReaction
 {
-    // ── Universal constants ────────────────────────────────────────────────────────────────────
-    /// <summary>Molar gas constant R (J·mol⁻¹·K⁻¹).</summary>
-    public const double R = 8.3145;
-
-    /// <summary>Faraday constant F (C·mol⁻¹).</summary>
-    public const double F = 96485.3329;
-
     // ── Reaction-specific properties ──────────────────────────────────────────────────────────
     /// <summary>Descriptive name of the reaction (e.g., "HER").</summary>
     public string Name { get; }
@@ -41,10 +39,10 @@ public sealed class ElectrochemicalReaction
     /// E_eq = E0 − (R·T / z·F) · ln(10) · pH.
     /// </summary>
     public double EquilibriumPotentialVshe =>
-        E0Vshe - (R * TemperatureKelvin / (Z * F)) * Math.Log(10.0) * pH;
+        E0Vshe - (ElectrochemicalConstants.R * TemperatureKelvin / (Z * ElectrochemicalConstants.F)) * Math.Log(10.0) * pH;
 
     /// <summary>Thermal voltage V_T = R·T / (z·F) (V).</summary>
-    public double ThermalVoltageV => R * TemperatureKelvin / (Z * F);
+    public double ThermalVoltageV => ElectrochemicalConstants.R * TemperatureKelvin / (Z * ElectrochemicalConstants.F);
 
     // ── Constructor ───────────────────────────────────────────────────────────────────────────
     /// <summary>
