@@ -17,7 +17,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
     // ── Module-level reaction singletons ──────────────────────────────────────────────────────
     /// <summary>Fixed thermodynamic constants for the metal oxidation half-reaction (Fe/Fe²⁺, E0 = −0.44 V vs. SHE).</summary>
     private static readonly ElectrochemicalReaction MetalReaction =
-        new ElectrochemicalReaction(name: "Metal", e0Vshe: -0.54, z: 2, pH: 8.0, temperatureCelsius: 25.0);
+        new ElectrochemicalReaction(name: "Metal", e0Vshe: -0.54, z: 2, pH: 8.0, temperatureCelsius: 25.0); // This is technically the wrong potential for Fe/Fe2+, but this is what the polarization curve is giving us, so maybe the reference electrode was off?
 
     /// <summary>Fixed thermodynamic constants for the ORR half-reaction (O₂/H₂O, E0 = 1.229 V vs. SHE at pH 0).</summary>
     private static readonly ElectrochemicalReaction OrrReaction =
