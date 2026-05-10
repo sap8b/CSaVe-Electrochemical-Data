@@ -41,7 +41,7 @@ public sealed class PolarizationAnalysisResult
     public double I0CathodicAcm2 { get; init; }
 
     /// <summary>Fitted HER symmetry factor β (dimensionless).</summary>
-    public double BetaHerV { get; init; }
+    public double BetaHer { get; init; }
 
     /// <summary>Fitted HER exchange current density (A/cm²).</summary>
     public double I0HerAcm2 { get; init; }

@@ -178,7 +178,7 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
             IOxAcm2      = iOxAcm2,
             I0AnodicAcm2 = fitted.I0Anodic,
             I0CathodicAcm2 = fitted.I0Cathodic,
-            BetaHerV = fitted.BetaHer,
+            BetaHer = fitted.BetaHer,
             I0HerAcm2 = fitted.I0Her,
             BoundaryLayerThicknessCm = fitted.IlimOrr > 0.0
                 ? (4.0 * FaradayConstantCmol * OxygenDiffusivityCm2s * OxygenConcentrationMolCm3) / fitted.IlimOrr
