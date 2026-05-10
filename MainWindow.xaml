@@ -546,12 +546,24 @@
                     <DataGrid x:Name="PolarizationResultsGrid"
                               AutoGenerateColumns="True"
                               IsReadOnly="True" Margin="0,221,0,-84" Grid.ColumnSpan="2"/>
-                    <Label Content="HER" HorizontalAlignment="Left" Height="31" Margin="10,20,0,0" VerticalAlignment="Top" Width="132"/>
-                    <Label Content="i0_HER" HorizontalAlignment="Left" Height="34" Margin="10,56,0,0" VerticalAlignment="Top" Width="56"/>
-                    <TextBox HorizontalAlignment="Left" Height="34" Margin="84,56,0,0" TextWrapping="Wrap" Text="1.0e-14" VerticalAlignment="Top" Width="126"/>
-                    <Label Content="beta_HER" HorizontalAlignment="Left" Height="34" Margin="314,56,0,0" VerticalAlignment="Top" Width="99"/>
-                    <TextBox HorizontalAlignment="Left" Height="34" Margin="319,90,0,0" TextWrapping="Wrap" Text="0.95" VerticalAlignment="Top" Width="94"/>
-                    <RadioButton Content="Fix" HorizontalAlignment="Left" Height="32" Margin="76,121,0,0" VerticalAlignment="Top" Width="70"/>
+                    <Label Content="HER" HorizontalAlignment="Left" Height="31" Margin="10,10,0,0" VerticalAlignment="Top" Width="45"/>
+                    <Label Content="i0_HER" HorizontalAlignment="Left" Height="34" Margin="55,17,0,0" VerticalAlignment="Top" Width="56"/>
+                    <TextBox HorizontalAlignment="Left" Height="34" Margin="106,26,0,0" TextWrapping="Wrap" Text="1.0e-14" VerticalAlignment="Top" Width="80"/>
+                    <Label Content="beta_HER" HorizontalAlignment="Left" Height="34" Margin="197,26,0,0" VerticalAlignment="Top" Width="61"/>
+                    <TextBox HorizontalAlignment="Left" Height="34" Margin="263,26,0,0" TextWrapping="Wrap" Text="0.95" VerticalAlignment="Top" Width="94"/>
+                    <RadioButton Content="Fix" HorizontalAlignment="Left" Height="32" Margin="362,28,0,0" VerticalAlignment="Top" Width="53"/>
+                    <Label Content="ORR" HorizontalAlignment="Left" Height="31" Margin="10,55,0,0" VerticalAlignment="Top" Width="45"/>
+                    <Label Content="i0_ORR" HorizontalAlignment="Left" Height="34" Margin="55,62,0,0" VerticalAlignment="Top" Width="56"/>
+                    <TextBox HorizontalAlignment="Left" Height="34" Margin="106,71,0,0" TextWrapping="Wrap" Text="1.0e-14" VerticalAlignment="Top" Width="80"/>
+                    <Label Content="beta_ORR" HorizontalAlignment="Left" Height="34" Margin="197,71,0,0" VerticalAlignment="Top" Width="61"/>
+                    <TextBox HorizontalAlignment="Left" Height="34" Margin="263,71,0,0" TextWrapping="Wrap" Text="0.95" VerticalAlignment="Top" Width="94"/>
+                    <RadioButton Content="Fix" HorizontalAlignment="Left" Height="32" Margin="362,73,0,0" VerticalAlignment="Top" Width="53"/>
+                    <Label Content="Me Ox" HorizontalAlignment="Left" Height="31" Margin="10,0,0,0" VerticalAlignment="Center" Width="45"/>
+                    <Label Content="i0_MeOx" HorizontalAlignment="Left" Height="34" Margin="55,118,0,0" VerticalAlignment="Top" Width="56"/>
+                    <TextBox HorizontalAlignment="Left" Height="34" Margin="106,127,0,0" TextWrapping="Wrap" Text="1.0e-14" VerticalAlignment="Top" Width="80"/>
+                    <Label Content="beta_MeOx" HorizontalAlignment="Left" Height="34" Margin="197,127,0,0" VerticalAlignment="Top" Width="61"/>
+                    <TextBox HorizontalAlignment="Left" Height="34" Margin="263,127,0,0" TextWrapping="Wrap" Text="0.95" VerticalAlignment="Top" Width="94"/>
+                    <RadioButton Content="Fix" HorizontalAlignment="Left" Height="32" Margin="362,129,0,0" VerticalAlignment="Top" Width="53"/>
                 </Grid>
 
                 <TextBox x:Name="PolarizationSummaryBox"
