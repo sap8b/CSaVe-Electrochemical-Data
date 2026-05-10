@@ -542,11 +542,10 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <oxy:PlotView x:Name="PolarizationPlotView" Grid.Column="0" Margin="0,0,8,0"/>
+                    <oxy:PlotView x:Name="PolarizationPlotView" Grid.Column="0" Margin="463,0,10,0" Grid.ColumnSpan="2"/>
                     <DataGrid x:Name="PolarizationResultsGrid"
-                              Grid.Column="1"
                               AutoGenerateColumns="True"
-                              IsReadOnly="True"/>
+                              IsReadOnly="True" Margin="0,221,0,-84" Grid.ColumnSpan="2"/>
                 </Grid>
 
                 <TextBox x:Name="PolarizationSummaryBox"
@@ -555,7 +554,7 @@
                          VerticalScrollBarVisibility="Auto"
                          TextWrapping="Wrap"
                          Style="{StaticResource ReadOnlyTextBox}"
-                         Text="Summary statistics will appear here."/>
+                         Text="Summary statistics will appear here." Margin="0,91,0,0" HorizontalAlignment="Right" Width="930"/>
             </Grid>
         </TabItem>
 
