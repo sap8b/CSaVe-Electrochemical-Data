@@ -1,103 +1,67 @@
 using CSaVe_Electrochemical_Data.Services.Polarization.Reactions;
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace CSaVe_Electrochemical_Data
 {
     /// <summary>
     /// Holds the Butler-Volmer model for polarization curve fitting.
-    /// The fitter can activate any subset of the supported reactions, so the optimised
-    /// parameter vector is determined dynamically per analysis run.
-    /// Metal oxidation, ORR, and HER are represented by the full Butler-Volmer equation
-    /// using Nernst-fixed equilibrium potentials. ORR additionally includes a
-    /// Koutecky-Levich mass-transport correction to capture the limiting-current plateau.
-    /// Equilibrium potentials for each reaction are fixed by the Nernst equation via
-    /// <see cref="ElectrochemicalReaction"/> objects; they are not fit parameters.
+    /// Stores a list of <see cref="ReactionParameters"/> sorted ascending by equilibrium potential,
+    /// one per registered electrochemical reaction. Each reaction may have a Koutecky-Levich
+    /// limiting current (Ilim &gt; 0) applied to its cathodic branch.
+    /// Backward-compatible named properties are provided for the UI layer.
     /// </summary>
     public sealed class BvModelParameters
     {
-        private readonly IBvReaction _metalReaction;
-        private readonly IBvReaction _orrReaction;
-        private readonly IBvReaction _herReaction;
+        // ── Inner record ─────────────────────────────────────────────────────────────────────────
+        /// <summary>
+        /// Fitted parameters for one electrochemical half-reaction.
+        /// </summary>
+        public sealed class ReactionParameters
+        {
+            public ReactionParameters(IBvReaction reaction, double i0, double beta, double ilim, bool isIncluded)
+            {
+                Reaction   = reaction   ?? throw new ArgumentNullException(nameof(reaction));
+                I0         = i0;
+                Beta       = beta;
+                Ilim       = ilim;
+                IsIncluded = isIncluded;
+            }
+
+            /// <summary>The electrochemical half-reaction (thermodynamic and kinetic data).</summary>
+            public IBvReaction Reaction { get; }
+
+            /// <summary>Fitted exchange current density (A/cm²).</summary>
+            public double I0 { get; }
+
+            /// <summary>Fitted symmetry factor β (dimensionless).</summary>
+            public double Beta { get; }
+
+            /// <summary>
+            /// Fitted Koutecky-Levich limiting current density (A/cm²).
+            /// Zero means no mass-transport correction is applied.
+            /// </summary>
+            public double Ilim { get; }
+
+            /// <summary>Whether this reaction contributes to the model current.</summary>
+            public bool IsIncluded { get; }
+        }
+
+        // ── Fields ────────────────────────────────────────────────────────────────────────────────
+        private readonly IReadOnlyList<ReactionParameters> _reactions;
 
         // ── Constructor ───────────────────────────────────────────────────────────────────────────
         /// <summary>
-        /// Initialises a new <see cref="BvModelParameters"/> bound to the given reaction objects.
-        /// All other parameters are set via object-initialiser syntax after construction.
+        /// Initialises a new <see cref="BvModelParameters"/> from a list of per-reaction parameters
+        /// sorted ascending by <see cref="IBvReaction.EquilibriumPotentialVshe"/>.
         /// </summary>
-        /// <param name="metalReaction">Reaction object for the metal oxidation half-reaction (e.g. Fe/Fe²⁺).</param>
-        /// <param name="orrReaction">Reaction object for the oxygen reduction half-reaction (ORR).</param>
-        /// <param name="herReaction">Reaction object for the hydrogen evolution half-reaction (HER).</param>
-        public BvModelParameters(
-            IBvReaction metalReaction,
-            IBvReaction orrReaction,
-            IBvReaction herReaction)
+        /// <param name="reactions">Per-reaction fitted parameters. Must not be null.</param>
+        public BvModelParameters(IReadOnlyList<ReactionParameters> reactions)
         {
-            _metalReaction = metalReaction ?? throw new ArgumentNullException(nameof(metalReaction));
-            _orrReaction   = orrReaction   ?? throw new ArgumentNullException(nameof(orrReaction));
-            _herReaction   = herReaction   ?? throw new ArgumentNullException(nameof(herReaction));
+            _reactions = reactions ?? throw new ArgumentNullException(nameof(reactions));
         }
-
-        // ── Metal oxidation branch (Fe → Fe²⁺ + 2e⁻) ────────────────────────────────────────────
-        /// <summary>Metal-oxidation exchange current density I₀,metal (A/cm²) at the Nernst equilibrium potential.</summary>
-        public double I0Metal { get; init; }
-
-        /// <summary>
-        /// Metal-oxidation symmetry factor βₘₑₜₐₗ (dimensionless, 0 &lt; β &lt; 1);
-        /// governs the forward/reverse asymmetry of the Butler-Volmer equation.
-        /// </summary>
-        public double BetaMetal { get; init; }
-
-        /// <summary>Metal equilibrium potential Eₘₑₜₐₗ (V) fixed by the Nernst equation; not a fit parameter.</summary>
-        public double EMetalEquilibriumV { get; init; }
-
-        // ── ORR branch (O₂ + 2H₂O + 4e⁻ → 4OH⁻) ────────────────────────────────────────────────
-        /// <summary>ORR exchange current density I₀,ₒᵣᵣ (A/cm²) at the Nernst equilibrium potential.</summary>
-        public double I0Orr { get; init; }
-
-        /// <summary>
-        /// ORR symmetry factor βₒᵣᵣ (dimensionless, 0 &lt; β &lt; 1);
-        /// governs the forward/reverse asymmetry of the Butler-Volmer equation.
-        /// </summary>
-        public double BetaOrr { get; init; }
-
-        /// <summary>ORR mass-transport limiting current density iₗᵢₘ,ₒᵣᵣ (A/cm²); always a positive magnitude.</summary>
-        public double IlimOrr { get; init; }
-
-        /// <summary>ORR equilibrium potential Eₒᵣᵣ (V) fixed by the Nernst equation; not a fit parameter.</summary>
-        public double EorrEquilibriumV { get; init; }
-
-        // ── HER branch (2H⁺ + 2e⁻ → H₂) ─────────────────────────────────────────────────────────
-        /// <summary>HER exchange current density I₀,ₕₑᵣ (A/cm²) at the Nernst equilibrium potential.</summary>
-        public double I0Her { get; init; }
-
-        /// <summary>
-        /// HER symmetry factor βₕₑᵣ (dimensionless, 0 &lt; β &lt; 1);
-        /// governs the cathodic/anodic asymmetry of the Butler-Volmer equation.
-        /// </summary>
-        public double BetaHer { get; init; }
-
-        /// <summary>HER equilibrium potential Eₕₑᵣ (V) fixed by the Nernst equation; not a fit parameter.</summary>
-        public double EherEquilibriumV { get; init; }
-
-        // ── Reaction inclusion flags ──────────────────────────────────────────────────────────────
-        /// <summary>
-        /// When <c>true</c> (default), the metal oxidation reaction contributes to the model current.
-        /// When <c>false</c>, <see cref="ComputeMetalOxidationComponent"/> is skipped (returns 0).
-        /// </summary>
-        public bool IncludeMetal { get; init; } = true;
-
-        /// <summary>
-        /// When <c>true</c> (default), the ORR reaction contributes to the model current.
-        /// When <c>false</c>, <see cref="ComputeOrrComponent"/> is skipped (returns 0).
-        /// </summary>
-        public bool IncludeOrr { get; init; } = true;
-
-        /// <summary>
-        /// When <c>true</c> (default), the HER reaction contributes to the model current.
-        /// When <c>false</c>, <see cref="ComputeHerComponent"/> is skipped (returns 0).
-        /// </summary>
-        public bool IncludeHer { get; init; } = true;
 
         // ── Corrosion potential (derived, not a fit parameter) ────────────────────────────────────
         /// <summary>
@@ -111,95 +75,136 @@ namespace CSaVe_Electrochemical_Data
         private const double ExpClipMin = -50.0;
         private const double ExpClipMax =  50.0;
 
+        // ── Per-reaction list access ──────────────────────────────────────────────────────────────
+        /// <summary>Returns the fitted parameters for the reaction matching <paramref name="name"/>, or null.</summary>
+        public ReactionParameters GetReactionParam(ReactionType name) =>
+            _reactions.FirstOrDefault(r => r.Reaction.Name == name);
+
+        // ── Backward-compatible named property accessors ──────────────────────────────────────────
+        // These allow the UI layer (PolarizationAnalysisService, WinForms) to continue reading
+        // named fields without modification while the internal model has been generalised to a list.
+
+        /// <summary>Fitted metal-oxidation exchange current density I₀,metal (A/cm²).</summary>
+        public double I0Metal => GetReactionParam(ReactionType.MetalOxidation)?.I0 ?? 0.0;
+
+        /// <summary>Fitted metal-oxidation symmetry factor βₘₑₜₐₗ (dimensionless).</summary>
+        public double BetaMetal => GetReactionParam(ReactionType.MetalOxidation)?.Beta ?? 0.5;
+
+        /// <summary>Fitted cathodic limiting current density for metal reduction (A/cm²). Zero = no KL correction.</summary>
+        public double IlimMetal => GetReactionParam(ReactionType.MetalOxidation)?.Ilim ?? 0.0;
+
+        /// <summary>Metal equilibrium potential Eₘₑₜₐₗ (V) fixed by the Nernst equation; not a fit parameter.</summary>
+        public double EMetalEquilibriumV => GetReactionParam(ReactionType.MetalOxidation)?.Reaction.EquilibriumPotentialVshe ?? 0.0;
+
+        /// <summary>Whether the metal oxidation reaction is included in the model.</summary>
+        public bool IncludeMetal => GetReactionParam(ReactionType.MetalOxidation)?.IsIncluded ?? false;
+
+        /// <summary>Fitted ORR exchange current density I₀,ₒᵣᵣ (A/cm²).</summary>
+        public double I0Orr => GetReactionParam(ReactionType.OxygenReduction)?.I0 ?? 0.0;
+
+        /// <summary>Fitted ORR symmetry factor βₒᵣᵣ (dimensionless).</summary>
+        public double BetaOrr => GetReactionParam(ReactionType.OxygenReduction)?.Beta ?? 0.5;
+
+        /// <summary>Fitted ORR mass-transport limiting current density iₗᵢₘ,ₒᵣᵣ (A/cm²).</summary>
+        public double IlimOrr => GetReactionParam(ReactionType.OxygenReduction)?.Ilim ?? 0.0;
+
+        /// <summary>ORR equilibrium potential Eₒᵣᵣ (V) fixed by the Nernst equation; not a fit parameter.</summary>
+        public double EorrEquilibriumV => GetReactionParam(ReactionType.OxygenReduction)?.Reaction.EquilibriumPotentialVshe ?? 0.0;
+
+        /// <summary>Whether the ORR reaction is included in the model.</summary>
+        public bool IncludeOrr => GetReactionParam(ReactionType.OxygenReduction)?.IsIncluded ?? false;
+
+        /// <summary>Fitted HER exchange current density I₀,ₕₑᵣ (A/cm²).</summary>
+        public double I0Her => GetReactionParam(ReactionType.HydrogenEvolution)?.I0 ?? 0.0;
+
+        /// <summary>Fitted HER symmetry factor βₕₑᵣ (dimensionless).</summary>
+        public double BetaHer => GetReactionParam(ReactionType.HydrogenEvolution)?.Beta ?? 0.5;
+
+        /// <summary>Fitted HER limiting current density (A/cm²). Zero = no KL correction.</summary>
+        public double IlimHer => GetReactionParam(ReactionType.HydrogenEvolution)?.Ilim ?? 0.0;
+
+        /// <summary>HER equilibrium potential Eₕₑᵣ (V) fixed by the Nernst equation; not a fit parameter.</summary>
+        public double EherEquilibriumV => GetReactionParam(ReactionType.HydrogenEvolution)?.Reaction.EquilibriumPotentialVshe ?? 0.0;
+
+        /// <summary>Whether the HER reaction is included in the model.</summary>
+        public bool IncludeHer => GetReactionParam(ReactionType.HydrogenEvolution)?.IsIncluded ?? false;
+
         // ── Public current-density methods ────────────────────────────────────────────────────────
 
         /// <summary>
         /// Evaluates the net Butler-Volmer model current density (A/cm²) at a single electrode potential.
-        /// Net current = metal oxidation + ORR + HER.
+        /// Net current = sum of all included reactions, each optionally limited by Koutecky-Levich.
         /// </summary>
         /// <param name="potentialV">Electrode potential (V vs. reference).</param>
         /// <returns>Net signed current density (A/cm²); positive = net anodic.</returns>
-        public double ComputeCurrentDensity(double potentialV) =>
-            (IncludeMetal ? ComputeMetalOxidationComponent(potentialV) : 0.0)
-          + (IncludeOrr   ? ComputeOrrComponent(potentialV)            : 0.0)
-          + (IncludeHer   ? ComputeHerComponent(potentialV)            : 0.0);
+        public double ComputeCurrentDensity(double potentialV)
+        {
+            double total = 0.0;
+            foreach (ReactionParameters rp in _reactions)
+            {
+                if (rp.IsIncluded)
+                    total += ComputeReactionComponent(rp, potentialV);
+            }
+            return total;
+        }
 
         /// <summary>
         /// Evaluates the metal-oxidation Butler-Volmer component at a single electrode potential.
-        /// Uses the full BV equation referenced to the Nernst equilibrium potential.
         /// Net metal current is anodic (positive) above E_eq,metal.
         /// </summary>
-        /// <param name="potentialV">Electrode potential (V vs. reference).</param>
-        /// <returns>Metal oxidation net current density (A/cm²); positive = anodic (dissolution).</returns>
         public double ComputeMetalOxidationComponent(double potentialV)
         {
-            if (!IncludeMetal)
-                return 0.0;
-
-            double eta      = potentialV - EMetalEquilibriumV;
-            double zFoverRT = _metalReaction.Z * ElectrochemicalConstants.F
-                              / (ElectrochemicalConstants.R * _metalReaction.TemperatureKelvin);
-
-            double forward  = Math.Exp(Math.Clamp( BetaMetal         * zFoverRT * eta, ExpClipMin, ExpClipMax));
-            double reverse  = Math.Exp(Math.Clamp(-(1.0 - BetaMetal) * zFoverRT * eta, ExpClipMin, ExpClipMax));
-
-            return I0Metal * (forward - reverse);
+            ReactionParameters rp = GetReactionParam(ReactionType.MetalOxidation);
+            return rp != null && rp.IsIncluded ? ComputeReactionComponent(rp, potentialV) : 0.0;
         }
 
         /// <summary>
-        /// Evaluates the ORR Butler-Volmer component with Koutecky-Levich mass-transport correction
-        /// at a single electrode potential.
-        /// Kinetic current is computed from the full BV equation referenced to E_eq,ORR; the
-        /// cathodic branch is then limited by the mass-transport plateau iₗᵢₘ,ₒᵣᵣ.
+        /// Evaluates the ORR Butler-Volmer component with Koutecky-Levich mass-transport correction.
         /// Net ORR current is cathodic (negative) below E_eq,ORR.
         /// </summary>
-        /// <param name="potentialV">Electrode potential (V vs. reference).</param>
-        /// <returns>ORR net current density (A/cm²); non-positive in the cathodic region.</returns>
         public double ComputeOrrComponent(double potentialV)
         {
-            if (!IncludeOrr)
-                return 0.0;
-
-            double eta      = potentialV - EorrEquilibriumV;
-            double zFoverRT = _orrReaction.Z * ElectrochemicalConstants.F
-                              / (ElectrochemicalConstants.R * _orrReaction.TemperatureKelvin);
-
-            double cathodic = Math.Exp(Math.Clamp(-(1.0 - BetaOrr) * zFoverRT * eta, ExpClipMin, ExpClipMax));
-            double anodic   = Math.Exp(Math.Clamp( BetaOrr          * zFoverRT * eta, ExpClipMin, ExpClipMax));
-
-            // Kinetic current (negative = cathodic ORR reduction).
-            double iKinetic = -I0Orr * (cathodic - anodic);
-
-            // Apply Koutecky-Levich mass-transport correction only to the cathodic branch.
-            // Anodic reverse ORR is not mass-transport limited in this model.
-            if (iKinetic >= 0.0)
-                return iKinetic;
-
-            // denom > 0 because iKinetic < 0 and IlimOrr > 0.
-            double denom = IlimOrr - iKinetic;
-            return iKinetic * IlimOrr / denom;
+            ReactionParameters rp = GetReactionParam(ReactionType.OxygenReduction);
+            return rp != null && rp.IsIncluded ? ComputeReactionComponent(rp, potentialV) : 0.0;
         }
 
         /// <summary>
-        /// Evaluates the HER Butler-Volmer component at a single electrode potential using the
-        /// full Butler-Volmer equation referenced to the Nernst equilibrium potential.
+        /// Evaluates the HER Butler-Volmer component at a single electrode potential.
         /// Net HER current is cathodic (negative) below E_eq,HER.
         /// </summary>
-        /// <param name="potentialV">Electrode potential (V vs. reference).</param>
-        /// <returns>HER current density (A/cm²); non-positive in the cathodic region.</returns>
         public double ComputeHerComponent(double potentialV)
         {
-            if (!IncludeHer)
-                return 0.0;
+            ReactionParameters rp = GetReactionParam(ReactionType.HydrogenEvolution);
+            return rp != null && rp.IsIncluded ? ComputeReactionComponent(rp, potentialV) : 0.0;
+        }
 
-            double eta      = potentialV - EherEquilibriumV;
-            double zFoverRT = _herReaction.Z * ElectrochemicalConstants.F
-                              / (ElectrochemicalConstants.R * _herReaction.TemperatureKelvin);
+        // ── Private helper ────────────────────────────────────────────────────────────────────────
 
-            double anodic   = Math.Exp(Math.Clamp( BetaHer         * zFoverRT * eta, ExpClipMin, ExpClipMax));
-            double cathodic = Math.Exp(Math.Clamp(-(1.0 - BetaHer) * zFoverRT * eta, ExpClipMin, ExpClipMax));
+        /// <summary>
+        /// Computes the Butler-Volmer current for one reaction, applying a Koutecky-Levich
+        /// correction to the cathodic branch if <paramref name="rp"/>.Ilim &gt; 0.
+        /// </summary>
+        private static double ComputeReactionComponent(ReactionParameters rp, double potentialV)
+        {
+            double eta      = potentialV - rp.Reaction.EquilibriumPotentialVshe;
+            double zFoverRT = rp.Reaction.Z * ElectrochemicalConstants.F
+                              / (ElectrochemicalConstants.R * rp.Reaction.TemperatureKelvin);
 
-            return -I0Her * (cathodic - anodic);
+            double forward  = Math.Exp(Math.Clamp( rp.Beta         * zFoverRT * eta, ExpClipMin, ExpClipMax));
+            double reverse  = Math.Exp(Math.Clamp(-(1.0 - rp.Beta) * zFoverRT * eta, ExpClipMin, ExpClipMax));
+
+            // Standard Butler-Volmer: positive = anodic (above E_eq), negative = cathodic (below E_eq).
+            double iKinetic = rp.I0 * (forward - reverse);
+
+            // Apply Koutecky-Levich mass-transport correction to the cathodic branch only.
+            if (rp.Ilim > 0.0 && iKinetic < 0.0)
+            {
+                // denom = Ilim - iKinetic > 0 because iKinetic < 0 and Ilim > 0.
+                double denom = rp.Ilim - iKinetic;
+                iKinetic = iKinetic * rp.Ilim / denom;
+            }
+
+            return iKinetic;
         }
     }
 }

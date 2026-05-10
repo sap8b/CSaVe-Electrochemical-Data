@@ -9,6 +9,9 @@ namespace CSaVe_Electrochemical_Data
     /// <summary>
     /// Fits a Butler-Volmer model to a merged polarization curve using a dynamic parameter vector
     /// that only includes the reactions selected for the analysis run.
+    /// Reactions are stored in a list sorted ascending by equilibrium potential (Nernst), so the
+    /// algorithm is independent of the number and type of reactions — any factory added to the
+    /// default constructor list is automatically included.
     /// </summary>
     public sealed class BvCurveFitter : IBvCurveFitter
     {
@@ -20,7 +23,7 @@ namespace CSaVe_Electrochemical_Data
         private const double DefaultI0OrrAcm2 = 1e-8;
         private const double DefaultI0HerAcm2 = 1e-9;
         private const double DefaultIlimOrrAcm2 = 1e-6;
-        private const double IlimOrrDepthFraction = 0.20;
+        private const double IlimDepthFraction = 0.20;
         private const double LogFloorAcm2 = 1e-20;
         private const double ExpClipMin = -50.0;
         private const double ExpClipMax = 50.0;
@@ -62,8 +65,8 @@ namespace CSaVe_Electrochemical_Data
                 throw new ArgumentException("Input arrays must not be empty.");
 
             bool includeMetal = overrides?.IncludeMetal ?? true;
-            bool includeOrr = overrides?.IncludeOrr ?? true;
-            bool includeHer = overrides?.IncludeHer ?? true;
+            bool includeOrr   = overrides?.IncludeOrr   ?? true;
+            bool includeHer   = overrides?.IncludeHer   ?? true;
 
             if (!includeMetal && !includeOrr && !includeHer)
                 throw new ArgumentException("Select at least one reaction before fitting the polarization curve.", nameof(overrides));
@@ -71,17 +74,13 @@ namespace CSaVe_Electrochemical_Data
             double[] e = [.. potentialV];
             double[] i = [.. currentDensityAcm2];
 
-            ReactionSet reactions = CreateReactionSet(temperatureCelsius);
+            IReadOnlyList<IBvReaction> reactions = CreateReactionList(temperatureCelsius);
             double ecorr0 = EstimateEcorr(e, i, ecorrHintV);
 
             FitState initialState = EstimateInitialState(e, i, ecorr0, reactions, includeMetal, includeOrr, includeHer);
-            ApplyOverrides(initialState, overrides, reactions);
+            ApplyOverrides(initialState, overrides);
 
-            List<FitParameterBinding> bindings = BuildBindings(initialState, overrides, reactions);
-
-            double[] absI = [.. i.Select(selector: v => Math.Abs(v))];
-            double p20 = Percentile(absI, 20);
-            double[] weight = [.. absI.Select(selector: v => 1.0 / Math.Max(v, p20))];
+            List<FitParameterBinding> bindings = BuildBindings(initialState, overrides);
 
             FitState fittedState;
             if (bindings.Count > 0)
@@ -91,148 +90,185 @@ namespace CSaVe_Electrochemical_Data
                 double[] ub = [.. bindings.Select(b => b.UpperBound)];
 
                 double[] pFitted = LevenbergMarquardtSolver.Solve(
-                    residualFunc: p => ComputeWeightedResiduals(e, i, weight, p, initialState, bindings, reactions),
+                    residualFunc: p => ComputeWeightedResiduals(e, i, p, initialState, bindings),
                     p0, lb, ub);
 
-                fittedState = ApplyParameters(initialState.Clone(), bindings, pFitted);
+                fittedState = initialState.Clone();
+                ApplyParameters(fittedState, bindings, pFitted);
             }
             else
             {
                 fittedState = initialState.Clone();
             }
 
-            BvModelParameters partialModel = ParametersToModel(fittedState, reactions);
+            BvModelParameters partialModel = ParametersToModel(fittedState);
             double ecorrFitted = FindEcorr(e, partialModel, ecorr0);
-            return ParametersToModel(fittedState, reactions, ecorrFitted);
+            return ParametersToModel(fittedState, ecorrFitted);
         }
 
-        private ReactionSet CreateReactionSet(double temperatureCelsius) =>
-            new ReactionSet(
-                CreateReaction(ReactionType.MetalOxidation, temperatureCelsius),
-                CreateReaction(ReactionType.OxygenReduction, temperatureCelsius),
-                CreateReaction(ReactionType.HydrogenEvolution, temperatureCelsius));
+        // ── Reaction list (replaces the old fixed ReactionSet) ────────────────────────────────────
 
-        private IBvReaction CreateReaction(ReactionType reactionType, double temperatureCelsius)
-        {
-            foreach (ElectrochemicalReactionFactory factory in _reactionFactories)
-            {
-                if (factory.CanCreateReaction(reactionType))
-                    return factory.CreateReaction(DefaultPh, temperatureCelsius);
-            }
+        /// <summary>
+        /// Creates one reaction per registered factory, sorted ascending by equilibrium potential.
+        /// The order determines the per-reaction estimation sequence in
+        /// <see cref="EstimateInitialState"/>.
+        /// </summary>
+        private IReadOnlyList<IBvReaction> CreateReactionList(double temperatureCelsius) =>
+            _reactionFactories
+                .Select(f => (IBvReaction)f.CreateReaction(DefaultPh, temperatureCelsius))
+                .OrderBy(r => r.EquilibriumPotentialVshe)
+                .ToList();
 
-            throw new InvalidOperationException($"No reaction factory is registered for {reactionType}.");
-        }
+        // ── Initial-state estimation ──────────────────────────────────────────────────────────────
 
         private static FitState EstimateInitialState(
             double[] e,
             double[] i,
             double ecorr,
-            ReactionSet reactions,
+            IReadOnlyList<IBvReaction> reactions,
             bool includeMetal,
             bool includeOrr,
             bool includeHer)
         {
-            FitState state = new()
+            // Build per-reaction state objects in the same sorted order as the reaction list.
+            var rfsList = new List<ReactionFitState>();
+            foreach (IBvReaction reaction in reactions)
             {
-                IncludeMetal = includeMetal,
-                IncludeOrr = includeOrr,
-                IncludeHer = includeHer,
-                I0Metal = reactions.Metal.I0MinAcm2,
-                BetaMetal = DefaultBeta,
-                I0Orr = reactions.Orr.I0MinAcm2,
-                BetaOrr = DefaultBeta,
-                IlimOrr = reactions.Orr.IlimMinAcm2,
-                I0Her = reactions.Her.I0MinAcm2,
-                BetaHer = DefaultBeta
-            };
+                bool isIncluded = reaction.Name switch
+                {
+                    ReactionType.MetalOxidation    => includeMetal,
+                    ReactionType.OxygenReduction   => includeOrr,
+                    ReactionType.HydrogenEvolution => includeHer,
+                    _                              => true
+                };
 
-            if (includeMetal)
-            {
-                FitMetalOxidation(e, i, ecorr, reactions.Metal, out double betaMetal, out double i0Metal);
-                state.BetaMetal = betaMetal;
-                state.I0Metal = i0Metal;
-            }
-            else
-            {
-                state.I0Metal = reactions.Metal.I0MinAcm2;
-                state.BetaMetal = DefaultBeta;
+                rfsList.Add(new ReactionFitState
+                {
+                    Reaction   = reaction,
+                    IsIncluded = isIncluded,
+                    I0         = reaction.I0MinAcm2,
+                    Beta       = DefaultBeta,
+                    Ilim       = reaction.IlimMinAcm2
+                });
             }
 
-            if (includeOrr)
-            {
-                double ilim = EstimateIlimOrr(e, i, ecorr, reactions.Orr);
-                FitOrrBv(e, i, ecorr, reactions.Orr, out double betaOrr, out double i0Orr);
-                state.IlimOrr = ilim;
-                state.BetaOrr = betaOrr;
-                state.I0Orr = i0Orr;
-            }
-            else
-            {
-                state.I0Orr = reactions.Orr.I0MinAcm2;
-                state.BetaOrr = DefaultBeta;
-                state.IlimOrr = reactions.Orr.IlimMinAcm2;
-            }
+            var state = new FitState { Reactions = rfsList };
 
-            if (includeHer)
+            // Estimate ORR iLim first; it is subtracted as background when fitting HER.
+            ReactionFitState orrRfs = state.TryGetReaction(ReactionType.OxygenReduction);
+            if (orrRfs != null && orrRfs.IsIncluded)
+                orrRfs.Ilim = EstimateIlimOrr(e, i, ecorr, orrRfs.Reaction);
+
+            // Estimate kinetic parameters for each included reaction in sorted (low→high E_eq) order.
+            foreach (ReactionFitState rfs in rfsList)
             {
-                double cathodicBackground = includeOrr ? state.IlimOrr : 0.0;
-                FitHer(e, i, cathodicBackground, reactions.Her, out double i0Her, out double betaHer);
-                state.I0Her = i0Her;
-                state.BetaHer = betaHer;
-            }
-            else
-            {
-                state.I0Her = reactions.Her.I0MinAcm2;
-                state.BetaHer = DefaultBeta;
+                if (!rfs.IsIncluded)
+                    continue;
+
+                switch (rfs.Reaction.Name)
+                {
+                    case ReactionType.MetalOxidation:
+                        FitMetalOxidation(e, i, ecorr, rfs.Reaction, out double betaMetal, out double i0Metal);
+                        rfs.Beta = betaMetal;
+                        rfs.I0   = i0Metal;
+                        if (rfs.Reaction.IlimMaxAcm2 > 0.0)
+                            rfs.Ilim = EstimateIlimMetal(e, i, ecorr, rfs.Reaction);
+                        break;
+
+                    case ReactionType.HydrogenEvolution:
+                        double cathodicBackground = orrRfs?.IsIncluded == true ? orrRfs.Ilim : 0.0;
+                        FitHer(e, i, cathodicBackground, rfs.Reaction, out double i0Her, out double betaHer);
+                        rfs.I0   = i0Her;
+                        rfs.Beta = betaHer;
+                        // HER is limited only by water/proton diffusion — very large in practice.
+                        if (rfs.Reaction.IlimMaxAcm2 > 0.0)
+                            rfs.Ilim = rfs.Reaction.IlimMaxAcm2 * 0.5;
+                        break;
+
+                    case ReactionType.OxygenReduction:
+                        FitOrrBv(e, i, ecorr, rfs.Reaction, out double betaOrr, out double i0Orr);
+                        rfs.Beta = betaOrr;
+                        rfs.I0   = i0Orr;
+                        // Ilim already estimated above before the main loop.
+                        break;
+                }
             }
 
             return state;
         }
 
-        private static void ApplyOverrides(FitState state, BvUserOverrides overrides, ReactionSet reactions)
+        // ── Override application ──────────────────────────────────────────────────────────────────
+
+        private static void ApplyOverrides(FitState state, BvUserOverrides overrides)
         {
             if (overrides == null)
                 return;
 
-            if (overrides.I0Metal.HasValue)
-                state.I0Metal = Math.Clamp(overrides.I0Metal.Value, reactions.Metal.I0MinAcm2, reactions.Metal.I0MaxAcm2);
-            if (overrides.BetaMetal.HasValue)
-                state.BetaMetal = Math.Clamp(overrides.BetaMetal.Value, reactions.Metal.BetaMin, reactions.Metal.BetaMax);
+            ReactionFitState metalRfs = state.TryGetReaction(ReactionType.MetalOxidation);
+            if (metalRfs != null)
+            {
+                if (overrides.I0Metal.HasValue)
+                    metalRfs.I0   = Math.Clamp(overrides.I0Metal.Value,   metalRfs.Reaction.I0MinAcm2,   metalRfs.Reaction.I0MaxAcm2);
+                if (overrides.BetaMetal.HasValue)
+                    metalRfs.Beta = Math.Clamp(overrides.BetaMetal.Value,  metalRfs.Reaction.BetaMin,     metalRfs.Reaction.BetaMax);
+                if (overrides.IlimMetal.HasValue && metalRfs.Reaction.IlimMaxAcm2 > 0.0)
+                    metalRfs.Ilim = Math.Clamp(overrides.IlimMetal.Value,  metalRfs.Reaction.IlimMinAcm2, metalRfs.Reaction.IlimMaxAcm2);
+            }
 
-            if (overrides.I0Orr.HasValue)
-                state.I0Orr = Math.Clamp(overrides.I0Orr.Value, reactions.Orr.I0MinAcm2, reactions.Orr.I0MaxAcm2);
-            if (overrides.BetaOrr.HasValue)
-                state.BetaOrr = Math.Clamp(overrides.BetaOrr.Value, reactions.Orr.BetaMin, reactions.Orr.BetaMax);
-            if (overrides.IlimOrr.HasValue)
-                state.IlimOrr = Math.Clamp(overrides.IlimOrr.Value, reactions.Orr.IlimMinAcm2, reactions.Orr.IlimMaxAcm2);
+            ReactionFitState orrRfs = state.TryGetReaction(ReactionType.OxygenReduction);
+            if (orrRfs != null)
+            {
+                if (overrides.I0Orr.HasValue)
+                    orrRfs.I0   = Math.Clamp(overrides.I0Orr.Value,   orrRfs.Reaction.I0MinAcm2,   orrRfs.Reaction.I0MaxAcm2);
+                if (overrides.BetaOrr.HasValue)
+                    orrRfs.Beta = Math.Clamp(overrides.BetaOrr.Value,  orrRfs.Reaction.BetaMin,     orrRfs.Reaction.BetaMax);
+                if (overrides.IlimOrr.HasValue)
+                    orrRfs.Ilim = Math.Clamp(overrides.IlimOrr.Value,  orrRfs.Reaction.IlimMinAcm2, orrRfs.Reaction.IlimMaxAcm2);
+            }
 
-            if (overrides.I0Her.HasValue)
-                state.I0Her = Math.Clamp(overrides.I0Her.Value, reactions.Her.I0MinAcm2, reactions.Her.I0MaxAcm2);
-            if (overrides.BetaHer.HasValue)
-                state.BetaHer = Math.Clamp(overrides.BetaHer.Value, reactions.Her.BetaMin, reactions.Her.BetaMax);
+            ReactionFitState herRfs = state.TryGetReaction(ReactionType.HydrogenEvolution);
+            if (herRfs != null)
+            {
+                if (overrides.I0Her.HasValue)
+                    herRfs.I0   = Math.Clamp(overrides.I0Her.Value,   herRfs.Reaction.I0MinAcm2,   herRfs.Reaction.I0MaxAcm2);
+                if (overrides.BetaHer.HasValue)
+                    herRfs.Beta = Math.Clamp(overrides.BetaHer.Value,  herRfs.Reaction.BetaMin,     herRfs.Reaction.BetaMax);
+                if (overrides.IlimHer.HasValue && herRfs.Reaction.IlimMaxAcm2 > 0.0)
+                    herRfs.Ilim = Math.Clamp(overrides.IlimHer.Value,  herRfs.Reaction.IlimMinAcm2, herRfs.Reaction.IlimMaxAcm2);
+            }
         }
 
-        private static List<FitParameterBinding> BuildBindings(FitState state, BvUserOverrides overrides, ReactionSet reactions)
+        // ── LM parameter binding ──────────────────────────────────────────────────────────────────
+
+        private static List<FitParameterBinding> BuildBindings(FitState state, BvUserOverrides overrides)
         {
             List<FitParameterBinding> bindings = [];
 
-            if (state.IncludeMetal && !(overrides?.FixMetal ?? false))
+            foreach (ReactionFitState rfs in state.Reactions)
             {
-                AddParameter(bindings, state.I0Metal, reactions.Metal.I0MinAcm2, reactions.Metal.I0MaxAcm2, (s, value) => s.I0Metal = value);
-                AddParameter(bindings, state.BetaMetal, reactions.Metal.BetaMin, reactions.Metal.BetaMax, (s, value) => s.BetaMetal = value);
-            }
+                if (!rfs.IsIncluded)
+                    continue;
 
-            if (state.IncludeOrr && !(overrides?.FixOrr ?? false))
-            {
-                AddParameter(bindings, state.I0Orr, reactions.Orr.I0MinAcm2, reactions.Orr.I0MaxAcm2, (s, value) => s.I0Orr = value);
-                AddParameter(bindings, state.BetaOrr, reactions.Orr.BetaMin, reactions.Orr.BetaMax, (s, value) => s.BetaOrr = value);
-                AddParameter(bindings, state.IlimOrr, reactions.Orr.IlimMinAcm2, reactions.Orr.IlimMaxAcm2, (s, value) => s.IlimOrr = value);
-            }
+                bool isFixed = rfs.Reaction.Name switch
+                {
+                    ReactionType.MetalOxidation    => overrides?.FixMetal ?? false,
+                    ReactionType.OxygenReduction   => overrides?.FixOrr   ?? false,
+                    ReactionType.HydrogenEvolution => overrides?.FixHer   ?? false,
+                    _                              => false
+                };
 
-            if (state.IncludeHer && !(overrides?.FixHer ?? false))
-            {
-                AddParameter(bindings, state.I0Her, reactions.Her.I0MinAcm2, reactions.Her.I0MaxAcm2, (s, value) => s.I0Her = value);
-                AddParameter(bindings, state.BetaHer, reactions.Her.BetaMin, reactions.Her.BetaMax, (s, value) => s.BetaHer = value);
+                if (isFixed)
+                    continue;
+
+                ReactionType name = rfs.Reaction.Name; // captured for closure
+                AddParameter(bindings, rfs.I0,   rfs.Reaction.I0MinAcm2,   rfs.Reaction.I0MaxAcm2,
+                    (s, val) => s.GetReaction(name).I0   = val);
+                AddParameter(bindings, rfs.Beta,  rfs.Reaction.BetaMin,     rfs.Reaction.BetaMax,
+                    (s, val) => s.GetReaction(name).Beta = val);
+
+                if (rfs.Reaction.IlimMaxAcm2 > 0.0)
+                    AddParameter(bindings, rfs.Ilim, rfs.Reaction.IlimMinAcm2, rfs.Reaction.IlimMaxAcm2,
+                        (s, val) => s.GetReaction(name).Ilim = val);
             }
 
             return bindings;
@@ -248,13 +284,13 @@ namespace CSaVe_Electrochemical_Data
             bindings.Add(new FitParameterBinding(initialValue, lowerBound, upperBound, apply));
         }
 
-        private static FitState ApplyParameters(FitState state, IReadOnlyList<FitParameterBinding> bindings, double[] values)
+        private static void ApplyParameters(FitState state, IReadOnlyList<FitParameterBinding> bindings, double[] values)
         {
             for (int index = 0; index < bindings.Count; index++)
                 bindings[index].Apply(state, values[index]);
-
-            return state;
         }
+
+        // ── Ecorr estimation ──────────────────────────────────────────────────────────────────────
 
         private static double EstimateEcorr(double[] e, double[] i, double hint)
         {
@@ -287,6 +323,8 @@ namespace CSaVe_Electrochemical_Data
             return e[minIdx];
         }
 
+        // ── Per-reaction parameter estimators ─────────────────────────────────────────────────────
+
         private static void FitMetalOxidation(
             double[] e,
             double[] i,
@@ -296,7 +334,7 @@ namespace CSaVe_Electrochemical_Data
             out double i0Metal)
         {
             betaMetal = DefaultBeta;
-            i0Metal = Math.Clamp(DefaultI0MetalAcm2, reaction.I0MinAcm2, reaction.I0MaxAcm2);
+            i0Metal   = Math.Clamp(DefaultI0MetalAcm2, reaction.I0MinAcm2, reaction.I0MaxAcm2);
 
             double eMin = ecorr + TafelLowerOffsetV;
             double eMax = ecorr + TafelUpperOffsetV;
@@ -315,14 +353,37 @@ namespace CSaVe_Electrochemical_Data
 
             double zFoverRTln10 = reaction.Z * ElectrochemicalConstants.F
                                   / (ElectrochemicalConstants.R * reaction.TemperatureKelvin * Math.Log(10.0));
-            double betaFit = slope / zFoverRTln10;
-            double i0MetalFit = Math.Pow(10.0, slope * reaction.EquilibriumPotentialVshe + intercept);
+            double betaFit     = slope / zFoverRTln10;
+            double i0MetalFit  = Math.Pow(10.0, slope * reaction.EquilibriumPotentialVshe + intercept);
 
             if (double.IsFinite(betaFit) && double.IsFinite(i0MetalFit))
             {
-                betaMetal = Math.Clamp(betaFit, reaction.BetaMin, reaction.BetaMax);
-                i0Metal = Math.Clamp(i0MetalFit, reaction.I0MinAcm2, reaction.I0MaxAcm2);
+                betaMetal = Math.Clamp(betaFit,    reaction.BetaMin,   reaction.BetaMax);
+                i0Metal   = Math.Clamp(i0MetalFit, reaction.I0MinAcm2, reaction.I0MaxAcm2);
             }
+        }
+
+        private static double EstimateIlimMetal(double[] e, double[] i, double ecorr, IBvReaction reaction)
+        {
+            // The cathodic limiting current for metal deposition is set by the very low dissolved
+            // cation concentration. Estimate from the minimum |i| in the deeply cathodic potential
+            // region, then clamp to [IlimMinAcm2, IlimMaxAcm2] = [1e-14, 1e-6] A/cm².
+            if (e.Length == 0)
+                return Math.Clamp(reaction.IlimMaxAcm2 * 0.1, reaction.IlimMinAcm2, reaction.IlimMaxAcm2);
+
+            double eMin    = e.Min();
+            double eRange  = e.Max() - eMin;
+            double cutoff  = eMin + eRange * IlimDepthFraction;
+
+            double[] deepAbsI = [.. i
+                .Where((_, k) => e[k] <= cutoff && e[k] < ecorr)
+                .Select(v => Math.Abs(v))];
+
+            double raw = deepAbsI.Length > 0
+                ? deepAbsI.Min()
+                : reaction.IlimMaxAcm2 * 0.1;
+
+            return Math.Clamp(raw, reaction.IlimMinAcm2, reaction.IlimMaxAcm2);
         }
 
         private static void FitOrrBv(
@@ -334,7 +395,7 @@ namespace CSaVe_Electrochemical_Data
             out double i0Orr)
         {
             betaOrr = DefaultBeta;
-            i0Orr = Math.Clamp(DefaultI0OrrAcm2, reaction.I0MinAcm2, reaction.I0MaxAcm2);
+            i0Orr   = Math.Clamp(DefaultI0OrrAcm2, reaction.I0MinAcm2, reaction.I0MaxAcm2);
 
             double eMin = ecorr - TafelUpperOffsetV;
             double eMax = ecorr - TafelLowerOffsetV;
@@ -354,13 +415,13 @@ namespace CSaVe_Electrochemical_Data
             double zFoverRTln10 = reaction.Z * ElectrochemicalConstants.F
                                   / (ElectrochemicalConstants.R * reaction.TemperatureKelvin * Math.Log(10.0));
             double oneMinusBeta = -slope / zFoverRTln10;
-            double betaFit = 1.0 - oneMinusBeta;
-            double i0OrrFit = Math.Pow(10.0, slope * reaction.EquilibriumPotentialVshe + intercept);
+            double betaFit      = 1.0 - oneMinusBeta;
+            double i0OrrFit     = Math.Pow(10.0, slope * reaction.EquilibriumPotentialVshe + intercept);
 
             if (double.IsFinite(betaFit) && double.IsFinite(i0OrrFit))
             {
-                betaOrr = Math.Clamp(betaFit, reaction.BetaMin, reaction.BetaMax);
-                i0Orr = Math.Clamp(i0OrrFit, reaction.I0MinAcm2, reaction.I0MaxAcm2);
+                betaOrr = Math.Clamp(betaFit,   reaction.BetaMin,   reaction.BetaMax);
+                i0Orr   = Math.Clamp(i0OrrFit,  reaction.I0MinAcm2, reaction.I0MaxAcm2);
             }
         }
 
@@ -369,17 +430,17 @@ namespace CSaVe_Electrochemical_Data
             if (e.Length == 0)
                 return Math.Clamp(DefaultIlimOrrAcm2, reaction.IlimMinAcm2, reaction.IlimMaxAcm2);
 
-            double eMin = e.Min();
+            double eMin   = e.Min();
             double eRange = e.Max() - eMin;
-            double cutoff = eMin + eRange * IlimOrrDepthFraction;
+            double cutoff = eMin + eRange * IlimDepthFraction;
 
             double[] deepI = [.. i
                 .Where((_, k) => e[k] <= cutoff && e[k] < ecorr)
-                .Select(selector: v => Math.Abs(v))];
+                .Select(v => Math.Abs(v))];
 
             if (deepI.Length == 0)
             {
-                double[] cathodicI = [.. i.Where((_, k) => e[k] < ecorr).Select(selector: v => Math.Abs(v))];
+                double[] cathodicI = [.. i.Where((_, k) => e[k] < ecorr).Select(v => Math.Abs(v))];
                 if (cathodicI.Length == 0)
                     return Math.Clamp(DefaultIlimOrrAcm2, reaction.IlimMinAcm2, reaction.IlimMaxAcm2);
 
@@ -397,10 +458,10 @@ namespace CSaVe_Electrochemical_Data
             out double i0Her,
             out double betaHer)
         {
-            i0Her = Math.Clamp(DefaultI0HerAcm2, reaction.I0MinAcm2, reaction.I0MaxAcm2);
+            i0Her   = Math.Clamp(DefaultI0HerAcm2, reaction.I0MinAcm2, reaction.I0MaxAcm2);
             betaHer = DefaultBeta;
 
-            double eEq = reaction.EquilibriumPotentialVshe;
+            double eEq    = reaction.EquilibriumPotentialVshe;
             double eWinHi = eEq - 0.02;
             double eWinLo = eEq - 0.40;
 
@@ -422,26 +483,26 @@ namespace CSaVe_Electrochemical_Data
             if (eWin.Count < MinHerPoints)
                 return;
 
-            double[] eArr = [.. eWin];
-            double[] iArr = [.. iWin];
-            double[] eta = [.. eArr.Select(selector: v => v - eEq)];
-            double[] logI = [.. iArr.Select(selector: v => Math.Log10(Math.Max(Math.Abs(v), LogFloorAcm2)))];
+            double[] eArr  = [.. eWin];
+            double[] iArr  = [.. iWin];
+            double[] eta   = [.. eArr.Select(v => v - eEq)];
+            double[] logI  = [.. iArr.Select(v => Math.Log10(Math.Max(Math.Abs(v), LogFloorAcm2)))];
             double zFoverRTln10 = reaction.Z * ElectrochemicalConstants.F
                                   / (ElectrochemicalConstants.R * reaction.TemperatureKelvin * Math.Log(10.0));
 
             if (OlsFit(eta, logI, out double slope, out double intercept))
             {
                 double betaSeed = 1.0 + slope / zFoverRTln10;
-                double i0Seed = Math.Pow(10.0, intercept);
-                betaHer = Math.Clamp(betaSeed, reaction.BetaMin, reaction.BetaMax);
-                i0Her = Math.Clamp(i0Seed, reaction.I0MinAcm2, reaction.I0MaxAcm2);
+                double i0Seed   = Math.Pow(10.0, intercept);
+                betaHer = Math.Clamp(betaSeed, reaction.BetaMin,   reaction.BetaMax);
+                i0Her   = Math.Clamp(i0Seed,   reaction.I0MinAcm2, reaction.I0MaxAcm2);
             }
 
-            double zFoverRT = reaction.Z * ElectrochemicalConstants.F
-                              / (ElectrochemicalConstants.R * reaction.TemperatureKelvin);
-            double[] p0Her = { i0Her, betaHer };
-            double[] lbHer = { reaction.I0MinAcm2, reaction.BetaMin };
-            double[] ubHer = { reaction.I0MaxAcm2, reaction.BetaMax };
+            double zFoverRT   = reaction.Z * ElectrochemicalConstants.F
+                                / (ElectrochemicalConstants.R * reaction.TemperatureKelvin);
+            double[] p0Her    = { i0Her, betaHer };
+            double[] lbHer    = { reaction.I0MinAcm2, reaction.BetaMin };
+            double[] ubHer    = { reaction.I0MaxAcm2, reaction.BetaMax };
             double[] weightHer = [.. iArr.Select(v => 1.0 / Math.Max(Math.Abs(v), 1e-12))];
 
             double[] pHerFitted = LevenbergMarquardtSolver.Solve(
@@ -450,7 +511,7 @@ namespace CSaVe_Electrochemical_Data
                     var residuals = new double[eArr.Length];
                     for (int k = 0; k < eArr.Length; k++)
                     {
-                        double etaK = eArr[k] - eEq;
+                        double etaK  = eArr[k] - eEq;
                         double iModel = -p[0] * Math.Exp(
                             Math.Clamp(-(1.0 - p[1]) * zFoverRT * etaK, ExpClipMin, ExpClipMax));
                         residuals[k] = (iModel - iArr[k]) * weightHer[k];
@@ -459,9 +520,11 @@ namespace CSaVe_Electrochemical_Data
                 },
                 p0Her, lbHer, ubHer);
 
-            i0Her = Math.Clamp(pHerFitted[0], reaction.I0MinAcm2, reaction.I0MaxAcm2);
-            betaHer = Math.Clamp(pHerFitted[1], reaction.BetaMin, reaction.BetaMax);
+            i0Her   = Math.Clamp(pHerFitted[0], reaction.I0MinAcm2, reaction.I0MaxAcm2);
+            betaHer = Math.Clamp(pHerFitted[1], reaction.BetaMin,   reaction.BetaMax);
         }
+
+        // ── Ecorr post-fit refinement ─────────────────────────────────────────────────────────────
 
         private static double FindEcorr(double[] e, BvModelParameters model, double ecorrHint)
         {
@@ -471,7 +534,7 @@ namespace CSaVe_Electrochemical_Data
             double eMin = e.Min();
             double eMax = e.Max();
             const int scanSteps = 500;
-            double step = (eMax - eMin) / scanSteps;
+            double step  = (eMax - eMin) / scanSteps;
             double ePrev = eMin;
             double iPrev = model.ComputeCurrentDensity(eMin);
 
@@ -492,63 +555,62 @@ namespace CSaVe_Electrochemical_Data
             return ecorrHint;
         }
 
+        // ── Residual computation (log-space for equal per-decade weighting) ───────────────────────
+
         private static double[] ComputeWeightedResiduals(
             double[] e,
             double[] iMeasured,
-            double[] weight,
             double[] p,
             FitState baseState,
-            IReadOnlyList<FitParameterBinding> bindings,
-            ReactionSet reactions)
+            IReadOnlyList<FitParameterBinding> bindings)
         {
-            FitState state = ApplyParameters(baseState.Clone(), bindings, p);
-            BvModelParameters model = ParametersToModel(state, reactions);
+            FitState state = baseState.Clone();
+            ApplyParameters(state, bindings, p);
+            BvModelParameters model = ParametersToModel(state);
+
+            // Residuals in log10(|i|) space give equal weight per decade of current,
+            // preventing the optimizer from over-fitting the low-current cathodic region
+            // at the expense of the anodic branch.
             double[] residuals = new double[e.Length];
             for (int k = 0; k < e.Length; k++)
             {
-                double iModel = model.ComputeCurrentDensity(e[k]);
-                residuals[k] = (iModel - iMeasured[k]) * weight[k];
+                double absModel = Math.Max(Math.Abs(model.ComputeCurrentDensity(e[k])), LogFloorAcm2);
+                double absMeas  = Math.Max(Math.Abs(iMeasured[k]),                       LogFloorAcm2);
+                residuals[k] = Math.Log10(absModel) - Math.Log10(absMeas);
             }
 
             return residuals;
         }
 
-        private static BvModelParameters ParametersToModel(FitState state, ReactionSet reactions, double ecorr = 0.0) =>
-            new BvModelParameters(reactions.Metal, reactions.Orr, reactions.Her)
-            {
-                I0Metal = state.I0Metal,
-                BetaMetal = state.BetaMetal,
-                EMetalEquilibriumV = reactions.Metal.EquilibriumPotentialVshe,
-                I0Orr = state.I0Orr,
-                BetaOrr = state.BetaOrr,
-                IlimOrr = state.IlimOrr,
-                EorrEquilibriumV = reactions.Orr.EquilibriumPotentialVshe,
-                I0Her = state.I0Her,
-                BetaHer = state.BetaHer,
-                EherEquilibriumV = reactions.Her.EquilibriumPotentialVshe,
-                Ecorr = ecorr,
-                IncludeMetal = state.IncludeMetal,
-                IncludeOrr = state.IncludeOrr,
-                IncludeHer = state.IncludeHer,
-            };
+        // ── Model assembly ────────────────────────────────────────────────────────────────────────
+
+        private static BvModelParameters ParametersToModel(FitState state, double ecorr = 0.0)
+        {
+            var reactionParams = state.Reactions.Select(rfs =>
+                new BvModelParameters.ReactionParameters(
+                    rfs.Reaction,
+                    rfs.I0,
+                    rfs.Beta,
+                    rfs.Reaction.IlimMaxAcm2 > 0.0 ? rfs.Ilim : 0.0,
+                    rfs.IsIncluded)).ToList();
+
+            return new BvModelParameters(reactionParams) { Ecorr = ecorr };
+        }
+
+        // ── Numerical helpers ─────────────────────────────────────────────────────────────────────
 
         private static bool OlsFit(double[] x, double[] y, out double slope, out double intercept)
         {
-            slope = 0.0;
+            slope     = 0.0;
             intercept = 0.0;
 
             int n = x.Length;
             if (n < 2)
                 return false;
 
-            double sumX = 0.0;
-            double sumY = 0.0;
-            double sumXY = 0.0;
-            double sumX2 = 0.0;
-            foreach (double v in x)
-                sumX += v;
-            foreach (double v in y)
-                sumY += v;
+            double sumX = 0.0, sumY = 0.0, sumXY = 0.0, sumX2 = 0.0;
+            foreach (double v in x) sumX  += v;
+            foreach (double v in y) sumY  += v;
             for (int k = 0; k < n; k++)
             {
                 sumXY += x[k] * y[k];
@@ -559,7 +621,7 @@ namespace CSaVe_Electrochemical_Data
             if (Math.Abs(denom) < 1e-30)
                 return false;
 
-            slope = (n * sumXY - sumX * sumY) / denom;
+            slope     = (n * sumXY - sumX * sumY) / denom;
             intercept = (sumY - slope * sumX) / n;
             return true;
         }
@@ -585,68 +647,71 @@ namespace CSaVe_Electrochemical_Data
             double[] sorted = (double[])values.Clone();
             Array.Sort(sorted);
 
-            double idx = (percentile / 100.0) * (sorted.Length - 1);
-            int lo = (int)Math.Floor(idx);
-            int hi = Math.Min(lo + 1, sorted.Length - 1);
+            double idx  = (percentile / 100.0) * (sorted.Length - 1);
+            int    lo   = (int)Math.Floor(idx);
+            int    hi   = Math.Min(lo + 1, sorted.Length - 1);
             double frac = idx - lo;
             return sorted[lo] * (1.0 - frac) + sorted[hi] * frac;
         }
 
-        private sealed class ReactionSet
-        {
-            public ReactionSet(IBvReaction metal, IBvReaction orr, IBvReaction her)
-            {
-                Metal = metal;
-                Orr = orr;
-                Her = her;
-            }
+        // ── Private inner types ───────────────────────────────────────────────────────────────────
 
-            public IBvReaction Metal { get; }
-            public IBvReaction Orr { get; }
-            public IBvReaction Her { get; }
+        private sealed class ReactionFitState
+        {
+            public IBvReaction Reaction   { get; init; }
+            public bool        IsIncluded { get; set; }
+            public double      I0         { get; set; }
+            public double      Beta       { get; set; }
+            public double      Ilim       { get; set; }
+
+            public ReactionFitState Clone() => new ReactionFitState
+            {
+                Reaction   = Reaction,
+                IsIncluded = IsIncluded,
+                I0         = I0,
+                Beta       = Beta,
+                Ilim       = Ilim
+            };
         }
 
         private sealed class FitState
         {
-            public bool IncludeMetal { get; init; }
-            public bool IncludeOrr { get; init; }
-            public bool IncludeHer { get; init; }
-            public double I0Metal { get; set; }
-            public double BetaMetal { get; set; }
-            public double I0Orr { get; set; }
-            public double BetaOrr { get; set; }
-            public double IlimOrr { get; set; }
-            public double I0Her { get; set; }
-            public double BetaHer { get; set; }
+            public List<ReactionFitState> Reactions { get; init; }
+
+            /// <summary>
+            /// Returns the ReactionFitState for the given reaction type.
+            /// Throws <see cref="InvalidOperationException"/> if not found; only call this
+            /// from closures that were created while the reaction is known to be in the list.
+            /// </summary>
+            public ReactionFitState GetReaction(ReactionType name) =>
+                Reactions.First(r => r.Reaction.Name == name);
+
+            public ReactionFitState TryGetReaction(ReactionType name) =>
+                Reactions.FirstOrDefault(r => r.Reaction.Name == name);
 
             public FitState Clone() => new FitState
             {
-                IncludeMetal = IncludeMetal,
-                IncludeOrr = IncludeOrr,
-                IncludeHer = IncludeHer,
-                I0Metal = I0Metal,
-                BetaMetal = BetaMetal,
-                I0Orr = I0Orr,
-                BetaOrr = BetaOrr,
-                IlimOrr = IlimOrr,
-                I0Her = I0Her,
-                BetaHer = BetaHer,
+                Reactions = Reactions.Select(r => r.Clone()).ToList()
             };
         }
 
         private sealed class FitParameterBinding
         {
-            public FitParameterBinding(double initialValue, double lowerBound, double upperBound, Action<FitState, double> apply)
+            public FitParameterBinding(
+                double initialValue,
+                double lowerBound,
+                double upperBound,
+                Action<FitState, double> apply)
             {
                 InitialValue = initialValue;
-                LowerBound = lowerBound;
-                UpperBound = upperBound;
-                Apply = apply;
+                LowerBound   = lowerBound;
+                UpperBound   = upperBound;
+                Apply        = apply;
             }
 
             public double InitialValue { get; }
-            public double LowerBound { get; }
-            public double UpperBound { get; }
+            public double LowerBound   { get; }
+            public double UpperBound   { get; }
             public Action<FitState, double> Apply { get; }
         }
     }

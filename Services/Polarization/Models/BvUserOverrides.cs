@@ -17,6 +17,9 @@ namespace CSaVe_Electrochemical_Data
         /// <summary>User-specified initial symmetry factor β for metal oxidation (dimensionless, 0–1).</summary>
         public double? BetaMetal { get; init; }
 
+        /// <summary>User-specified initial limiting current density for metal oxidation (A/cm²).</summary>
+        public double? IlimMetal { get; init; }
+
         /// <summary>
         /// When <c>true</c>, the metal-oxidation i₀ and β are held fixed at the user-specified
         /// values and are not adjusted by the LM optimiser.
@@ -48,6 +51,9 @@ namespace CSaVe_Electrochemical_Data
 
         /// <summary>User-specified initial symmetry factor β for HER (dimensionless, 0–1).</summary>
         public double? BetaHer { get; init; }
+
+        /// <summary>User-specified initial limiting current density for HER (A/cm²).</summary>
+        public double? IlimHer { get; init; }
 
         /// <summary>
         /// When <c>true</c>, the HER i₀ and β are held fixed at the user-specified values
