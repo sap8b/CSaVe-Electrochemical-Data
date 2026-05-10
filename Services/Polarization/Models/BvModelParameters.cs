@@ -13,9 +13,9 @@ namespace CSaVe_Electrochemical_Data;
 /// </summary>
 public sealed class BvModelParameters
 {
-    private readonly ElectrochemicalReaction _metalReaction;
-    private readonly ElectrochemicalReaction _orrReaction;
-    private readonly ElectrochemicalReaction _herReaction;
+    private readonly IBvReaction _metalReaction;
+    private readonly IBvReaction _orrReaction;
+    private readonly IBvReaction _herReaction;
 
     // ── Constructor ───────────────────────────────────────────────────────────────────────────
     /// <summary>
@@ -26,9 +26,9 @@ public sealed class BvModelParameters
     /// <param name="orrReaction">Reaction object for the oxygen reduction half-reaction (ORR).</param>
     /// <param name="herReaction">Reaction object for the hydrogen evolution half-reaction (HER).</param>
     public BvModelParameters(
-        ElectrochemicalReaction metalReaction,
-        ElectrochemicalReaction orrReaction,
-        ElectrochemicalReaction herReaction)
+        IBvReaction metalReaction,
+        IBvReaction orrReaction,
+        IBvReaction herReaction)
     {
         _metalReaction = metalReaction ?? throw new ArgumentNullException(nameof(metalReaction));
         _orrReaction   = orrReaction   ?? throw new ArgumentNullException(nameof(orrReaction));
@@ -112,8 +112,8 @@ public sealed class BvModelParameters
     public double ComputeMetalOxidationComponent(double potentialV)
     {
         double eta      = potentialV - EMetalEquilibriumV;
-        double zFoverRT = _metalReaction.Z * ElectrochemicalReaction.F
-                          / (ElectrochemicalReaction.R * _metalReaction.TemperatureKelvin);
+        double zFoverRT = _metalReaction.Z * ElectrochemicalConstants.F
+                          / (ElectrochemicalConstants.R * _metalReaction.TemperatureKelvin);
 
         double forward  = Math.Exp(Math.Clamp( BetaMetal         * zFoverRT * eta, ExpClipMin, ExpClipMax));
         double reverse  = Math.Exp(Math.Clamp(-(1.0 - BetaMetal) * zFoverRT * eta, ExpClipMin, ExpClipMax));
@@ -133,8 +133,8 @@ public sealed class BvModelParameters
     public double ComputeOrrComponent(double potentialV)
     {
         double eta      = potentialV - EorrEquilibriumV;
-        double zFoverRT = _orrReaction.Z * ElectrochemicalReaction.F
-                          / (ElectrochemicalReaction.R * _orrReaction.TemperatureKelvin);
+        double zFoverRT = _orrReaction.Z * ElectrochemicalConstants.F
+                          / (ElectrochemicalConstants.R * _orrReaction.TemperatureKelvin);
 
         double cathodic = Math.Exp(Math.Clamp(-(1.0 - BetaOrr) * zFoverRT * eta, ExpClipMin, ExpClipMax));
         double anodic   = Math.Exp(Math.Clamp( BetaOrr          * zFoverRT * eta, ExpClipMin, ExpClipMax));
@@ -162,8 +162,8 @@ public sealed class BvModelParameters
     public double ComputeHerComponent(double potentialV)
     {
         double eta      = potentialV - EherEquilibriumV;
-        double zFoverRT = _herReaction.Z * ElectrochemicalReaction.F
-                          / (ElectrochemicalReaction.R * _herReaction.TemperatureKelvin);
+        double zFoverRT = _herReaction.Z * ElectrochemicalConstants.F
+                          / (ElectrochemicalConstants.R * _herReaction.TemperatureKelvin);
 
         double anodic   = Math.Exp(Math.Clamp( BetaHer         * zFoverRT * eta, ExpClipMin, ExpClipMax));
         double cathodic = Math.Exp(Math.Clamp(-(1.0 - BetaHer) * zFoverRT * eta, ExpClipMin, ExpClipMax));

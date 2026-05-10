@@ -14,18 +14,15 @@ namespace CSaVe_Electrochemical_Data;
 /// </summary>
 public sealed class BvCurveFitter : IBvCurveFitter
 {
-    // ── Module-level reaction singletons ──────────────────────────────────────────────────────
-    /// <summary>Fixed thermodynamic constants for the metal oxidation half-reaction (Fe/Fe²⁺, E0 = −0.44 V vs. SHE).</summary>
-    private static readonly ElectrochemicalReaction MetalReaction =
-        new ElectrochemicalReaction(name: "Metal", e0Vshe: -0.54, z: 2, pH: 8.0, temperatureCelsius: 25.0); // This is technically the wrong potential for Fe/Fe2+, but this is what the polarization curve is giving us, so maybe the reference electrode was off?
+    // ── Module-level reaction singletons created via BvReactionFactory ───────────────────────
+    /// <summary>Fixed thermodynamic constants for the metal oxidation half-reaction (Fe/Fe²⁺, E0 = −0.54 V vs. SHE).</summary>
+    private static readonly IBvReaction MetalReaction = BvReactionFactory.CreateMetalOxidation();
 
     /// <summary>Fixed thermodynamic constants for the ORR half-reaction (O₂/H₂O, E0 = 1.229 V vs. SHE at pH 0).</summary>
-    private static readonly ElectrochemicalReaction OrrReaction =
-        new ElectrochemicalReaction(name: "ORR", e0Vshe: 1.229, z: 4, pH: 8.0, temperatureCelsius: 25.0);
+    private static readonly IBvReaction OrrReaction = BvReactionFactory.CreateOrr();
 
     /// <summary>Fixed thermodynamic constants for the HER half-reaction (E0 = 0 V vs. SHE at pH 0).</summary>
-    private static readonly ElectrochemicalReaction HerReaction =
-        new ElectrochemicalReaction(name: "HER", e0Vshe: 0.0, z: 2, pH: 8.0, temperatureCelsius: 25.0);
+    private static readonly IBvReaction HerReaction = BvReactionFactory.CreateHer();
 
     // ── Tafel window offsets relative to Ecorr ────────────────────────────────────────────────
     // Lower offset: skip the near-linear mixed-potential zone where neither branch is dominant.
@@ -314,8 +311,8 @@ public sealed class BvCurveFitter : IBvCurveFitter
 
         // slope = BetaMetal * z * F / (R * T * ln10)
         // → BetaMetal = slope * R * T * ln10 / (z * F)
-        double zFoverRTln10 = MetalReaction.Z * ElectrochemicalReaction.F
-                              / (ElectrochemicalReaction.R * MetalReaction.TemperatureKelvin * Math.Log(10.0));
+        double zFoverRTln10 = MetalReaction.Z * ElectrochemicalConstants.F
+                              / (ElectrochemicalConstants.R * MetalReaction.TemperatureKelvin * Math.Log(10.0));
         double betaFit = slope / zFoverRTln10;
 
         // I0Metal = 10^(slope * E_eq_metal + intercept) — extrapolated to the equilibrium potential.
@@ -362,8 +359,8 @@ public sealed class BvCurveFitter : IBvCurveFitter
         // In cathodic Tafel region: log|i_kinetic| ≈ log(I0Orr) − (1−β)*z*F/(R*T*ln10) * (E − E_eq_ORR)
         // slope of log|i| vs E = −(1−BetaOrr)*z*F / (R*T*ln10)  [typically negative]
         // → (1−BetaOrr) = −slope * R*T*ln10 / (z*F)
-        double zFoverRTln10 = OrrReaction.Z * ElectrochemicalReaction.F
-                              / (ElectrochemicalReaction.R * OrrReaction.TemperatureKelvin * Math.Log(10.0));
+        double zFoverRTln10 = OrrReaction.Z * ElectrochemicalConstants.F
+                              / (ElectrochemicalConstants.R * OrrReaction.TemperatureKelvin * Math.Log(10.0));
         double oneMinusBeta = -slope / zFoverRTln10;
         double betaFit      = 1.0 - oneMinusBeta;
 
@@ -450,8 +447,8 @@ public sealed class BvCurveFitter : IBvCurveFitter
         // log|i| = log(i0) − (1−β)·z·F·η / (R·T·ln10)
         double[] eta         = [.. eArr.Select(selector: v => v - eEq)];
         double[] logI        = [.. iArr.Select(v => Math.Log10(Math.Max(Math.Abs(v), LogFloorAcm2)))];
-        double zFoverRTln10  = HerReaction.Z * ElectrochemicalReaction.F
-                               / (ElectrochemicalReaction.R * HerReaction.TemperatureKelvin * Math.Log(10.0));
+        double zFoverRTln10  = HerReaction.Z * ElectrochemicalConstants.F
+                               / (ElectrochemicalConstants.R * HerReaction.TemperatureKelvin * Math.Log(10.0));
 
         if (OlsFit(eta, logI, out double slope, out double intercept))
         {
@@ -464,8 +461,8 @@ public sealed class BvCurveFitter : IBvCurveFitter
         }
 
         // Polish with a bounded two-parameter Levenberg-Marquardt solve.
-        double zFoverRT = HerReaction.Z * ElectrochemicalReaction.F
-                          / (ElectrochemicalReaction.R * HerReaction.TemperatureKelvin);
+        double zFoverRT = HerReaction.Z * ElectrochemicalConstants.F
+                          / (ElectrochemicalConstants.R * HerReaction.TemperatureKelvin);
 
         double[] p0Her = { i0Her, betaHer };
         double[] lbHer = { I0MinAcm2, BetaSymMin };

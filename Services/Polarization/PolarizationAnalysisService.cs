@@ -170,7 +170,7 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
         // ba (metal anodic) = 2.303 * R * T / (BetaMetal * z_metal * F)  with z_metal = 2
         // bc (ORR cathodic) = 2.303 * R * T / ((1-BetaOrr) * z_ORR * F) with z_ORR   = 4
         double temperatureKelvin = input.TemperatureCelsius + 273.15;
-        double rtFactor          = 2.303 * ElectrochemicalReaction.R * temperatureKelvin / ElectrochemicalReaction.F;
+        double rtFactor          = 2.303 * ElectrochemicalConstants.R * temperatureKelvin / ElectrochemicalConstants.F;
         double betaAnodicV       = rtFactor / (fitted.BetaMetal * 2.0);
         double betaCathodicV     = rtFactor / ((1.0 - fitted.BetaOrr) * 4.0);
 
