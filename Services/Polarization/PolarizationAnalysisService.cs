@@ -168,10 +168,10 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
         // Effective Tafel slopes derived from BV symmetry factors for display.
         // ba (metal anodic) = 2.303 * R * T / (BetaMetal * z_metal * F)  with z_metal = 2
         // bc (ORR cathodic) = 2.303 * R * T / ((1-BetaOrr) * z_ORR * F) with z_ORR   = 4
-        double tK             = input.TemperatureCelsius + 273.15;
-        double rtFactor       = 2.303 * ElectrochemicalReaction.R * tK / ElectrochemicalReaction.F;
-        double betaAnodicV    = rtFactor / (fitted.BetaMetal * 2.0);
-        double betaCathodicV  = rtFactor / ((1.0 - fitted.BetaOrr) * 4.0);
+        double temperatureKelvin = input.TemperatureCelsius + 273.15;
+        double rtFactor          = 2.303 * ElectrochemicalReaction.R * temperatureKelvin / ElectrochemicalReaction.F;
+        double betaAnodicV       = rtFactor / (fitted.BetaMetal * 2.0);
+        double betaCathodicV     = rtFactor / ((1.0 - fitted.BetaOrr) * 4.0);
 
         // ── Step 7: interpolate protection current densities ─────────────────────────────
         var protectionCurrents = new Dictionary<string, double>();

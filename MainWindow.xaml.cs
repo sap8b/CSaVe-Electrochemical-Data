@@ -1384,8 +1384,8 @@ namespace CSaVe_Electrochemical_Data
                     LineStyle       = LineStyle.Dot,
                     StrokeThickness = 1.0
                 };
-                int nc2 = Math.Min(result.PlotCathodicFilePotentialsV.Count, result.PlotCathodicFileCurrentDensityAcm2.Count);
-                for (int j = 0; j < nc2; j++)
+                int cathodicPointCount = Math.Min(result.PlotCathodicFilePotentialsV.Count, result.PlotCathodicFileCurrentDensityAcm2.Count);
+                for (int j = 0; j < cathodicPointCount; j++)
                 {
                     double x = Math.Max(Math.Abs(result.PlotCathodicFileCurrentDensityAcm2[j]), 1.0e-12);
                     cathodicFileSeries.Points.Add(new DataPoint(x, result.PlotCathodicFilePotentialsV[j]));
