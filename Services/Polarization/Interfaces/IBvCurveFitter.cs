@@ -17,10 +17,15 @@ public interface IBvCurveFitter
     /// <param name="currentDensityAcm2">Signed current density (A/cm²) at each potential.</param>
     /// <param name="ecorrHintV">Initial estimate for the corrosion potential (V).</param>
     /// <param name="temperatureCelsius">Electrolyte temperature (°C).</param>
+    /// <param name="overrides">
+    /// Optional user-specified starting values and per-reaction fix flags.
+    /// Pass <c>null</c> to use fully automatic initialisation and unconstrained LM fitting.
+    /// </param>
     /// <returns>Fitted model parameters.</returns>
     BvModelParameters Fit(
         IReadOnlyList<double> potentialV,
         IReadOnlyList<double> currentDensityAcm2,
         double ecorrHintV,
-        double temperatureCelsius);
+        double temperatureCelsius,
+        BvUserOverrides overrides = null);
 }

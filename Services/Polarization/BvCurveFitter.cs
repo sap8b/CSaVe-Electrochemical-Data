@@ -106,6 +106,10 @@ public sealed class BvCurveFitter : IBvCurveFitter
     /// <param name="currentDensityAcm2">Signed current density (A/cm²) at each potential.</param>
     /// <param name="ecorrHintV">Initial estimate for the corrosion potential (V).</param>
     /// <param name="temperatureCelsius">Electrolyte temperature (°C).</param>
+    /// <param name="overrides">
+    /// Optional user-specified starting values and per-reaction fix flags.
+    /// Pass <c>null</c> to use fully automatic initialisation and unconstrained LM fitting.
+    /// </param>
     /// <returns>Fitted model parameters.</returns>
     /// <exception cref="ArgumentException">
     /// Thrown when the input arrays have different lengths or are empty.
@@ -114,7 +118,8 @@ public sealed class BvCurveFitter : IBvCurveFitter
         IReadOnlyList<double> potentialV,
         IReadOnlyList<double> currentDensityAcm2,
         double ecorrHintV,
-        double temperatureCelsius)
+        double temperatureCelsius,
+        BvUserOverrides overrides = null)
     {
         if (potentialV.Count != currentDensityAcm2.Count)
             throw new ArgumentException("potentialV and currentDensityAcm2 must have the same length.");
@@ -169,6 +174,46 @@ public sealed class BvCurveFitter : IBvCurveFitter
         // Clamp initial guess to bounds.
         for (int j = 0; j < NumParams; j++)
             p0[j] = Math.Clamp(p0[j], lb[j], ub[j]);
+
+        // ── Apply user overrides to initial guess and fix flags ───────────────────────────────
+        if (overrides != null)
+        {
+            // Override initial guess values where the user has specified them.
+            if (overrides.I0Metal.HasValue)
+                p0[IdxI0Metal]   = Math.Clamp(overrides.I0Metal.Value,   I0MinAcm2,     I0MaxAcm2);
+            if (overrides.BetaMetal.HasValue)
+                p0[IdxBetaMetal] = Math.Clamp(overrides.BetaMetal.Value, BetaSymMin,    BetaSymMax);
+            if (overrides.I0Orr.HasValue)
+                p0[IdxI0Orr]     = Math.Clamp(overrides.I0Orr.Value,    I0MinAcm2,     I0MaxAcm2);
+            if (overrides.BetaOrr.HasValue)
+                p0[IdxBetaOrr]   = Math.Clamp(overrides.BetaOrr.Value,  BetaSymMin,    BetaSymMax);
+            if (overrides.IlimOrr.HasValue)
+                p0[IdxIlimOrr]   = Math.Clamp(overrides.IlimOrr.Value,  IlimOrrMinAcm2, IlimOrrMaxAcm2);
+            if (overrides.I0Her.HasValue)
+                p0[IdxI0Her]     = Math.Clamp(overrides.I0Her.Value,    I0MinAcm2,     I0MaxAcm2);
+            if (overrides.BetaHer.HasValue)
+                p0[IdxBetaHer]   = Math.Clamp(overrides.BetaHer.Value,  BetaSymMin,    BetaSymMax);
+
+            // Pin parameters that are flagged as fixed by setting lb = ub = p0.
+            // The LM solver clamps every trial step to [lb, ub], so lb == ub == value keeps
+            // the parameter frozen throughout the optimisation.
+            if (overrides.FixMetal)
+            {
+                lb[IdxI0Metal]   = ub[IdxI0Metal]   = p0[IdxI0Metal];
+                lb[IdxBetaMetal] = ub[IdxBetaMetal] = p0[IdxBetaMetal];
+            }
+            if (overrides.FixOrr)
+            {
+                lb[IdxI0Orr]   = ub[IdxI0Orr]   = p0[IdxI0Orr];
+                lb[IdxBetaOrr] = ub[IdxBetaOrr] = p0[IdxBetaOrr];
+                lb[IdxIlimOrr] = ub[IdxIlimOrr] = p0[IdxIlimOrr];
+            }
+            if (overrides.FixHer)
+            {
+                lb[IdxI0Her]   = ub[IdxI0Her]   = p0[IdxI0Her];
+                lb[IdxBetaHer] = ub[IdxBetaHer] = p0[IdxBetaHer];
+            }
+        }
 
         // ── Step 5: Levenberg-Marquardt polish ────────────────────────────────────────────────
         // Weight each residual by 1 / max(|I|, percentile_20(|I|)) to balance the fit

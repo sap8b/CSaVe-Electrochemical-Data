@@ -34,4 +34,10 @@ public sealed class PolarizationAnalysisInput
 
     /// <summary>Optional solution resistance in ohms for iR correction. Default 0 Ω (disabled).</summary>
     public double RSolutionOhm { get; set; } = 0.0;
+
+    /// <summary>
+    /// Optional user-specified starting values and per-reaction fix flags for BV curve fitting.
+    /// When null, all parameters are initialised automatically and fully optimised by LM.
+    /// </summary>
+    public BvUserOverrides UserOverrides { get; set; }
 }
