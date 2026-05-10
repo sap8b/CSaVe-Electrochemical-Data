@@ -11,6 +11,11 @@ namespace CSaVe_Electrochemical_Data;
 /// </summary>
 public sealed class BvCurveFitter : IBvCurveFitter
 {
+    // ── Module-level HER reaction singleton ───────────────────────────────────────────────────
+    /// <summary>Fixed thermodynamic constants for the HER half-reaction (E0 = 0 V vs. SHE at pH 0).</summary>
+    private static readonly ElectrochemicalReaction HerReaction =
+        new ElectrochemicalReaction(name: "HER", e0Vshe: 0.0, z: 2, pH: 8.0, temperatureCelsius: 25.0);
+
     // ── Tafel window offsets relative to Ecorr ────────────────────────────────────────────────
     // Lower offset: skip the near-linear mixed-potential zone where neither branch is dominant.
     private const double TafelLowerOffsetV       = 0.01;   // 0.01 V below/above Ecorr
@@ -31,14 +36,8 @@ public sealed class BvCurveFitter : IBvCurveFitter
     // Default cathodic exchange current density (A/cm²).
     private const double DefaultI0cFraction      = 0.5;    // fraction of max cathodic |I|
 
-    // Default HER Tafel slope (V/decade).
-    private const double DefaultBHerV            = 0.120;
-
     // Default HER exchange current density (A/cm²).
     private const double DefaultI0HerAcm2        = 1e-9;
-
-    // Default HER onset offset below Ecorr (V).
-    private const double DefaultEHerOffsetV      = 0.30;
 
     // ── Fitted-parameter box bounds ───────────────────────────────────────────────────────────
     // Minimum physically meaningful exchange current density (A/cm²).
@@ -50,8 +49,12 @@ public sealed class BvCurveFitter : IBvCurveFitter
     // Minimum Tafel slope (V/decade) – sharp activation.
     private const double BetaMinV                = 0.01;
 
-    // Maximum Tafel slope (V/decade) – very sluggish kinetics.
+    // Maximum Tafel slope (V/decade) — very sluggish kinetics.
     private const double BetaMaxV                = 0.50;
+
+    // HER symmetry factor bounds (dimensionless, 0 < β < 1).
+    private const double BetaHerMin              = 0.1;
+    private const double BetaHerMax              = 0.9;
 
     // Maximum ORR limiting current density (A/cm²) – generous upper bound.
     private const double IlimOrrMaxAcm2          = 1.0;
@@ -74,12 +77,6 @@ public sealed class BvCurveFitter : IBvCurveFitter
     private const double WorrMaxV                = 0.20;
     private const double WorrDefault             = 0.04;   // typical sigmoidal width for ORR
 
-    // EherOnset absolute lower bound (V).
-    private const double EherOnsetLowerV         = -2.0;
-
-    // EherOnset upper bound offset below Ecorr (V).
-    private const double EherOnsetUpperOffsetV   = 0.01;
-
     // Offset used when selecting EorrTransition candidates (V below Ecorr).
     private const double EorrSelectionOffsetV    = 0.05;
 
@@ -90,11 +87,12 @@ public sealed class BvCurveFitter : IBvCurveFitter
     // The ORR plateau is most clearly visible in the deepest cathodic region.
     private const double IlimOrrDepthFraction    = 0.20;
 
-    // Offset below Ecorr used to define the HER-dominant region.
-    private const double HerRegionOffsetV        = 0.25;
-
     // Floor applied before log10 to prevent log(0) errors.
     private const double LogFloorAcm2            = 1e-20;
+
+    // Exponential argument clip limits — prevents overflow in exp() while retaining all physically meaningful values.
+    private const double ExpClipMin              = -50.0;
+    private const double ExpClipMax              =  50.0;
 
     // Minimum number of Tafel-region points required before running OLS regression.
     private const int MinTafelPoints             = 2;
@@ -103,7 +101,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
     private const int MinHerPoints               = 5;
 
     // ── Parameter vector index constants ─────────────────────────────────────────────────────
-    // Maps the 11-element parameter array p[] to named model parameters.
+    // Maps the 10-element parameter array p[] to named model parameters.
     private const int IdxI0Anodic      = 0;
     private const int IdxBetaAnodic    = 1;
     private const int IdxI0Cathodic    = 2;
@@ -114,8 +112,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
     private const int IdxWorrV         = 7;
     private const int IdxI0Her         = 8;
     private const int IdxBetaHer       = 9;
-    private const int IdxEherOnset     = 10;
-    private const int NumParams        = 11;
+    private const int NumParams        = 10;
 
     /// <summary>
     /// Fit the BV model to <paramref name="currentDensityAcm2"/> vs
@@ -159,7 +156,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
         double ilim0 = EstimateIlimOrr(e, i, ecorr0);
 
         // ── Step 5: HER onset and slope ───────────────────────────────────────────────────
-        FitHer(e, i, ecorr0, ilim0, out double i0Her, out double bHer, out double eHer);
+        FitHer(e, i, ilim0, out double i0Her, out double betaHer);
 
         // ── Build initial parameter vector and bounds ─────────────────────────────────────
         double[] eorrCandidates = e.Where(v => v < ecorr0 - EorrSelectionOffsetV).ToArray();
@@ -177,8 +174,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
         p0[IdxEorrTransition] = eorr0;
         p0[IdxWorrV]          = WorrDefault;
         p0[IdxI0Her]          = i0Her;
-        p0[IdxBetaHer]        = bHer;
-        p0[IdxEherOnset]      = eHer;
+        p0[IdxBetaHer]        = betaHer;
 
         double[] lb = new double[NumParams];
         lb[IdxI0Anodic]       = I0MinAcm2;
@@ -190,8 +186,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
         lb[IdxEorrTransition] = EorrTransitionLowerV;
         lb[IdxWorrV]          = WorrMinV;
         lb[IdxI0Her]          = I0MinAcm2;
-        lb[IdxBetaHer]        = BetaMinV;
-        lb[IdxEherOnset]      = EherOnsetLowerV;
+        lb[IdxBetaHer]        = BetaHerMin;
 
         double[] ub = new double[NumParams];
         ub[IdxI0Anodic]       = I0MaxAcm2;
@@ -203,8 +198,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
         ub[IdxEorrTransition] = EorrTransitionUpperV;
         ub[IdxWorrV]          = WorrMaxV;
         ub[IdxI0Her]          = I0MaxAcm2;
-        ub[IdxBetaHer]        = BetaMaxV;
-        ub[IdxEherOnset]      = ecorrHintV - EherOnsetUpperOffsetV;
+        ub[IdxBetaHer]        = BetaHerMax;
 
         // Clamp initial guess to bounds.
         for (int j = 0; j < NumParams; j++)
@@ -367,47 +361,87 @@ public sealed class BvCurveFitter : IBvCurveFitter
     }
 
     /// <summary>
-    /// Estimate HER onset potential and Tafel slope by fitting log10(|I|) vs E in
-    /// the cathodic region below (Ecorr − <see cref="HerRegionOffsetV"/>).
+    /// Estimate HER exchange current density and symmetry factor by fitting the full
+    /// Butler-Volmer cathodic half-reaction in the HER-dominant potential window
+    /// [E_eq − 400 mV, E_eq − 20 mV].
     /// Falls back to default values when fewer than <see cref="MinHerPoints"/> are available.
     /// </summary>
     private static void FitHer(
-        double[] e, double[] i, double ecorr, double ilimOrr,
-        out double i0Her, out double bHer, out double eHer)
+        double[] e, double[] i, double ilimOrr,
+        out double i0Her, out double betaHer)
     {
-        i0Her = DefaultI0HerAcm2;
-        bHer  = DefaultBHerV;
-        eHer  = ecorr - DefaultEHerOffsetV;
+        i0Her   = DefaultI0HerAcm2;
+        betaHer = 0.5;   // symmetric transfer as default
 
-        double eMax = ecorr - HerRegionOffsetV;
-        double[] eWin = e.Where((_, k) => e[k] < eMax).ToArray();
-        double[] iWin = i.Where((_, k) => e[k] < eMax).ToArray();
+        double eEq    = HerReaction.EquilibriumPotentialVshe;
+        double eWinHi = eEq - 0.02;   // 20 mV below E_eq: avoid near-equilibrium linear region
+        double eWinLo = eEq - 0.40;   // 400 mV below E_eq: HER dominates here
 
-        if (eWin.Length < MinHerPoints)
-            return;
-
-        // Subtract the ORR limiting current contribution before fitting the HER slope.
-        double[] iResidual = iWin
-            .Select(v => Math.Max(Math.Abs(v) - ilimOrr, LogFloorAcm2))
-            .ToArray();
-        double[] logI = iResidual.Select(v => Math.Log10(v)).ToArray();
-
-        if (!OlsFit(eWin, logI, out double slope, out double intercept))
-            return;
-
-        if (!double.IsFinite(slope) || Math.Abs(slope) < 1e-30)
-            return;
-
-        double bHerFit  = 1.0 / (Math.Abs(slope) * Math.Log(10.0));
-        double eHerFit  = Median(eWin);
-        double i0HerFit = Math.Pow(10.0, slope * eHerFit + intercept);
-
-        if (double.IsFinite(bHerFit) && double.IsFinite(i0HerFit) && double.IsFinite(eHerFit))
+        var eWin = new System.Collections.Generic.List<double>();
+        var iWin = new System.Collections.Generic.List<double>();
+        for (int k = 0; k < e.Length; k++)
         {
-            bHer  = Math.Clamp(bHerFit,  BetaMinV,   BetaMaxV);
-            i0Her = Math.Clamp(i0HerFit, I0MinAcm2, I0MaxAcm2);
-            eHer  = eHerFit;
+            if (e[k] >= eWinLo && e[k] <= eWinHi)
+            {
+                double iResidual = Math.Abs(i[k]) - ilimOrr;
+                if (iResidual > LogFloorAcm2)
+                {
+                    eWin.Add(e[k]);
+                    iWin.Add(-iResidual);   // sign: cathodic = negative
+                }
+            }
         }
+
+        if (eWin.Count < MinHerPoints)
+            return;   // fall back to defaults
+
+        double[] eArr = eWin.ToArray();
+        double[] iArr = iWin.ToArray();
+
+        // Seed β from the Tafel-slope OLS approach:
+        // log|i| = log(i0) − (1−β)·z·F·η / (R·T·ln10)
+        double[] eta         = eArr.Select(v => v - eEq).ToArray();
+        double[] logI        = iArr.Select(v => Math.Log10(Math.Max(Math.Abs(v), LogFloorAcm2))).ToArray();
+        double zFoverRTln10  = HerReaction.Z * ElectrochemicalReaction.F
+                               / (ElectrochemicalReaction.R * HerReaction.TemperatureKelvin * Math.Log(10.0));
+
+        if (OlsFit(eta, logI, out double slope, out double intercept))
+        {
+            // slope = −(1−β) · zF / (R·T·ln10)  →  β = 1 + slope / zFoverRTln10
+            double betaSeed = 1.0 + slope / zFoverRTln10;
+            double i0Seed   = Math.Pow(10.0, intercept);
+
+            betaHer = Math.Clamp(betaSeed, BetaHerMin, BetaHerMax);
+            i0Her   = Math.Clamp(i0Seed,  I0MinAcm2,  I0MaxAcm2);
+        }
+
+        // Polish with a bounded two-parameter Levenberg-Marquardt solve.
+        double zFoverRT = HerReaction.Z * ElectrochemicalReaction.F
+                          / (ElectrochemicalReaction.R * HerReaction.TemperatureKelvin);
+
+        double[] p0Her = { i0Her, betaHer };
+        double[] lbHer = { I0MinAcm2, BetaHerMin };
+        double[] ubHer = { I0MaxAcm2, BetaHerMax };
+
+        double[] weightHer = iArr.Select(v => 1.0 / Math.Max(Math.Abs(v), 1e-12)).ToArray();
+
+        double[] pHerFitted = LevenbergMarquardtSolver.Solve(
+            p =>
+            {
+                var residuals = new double[eArr.Length];
+                for (int k = 0; k < eArr.Length; k++)
+                {
+                    double etaK   = eArr[k] - eEq;
+                    double iModel = -p[0] * Math.Exp(
+                        Math.Clamp(-(1.0 - p[1]) * zFoverRT * etaK, ExpClipMin, ExpClipMax));
+                    residuals[k] = (iModel - iArr[k]) * weightHer[k];
+                }
+                return residuals;
+            },
+            p0Her, lbHer, ubHer);
+
+        i0Her   = Math.Clamp(pHerFitted[0], I0MinAcm2, I0MaxAcm2);
+        betaHer = Math.Clamp(pHerFitted[1], BetaHerMin, BetaHerMax);
     }
 
     // ── Mathematical utilities ────────────────────────────────────────────────────────────────
@@ -429,22 +463,23 @@ public sealed class BvCurveFitter : IBvCurveFitter
     }
 
     /// <summary>
-    /// Convert a raw 11-element parameter vector to a <see cref="BvModelParameters"/> object.
+    /// Convert a raw 10-element parameter vector to a <see cref="BvModelParameters"/> object.
     /// </summary>
     private static BvModelParameters ParametersToModel(double[] p) =>
-        new BvModelParameters
+        new BvModelParameters(HerReaction)
         {
-            I0Anodic      = p[IdxI0Anodic],
-            BetaAnodic    = p[IdxBetaAnodic],
-            I0Cathodic    = p[IdxI0Cathodic],
-            BetaCathodic  = p[IdxBetaCathodic],
-            Ecorr         = p[IdxEcorr],
-            IlimOrr       = p[IdxIlimOrr],
+            I0Anodic       = p[IdxI0Anodic],
+            BetaAnodic     = p[IdxBetaAnodic],
+            I0Cathodic     = p[IdxI0Cathodic],
+            BetaCathodic   = p[IdxBetaCathodic],
+            Ecorr          = p[IdxEcorr],
+            IlimOrr        = p[IdxIlimOrr],
             EorrTransition = p[IdxEorrTransition],
-            WorrV         = p[IdxWorrV],
-            I0Her         = p[IdxI0Her],
-            BetaHer       = p[IdxBetaHer],
-            EherOnset     = p[IdxEherOnset],
+            WorrV          = p[IdxWorrV],
+            I0Her          = p[IdxI0Her],
+            BetaHer        = p[IdxBetaHer],
+            // EherEquilibriumV is fixed by the Nernst equation — not a fit parameter.
+            EherEquilibriumV = HerReaction.EquilibriumPotentialVshe,
         };
 
     /// <summary>

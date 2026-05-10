@@ -28,8 +28,8 @@ public sealed class PolarizationAnalysisResult
     /// <summary>ORR limiting current density ilim (A/cm²).</summary>
     public double IlimOrrAcm2 { get; init; }
 
-    /// <summary>HER onset potential (V).</summary>
-    public double HerOnsetV { get; init; }
+    /// <summary>HER equilibrium potential (V) fixed by the Nernst equation.</summary>
+    public double HerEquilibriumV { get; init; }
 
     /// <summary>Anodic exchange current density from Tafel back-extrapolation (A/cm²).</summary>
     public double IOxAcm2 { get; init; }
@@ -40,8 +40,8 @@ public sealed class PolarizationAnalysisResult
     /// <summary>Fitted cathodic exchange current density (A/cm²).</summary>
     public double I0CathodicAcm2 { get; init; }
 
-    /// <summary>Fitted HER Tafel slope (V/decade).</summary>
-    public double BetaHerV { get; init; }
+    /// <summary>Fitted HER symmetry factor β (dimensionless).</summary>
+    public double BetaHer { get; init; }
 
     /// <summary>Fitted HER exchange current density (A/cm²).</summary>
     public double I0HerAcm2 { get; init; }

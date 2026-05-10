@@ -961,7 +961,7 @@ namespace CSaVe_Electrochemical_Data
             public double Icorr_uAcm2 { get; set; }
             public double I_ox_uAcm2 { get; set; }
             public double Ilim_uAcm2 { get; set; }
-            public double HER_Onset_mV { get; set; }
+            public double HER_Eeq_mV { get; set; }
             public double I_at_neg850mV_uAcm2 { get; set; }
             public double I_at_neg1050mV_uAcm2 { get; set; }
         }
@@ -1320,7 +1320,7 @@ namespace CSaVe_Electrochemical_Data
                     Icorr_uAcm2          = result.IcorrAcm2 * 1.0e6,
                     I_ox_uAcm2           = double.IsNaN(result.IOxAcm2) ? double.NaN : result.IOxAcm2 * 1.0e6,
                     Ilim_uAcm2           = result.IlimOrrAcm2 * 1.0e6,
-                    HER_Onset_mV         = result.HerOnsetV * 1000.0,
+                    HER_Eeq_mV           = result.HerEquilibriumV * 1000.0,
                     I_at_neg850mV_uAcm2  = iAt850  * 1.0e6,
                     I_at_neg1050mV_uAcm2 = iAt1050 * 1.0e6
                 }
@@ -1333,7 +1333,7 @@ namespace CSaVe_Electrochemical_Data
                 $"i_corr (uA/cm²): {FormatMeanStd(rows.Select(r => r.Icorr_uAcm2))}",
                 $"i_ox (uA/cm²): {FormatMeanStd(rows.Select(r => r.I_ox_uAcm2))}",
                 $"i_lim ORR (uA/cm²): {FormatMeanStd(rows.Select(r => r.Ilim_uAcm2))}",
-                $"HER onset (mV): {FormatMeanStd(rows.Select(r => r.HER_Onset_mV))}",
+                $"HER E_eq (mV): {FormatMeanStd(rows.Select(r => r.HER_Eeq_mV))}",
                 $"i@-850 mV (uA/cm²): {FormatMeanStd(rows.Select(r => r.I_at_neg850mV_uAcm2))}",
                 $"i@-1050 mV (uA/cm²): {FormatMeanStd(rows.Select(r => r.I_at_neg1050mV_uAcm2))}"
             });
@@ -1341,26 +1341,65 @@ namespace CSaVe_Electrochemical_Data
 
             polarizationPlotModel.Series.Clear();
 
+            // ── Determine the potential array to use for model curves ────────────────────────────────────
             IReadOnlyList<double> modelPotentials =
                 result.PlotIrCorrectedPotentialsV.Count > 0 ? result.PlotIrCorrectedPotentialsV :
-                result.PlotFitPotentialsV.Count > 0 ? result.PlotFitPotentialsV :
+                result.PlotFitPotentialsV.Count         > 0 ? result.PlotFitPotentialsV :
                 result.PlotPotentialsV;
 
-            var dataSeries = new LineSeries { Title = "Data", Color = OxyColors.Black, StrokeThickness = 1.5 };
-            int count = Math.Min(result.PlotPotentialsV.Count, result.PlotCurrentDensityAcm2.Count);
-            for (int j = 0; j < count; j++)
+            // ── Split raw data into anodic (i > 0) and cathodic (i < 0) branches for separate styling ────
+            var anodicSeries = new LineSeries
+            {
+                Title           = "Anodic branch",
+                Color           = OxyColors.Gray,
+                LineStyle       = LineStyle.Dash,
+                StrokeThickness = 0.8
+            };
+
+            var cathodicSeries = new LineSeries
+            {
+                Title           = "Cathodic branch",
+                Color           = OxyColors.Gray,
+                LineStyle       = LineStyle.Dot,
+                StrokeThickness = 0.8
+            };
+
+            int dataCount = Math.Min(result.PlotPotentialsV.Count, result.PlotCurrentDensityAcm2.Count);
+            for (int j = 0; j < dataCount; j++)
             {
                 double x = Math.Max(Math.Abs(result.PlotCurrentDensityAcm2[j]), 1.0e-12);
-                dataSeries.Points.Add(new DataPoint(x, result.PlotPotentialsV[j]));
-            }
-            polarizationPlotModel.Series.Add(dataSeries);
+                double y = result.PlotPotentialsV[j];
 
+                if (result.PlotCurrentDensityAcm2[j] >= 0)
+                    anodicSeries.Points.Add(new DataPoint(x, y));
+                else
+                    cathodicSeries.Points.Add(new DataPoint(x, y));
+            }
+            polarizationPlotModel.Series.Add(anodicSeries);
+            polarizationPlotModel.Series.Add(cathodicSeries);
+
+            // ── Merged / combined data trace: gray solid line (all |i| vs E) ─────────────────────────────
+            var mergedSeries = new LineSeries
+            {
+                Title           = "Merged data",
+                Color           = OxyColors.Gray,
+                LineStyle       = LineStyle.Solid,
+                StrokeThickness = 1.5
+            };
+            for (int j = 0; j < dataCount; j++)
+            {
+                double x = Math.Max(Math.Abs(result.PlotCurrentDensityAcm2[j]), 1.0e-12);
+                mergedSeries.Points.Add(new DataPoint(x, result.PlotPotentialsV[j]));
+            }
+            polarizationPlotModel.Series.Add(mergedSeries);
+
+            // ── Modeled / fitted curve: thick black dashed line ───────────────────────────────────────────
             var fitSeries = new LineSeries
             {
-                Title = "BV Fit (total)",
-                Color = OxyColors.DarkGray,
-                LineStyle = LineStyle.Dash,
-                StrokeThickness = 1.5
+                Title           = "BV model",
+                Color           = OxyColors.Black,
+                LineStyle       = LineStyle.Dash,
+                StrokeThickness = 2.5
             };
             int fitCount = Math.Min(modelPotentials.Count, result.PlotModelCurrentDensityAcm2.Count);
             for (int j = 0; j < fitCount; j++)
@@ -1370,6 +1409,7 @@ namespace CSaVe_Electrochemical_Data
             }
             polarizationPlotModel.Series.Add(fitSeries);
 
+            // ── Component curves (i_ox, i_ORR, i_HER) — keep existing styling, omit if empty ─────────────
             if (result.PlotIoxAcm2.Count > 0)
             {
                 var ioxSeries = new LineSeries { Title = "i_ox (anodic)", Color = OxyColors.DodgerBlue, LineStyle = LineStyle.Solid, StrokeThickness = 1.2 };
