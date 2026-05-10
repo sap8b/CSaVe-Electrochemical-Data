@@ -99,10 +99,10 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
             anodicFilePoints   = rawAnodic.OrderBy(p => p.PotentialV).ToList();
             cathodicFilePoints = rawCathodic.OrderBy(p => p.PotentialV).ToList();
 
-            // Display curve: all raw points sorted by potential (shows hysteresis loop).
-            List<PolarizationPoint> allDisplay = [.. rawAnodic, .. rawCathodic];
-            allDisplay.Sort((a, b) => a.PotentialV.CompareTo(b.PotentialV));
-            displayPoints = allDisplay;
+            // Display curve: use the OCP-aligned and trimmed joined curve so the
+            // "Combined data" plot reflects the same potential-offset correction and
+            // wrong-side segment removal that is applied during BV fitting.
+            displayPoints = fitPoints;
         }
         else
         {
