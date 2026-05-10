@@ -550,8 +550,8 @@
                     <Label Content="i0_HER" HorizontalAlignment="Left" Height="34" Margin="10,56,0,0" VerticalAlignment="Top" Width="56"/>
                     <TextBox HorizontalAlignment="Left" Height="34" Margin="84,56,0,0" TextWrapping="Wrap" Text="1.0e-14" VerticalAlignment="Top" Width="126"/>
                     <Label Content="beta_HER" HorizontalAlignment="Left" Height="34" Margin="314,56,0,0" VerticalAlignment="Top" Width="99"/>
-                    <TextBox Grid.ColumnSpan="2" HorizontalAlignment="Left" Height="34" Margin="428,56,0,0" TextWrapping="Wrap" Text="0.95" VerticalAlignment="Top" Width="94"/>
-                    <RadioButton Grid.Column="1" Content="Fix" HorizontalAlignment="Left" Height="32" Margin="227,56,0,0" VerticalAlignment="Top" Width="70"/>
+                    <TextBox HorizontalAlignment="Left" Height="34" Margin="319,90,0,0" TextWrapping="Wrap" Text="0.95" VerticalAlignment="Top" Width="94"/>
+                    <RadioButton Content="Fix" HorizontalAlignment="Left" Height="32" Margin="76,121,0,0" VerticalAlignment="Top" Width="70"/>
                 </Grid>
 
                 <TextBox x:Name="PolarizationSummaryBox"
