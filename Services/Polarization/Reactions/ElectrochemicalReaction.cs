@@ -44,8 +44,9 @@ namespace CSaVe_Electrochemical_Data.Services.Polarization.Reactions
         /// <summary>
         /// Equilibrium potential vs. SHE (V) evaluated from the Nernst equation:
         /// E_eq = E0 − (R·T / z·F) · ln(10) · pH.
+        /// Subclasses may override to add additional concentration correction terms.
         /// </summary>
-        public double EquilibriumPotentialVshe =>
+        public virtual double EquilibriumPotentialVshe =>
             E0Vshe - (ElectrochemicalConstants.R * TemperatureKelvin / (Z * ElectrochemicalConstants.F)) * Math.Log(10.0) * pH;
 
         /// <summary>Thermal voltage V_T = R·T / (z·F) (V).</summary>
