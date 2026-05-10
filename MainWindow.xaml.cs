@@ -1020,7 +1020,7 @@ namespace CSaVe_Electrochemical_Data
             if (string.IsNullOrWhiteSpace(header))
                 return XmlEligibleCsvType.UNSUPPORTED;
 
-            string[] cols = header.Split(',').Select(c => c.Trim().ToLowerInvariant()).ToArray();
+            string[] cols = [.. header.Split(',').Select(c => c.Trim().ToLowerInvariant())];
             bool hasVf = cols.Contains("vf");
             bool hasIm = cols.Contains("im");
             bool looksLikeEis = cols.Contains("freq") || cols.Contains("zreal") || cols.Contains("zimag");
@@ -1480,7 +1480,7 @@ namespace CSaVe_Electrochemical_Data
 
             var response = pythonAnalysisService.RunEis(new EisAnalysisRequest
             {
-                Files = eisAnalysisFiles.ToList(),
+                Files = [.. eisAnalysisFiles],
                 Model = model
             });
 

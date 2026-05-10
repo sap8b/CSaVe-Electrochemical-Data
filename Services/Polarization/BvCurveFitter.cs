@@ -41,7 +41,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
 
     // ── Fitted-parameter box bounds ───────────────────────────────────────────────────────────
     // Minimum physically meaningful exchange current density (A/cm²).
-    private const double I0MinAcm2               = 1e-12;
+    private const double I0MinAcm2 = 1.0e-30; //1e-12;
 
     // Maximum exchange current density (A/cm²) before the solution is non-physical.
     private const double I0MaxAcm2               = 1e-1;
@@ -53,8 +53,8 @@ public sealed class BvCurveFitter : IBvCurveFitter
     private const double BetaMaxV                = 0.50;
 
     // HER symmetry factor bounds (dimensionless, 0 < β < 1).
-    private const double BetaHerMin              = 0.1;
-    private const double BetaHerMax              = 0.9;
+    private const double BetaHerMin              = 0.01;
+    private const double BetaHerMax              = 0.99;
 
     // Maximum ORR limiting current density (A/cm²) – generous upper bound.
     private const double IlimOrrMaxAcm2          = 1.0;
@@ -139,8 +139,8 @@ public sealed class BvCurveFitter : IBvCurveFitter
             throw new ArgumentException("Input arrays must not be empty.");
 
         // Copy to arrays for fast indexed access.
-        double[] e = potentialV.ToArray();
-        double[] i = currentDensityAcm2.ToArray();
+        double[] e = [.. potentialV];
+        double[] i = [.. currentDensityAcm2];
 
         // ── Step 1: Ecorr from zero-crossing interpolation ────────────────────────────────
         double ecorr0 = EstimateEcorr(e, i, ecorrHintV);
@@ -159,7 +159,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
         FitHer(e, i, ilim0, out double i0Her, out double betaHer);
 
         // ── Build initial parameter vector and bounds ─────────────────────────────────────
-        double[] eorrCandidates = e.Where(v => v < ecorr0 - EorrSelectionOffsetV).ToArray();
+        double[] eorrCandidates = [.. e.Where(v => v < ecorr0 - EorrSelectionOffsetV)];
         double eorr0 = eorrCandidates.Length >= 3
             ? Median(eorrCandidates)
             : ecorr0 - EorrFallbackOffsetV;
@@ -207,9 +207,9 @@ public sealed class BvCurveFitter : IBvCurveFitter
         // ── Step 6: Levenberg-Marquardt polish ────────────────────────────────────────────
         // Weight each residual by 1 / max(|I|, percentile_20(|I|)) to balance the fit
         // across the large dynamic range of electrochemical currents.
-        double[] absI   = i.Select(v => Math.Abs(v)).ToArray();
+        double[] absI   = [.. i.Select(v => Math.Abs(v))];
         double   p20    = Percentile(absI, 20);
-        double[] weight = absI.Select(v => 1.0 / Math.Max(v, p20)).ToArray();
+        double[] weight = [.. absI.Select(v => 1.0 / Math.Max(v, p20))];
 
         double[] pFitted = LevenbergMarquardtSolver.Solve(
             p => ComputeWeightedResiduals(e, i, weight, p),
@@ -265,13 +265,13 @@ public sealed class BvCurveFitter : IBvCurveFitter
 
         double eMin = ecorr + TafelLowerOffsetV;
         double eMax = ecorr + TafelUpperOffsetV;
-        double[] eWin = e.Where((_, k) => e[k] >= eMin && e[k] <= eMax).ToArray();
-        double[] iWin = i.Where((_, k) => e[k] >= eMin && e[k] <= eMax).ToArray();
+        double[] eWin = [.. e.Where((_, k) => e[k] >= eMin && e[k] <= eMax)];
+        double[] iWin = [.. i.Where((_, k) => e[k] >= eMin && e[k] <= eMax)];
 
         if (eWin.Length < MinTafelPoints)
             return;
 
-        double[] logI = iWin.Select(v => Math.Log10(Math.Max(Math.Abs(v), LogFloorAcm2))).ToArray();
+        double[] logI = [.. iWin.Select(v => Math.Log10(Math.Max(Math.Abs(v), LogFloorAcm2)))];
 
         if (!OlsFit(eWin, logI, out double slope, out double intercept))
             return;
@@ -305,13 +305,13 @@ public sealed class BvCurveFitter : IBvCurveFitter
 
         double eMin = ecorr - TafelUpperOffsetV;
         double eMax = ecorr - TafelLowerOffsetV;
-        double[] eWin = e.Where((_, k) => e[k] >= eMin && e[k] <= eMax).ToArray();
-        double[] iWin = i.Where((_, k) => e[k] >= eMin && e[k] <= eMax).ToArray();
+        double[] eWin = [.. e.Where((_, k) => e[k] >= eMin && e[k] <= eMax)];
+        double[] iWin = [.. i.Where((_, k) => e[k] >= eMin && e[k] <= eMax)];
 
         if (eWin.Length < MinTafelPoints)
             return;
 
-        double[] logI = iWin.Select(v => Math.Log10(Math.Max(Math.Abs(v), LogFloorAcm2))).ToArray();
+        double[] logI = [.. iWin.Select(v => Math.Log10(Math.Max(Math.Abs(v), LogFloorAcm2)))];
 
         if (!OlsFit(eWin, logI, out double slope, out double intercept))
             return;
@@ -343,15 +343,14 @@ public sealed class BvCurveFitter : IBvCurveFitter
         double eRange = e.Max() - eMin;
         double cutoff = eMin + eRange * IlimOrrDepthFraction; // deepest 20 %
 
-        double[] deepI = i
+        double[] deepI = [.. i
             .Where((_, k) => e[k] <= cutoff && e[k] < ecorr)
-            .Select(v => Math.Abs(v))
-            .ToArray();
+            .Select(v => Math.Abs(v))];
 
         if (deepI.Length == 0)
         {
             // Fall back to 75th percentile of all cathodic |I|.
-            double[] cathodicI = i.Where((_, k) => e[k] < ecorr).Select(v => Math.Abs(v)).ToArray();
+            double[] cathodicI = [.. i.Where((_, k) => e[k] < ecorr).Select(v => Math.Abs(v))];
             return cathodicI.Length > 0
                 ? Math.Clamp(Percentile(cathodicI, 75), IlimOrrMinAcm2, IlimOrrMaxAcm2)
                 : 1e-6;
@@ -377,8 +376,8 @@ public sealed class BvCurveFitter : IBvCurveFitter
         double eWinHi = eEq - 0.02;   // 20 mV below E_eq: avoid near-equilibrium linear region
         double eWinLo = eEq - 0.40;   // 400 mV below E_eq: HER dominates here
 
-        var eWin = new System.Collections.Generic.List<double>();
-        var iWin = new System.Collections.Generic.List<double>();
+        List<double> eWin = [];
+        List<double> iWin = [];
         for (int k = 0; k < e.Length; k++)
         {
             if (e[k] >= eWinLo && e[k] <= eWinHi)
@@ -395,13 +394,13 @@ public sealed class BvCurveFitter : IBvCurveFitter
         if (eWin.Count < MinHerPoints)
             return;   // fall back to defaults
 
-        double[] eArr = eWin.ToArray();
-        double[] iArr = iWin.ToArray();
+        double[] eArr = [.. eWin];
+        double[] iArr = [.. iWin];
 
         // Seed β from the Tafel-slope OLS approach:
         // log|i| = log(i0) − (1−β)·z·F·η / (R·T·ln10)
-        double[] eta         = eArr.Select(v => v - eEq).ToArray();
-        double[] logI        = iArr.Select(v => Math.Log10(Math.Max(Math.Abs(v), LogFloorAcm2))).ToArray();
+        double[] eta         = [.. eArr.Select(v => v - eEq)];
+        double[] logI        = [.. iArr.Select(v => Math.Log10(Math.Max(Math.Abs(v), LogFloorAcm2)))];
         double zFoverRTln10  = HerReaction.Z * ElectrochemicalReaction.F
                                / (ElectrochemicalReaction.R * HerReaction.TemperatureKelvin * Math.Log(10.0));
 
@@ -423,7 +422,7 @@ public sealed class BvCurveFitter : IBvCurveFitter
         double[] lbHer = { I0MinAcm2, BetaHerMin };
         double[] ubHer = { I0MaxAcm2, BetaHerMax };
 
-        double[] weightHer = iArr.Select(v => 1.0 / Math.Max(Math.Abs(v), 1e-12)).ToArray();
+        double[] weightHer = [.. iArr.Select(v => 1.0 / Math.Max(Math.Abs(v), 1e-12))];
 
         double[] pHerFitted = LevenbergMarquardtSolver.Solve(
             p =>

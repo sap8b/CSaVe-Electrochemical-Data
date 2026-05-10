@@ -129,7 +129,7 @@ namespace CSaVe_Electrochemical_Data
                     throw new InvalidOperationException("CSV contains no data points.");
 
                 // 2. Sort ascending by voltage to ensure a monotonic potential axis.
-                allPoints = allPoints.OrderBy(p => p.V).ToList();
+                allPoints = [.. allPoints.OrderBy(p => p.V)];
 
                 // 3. Find OCP: the point of minimum |I| in the sorted list.
                 int ocpIndex = 0;
@@ -148,8 +148,8 @@ namespace CSaVe_Electrochemical_Data
                 // 4. Split at OCP.
                 //    Anodic branch: oxidation region, keep V >= V_ocp.
                 //    Cathodic branch: reduction region, keep V < V_ocp.
-                anodicTrimmed   = allPoints.Where(p => p.V >= vOcp).ToList();
-                cathodicTrimmed = allPoints.Where(p => p.V <  vOcp).ToList();
+                anodicTrimmed   = [.. allPoints.Where(p => p.V >= vOcp)];
+                cathodicTrimmed = [.. allPoints.Where(p => p.V <  vOcp)];
             }
             else
             {
@@ -242,18 +242,14 @@ namespace CSaVe_Electrochemical_Data
 
                 // 7. Apply the potential shift to every point in each branch.
                 //    Anodic branch shifts down by halfDiff; cathodic branch shifts up by halfDiff.
-                anodicPoints   = anodicPoints
-                    .Select(p => (p.I, p.V - halfDiff))
-                    .ToList();
-                cathodicPoints = cathodicPoints
-                    .Select(p => (p.I, p.V + halfDiff))
-                    .ToList();
+                anodicPoints   = [.. anodicPoints.Select(p => (p.I, p.V - halfDiff))];
+                cathodicPoints = [.. cathodicPoints.Select(p => (p.I, p.V + halfDiff))];
 
                 // 8. Trim both branches at the aligned OCP boundary.
                 //    Anodic branch: oxidation data, keep V >= vOcpMid.
                 //    Cathodic branch: reduction data, keep V < vOcpMid.
-                anodicTrimmed   = anodicPoints.Where(p => p.V >= vOcpMid).ToList();
-                cathodicTrimmed = cathodicPoints.Where(p => p.V < vOcpMid).ToList();
+                anodicTrimmed   = [.. anodicPoints.Where(p => p.V >= vOcpMid)];
+                cathodicTrimmed = [.. cathodicPoints.Where(p => p.V < vOcpMid)];
             }
 
             // 7. Combine and sort ascending by voltage

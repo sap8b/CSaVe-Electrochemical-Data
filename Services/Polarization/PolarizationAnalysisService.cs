@@ -92,9 +92,7 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
             fitPoints = _curveJoiner.Join(fwdAnodic, fwdCathodic);
 
             // Display curve: all raw points sorted by potential (shows hysteresis loop).
-            var allDisplay = new List<PolarizationPoint>(rawAnodic.Count + rawCathodic.Count);
-            allDisplay.AddRange(rawAnodic);
-            allDisplay.AddRange(rawCathodic);
+            List<PolarizationPoint> allDisplay = [.. rawAnodic, .. rawCathodic];
             allDisplay.Sort((a, b) => a.PotentialV.CompareTo(b.PotentialV));
             displayPoints = allDisplay;
         }
@@ -114,39 +112,37 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
             fitPoints = ApplyIrCorrection(fitPoints, input.RSolutionOhm);
 
         // ── Step 2: estimate Ecorr as the initial hint ────────────────────────────────────
-        double[] ePot    = fitPoints.Select(p => p.PotentialV).ToArray();
-        double[] iCurr   = fitPoints.Select(p => p.CurrentA).ToArray();
+        double[] ePot    = [.. fitPoints.Select(p => p.PotentialV)];
+        double[] iCurr   = [.. fitPoints.Select(selector: p => p.CurrentA)];
         double   ecorrHint = EstimateEcorr(ePot, iCurr);
 
         // ── Step 3: convert raw current to current density ────────────────────────────────
         double   area        = input.ExposedAreaCm2;
-        double[] iDensity    = fitPoints.Select(p => p.CurrentA / area).ToArray();
+        double[] iDensity    = [.. fitPoints.Select(selector: p => p.CurrentA / area)];
 
-        double[] ePotDisplay = displayPoints.Select(p => p.PotentialV).ToArray();
-        double[] iDensDisp   = displayPoints.Select(p => p.CurrentA / area).ToArray();
+        double[] ePotDisplay = [.. displayPoints.Select(selector: p => p.PotentialV)];
+        double[] iDensDisp   = [.. displayPoints.Select(selector: p => p.CurrentA / area)];
 
         // ── Step 4: BV fitting ────────────────────────────────────────────────────────────
         BvModelParameters fitted = _curveFitter.Fit(
             ePot.ToList(), iDensity.ToList(), ecorrHint, input.TemperatureCelsius);
 
         // ── Step 5: compute display-resolution model curves ───────────────────────────────
-        double[] ePotFit = fitPoints.Select(p => p.PotentialV).ToArray();
+        double[] ePotFit = [.. fitPoints.Select(p => p.PotentialV)];
         double[] ePotModel = ePotFit;
         double[] ePotIrCorrected = Array.Empty<double>();
 
         if (input.RSolutionOhm > 0.0)
         {
             double areaR = area * input.RSolutionOhm;
-            ePotIrCorrected = ePotDisplay
-                .Select(e => SolveIrCorrectedPotential(e, fitted, areaR))
-                .ToArray();
+            ePotIrCorrected = [.. ePotDisplay.Select(e => SolveIrCorrectedPotential(e, fitted, areaR))];
             ePotModel = ePotIrCorrected;
         }
 
-        double[] modelCurve = ePotModel.Select(e => fitted.ComputeCurrentDensity(e)).ToArray();
-        double[] iOxCurve   = ePotModel.Select(e => fitted.ComputeAnodicComponent(e)).ToArray();
-        double[] iOrrCurve  = ePotModel.Select(e => fitted.ComputeOrrComponent(e)).ToArray();
-        double[] iHerCurve  = ePotModel.Select(e => fitted.ComputeHerComponent(e)).ToArray();
+        double[] modelCurve = [.. ePotModel.Select(selector: e => fitted.ComputeCurrentDensity(e))];
+        double[] iOxCurve   = [.. ePotModel.Select(selector: e => fitted.ComputeAnodicComponent(e))];
+        double[] iOrrCurve  = [.. ePotModel.Select(selector: e => fitted.ComputeOrrComponent(e))];
+        double[] iHerCurve  = [.. ePotModel.Select(selector: e => fitted.ComputeHerComponent(e))];
 
         // ── Step 6: extract corrosion metrics from fitted model ───────────────────────────
         double ecorrV    = fitted.Ecorr;
@@ -211,14 +207,13 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
         if (rSolutionOhm <= 0.0)
             return points;
 
-        return points
-            .Select(p => new PolarizationPoint
+        return [.. points
+            .Select(selector: p => new PolarizationPoint
             {
                 PotentialV = p.PotentialV - p.CurrentA * rSolutionOhm,
                 CurrentA = p.CurrentA
             })
-            .OrderBy(p => p.PotentialV)
-            .ToArray();
+            .OrderBy(keySelector: p => p.PotentialV)];
     }
 
     /// <summary>
@@ -309,8 +304,8 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
         const double upper = 0.15;
         const double logFloor = 1e-20;
 
-        double[] eWin = e.Where((_, k) => e[k] >= ecorr + lower && e[k] <= ecorr + upper).ToArray();
-        double[] iWin = i.Where((_, k) => e[k] >= ecorr + lower && e[k] <= ecorr + upper).ToArray();
+        double[] eWin = [.. e.Where((_, k) => e[k] >= ecorr + lower && e[k] <= ecorr + upper)];
+        double[] iWin = [.. i.Where((_, k) => e[k] >= ecorr + lower && e[k] <= ecorr + upper)];
 
         if (eWin.Length < 3)
             return double.NaN;
@@ -345,7 +340,7 @@ public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
     /// <returns>Interpolated |I| (A/cm²).</returns>
     private static double InterpolateAbsCurrentDensity(double[] e, double[] i, double targetV)
     {
-        double[] absI = i.Select(v => Math.Abs(v)).ToArray();
+        double[] absI = [.. i.Select(v => Math.Abs(v))];
 
         if (targetV <= e[0])
             return absI[0];
