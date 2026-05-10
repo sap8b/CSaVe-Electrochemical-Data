@@ -132,7 +132,7 @@ namespace CSaVe_Electrochemical_Data
             bool includeOrr,
             bool includeHer)
         {
-            var state = new FitState
+            FitState state = new()
             {
                 IncludeMetal = includeMetal,
                 IncludeOrr = includeOrr,
@@ -214,7 +214,7 @@ namespace CSaVe_Electrochemical_Data
 
         private static List<FitParameterBinding> BuildBindings(FitState state, BvUserOverrides overrides, ReactionSet reactions)
         {
-            var bindings = new List<FitParameterBinding>();
+            List<FitParameterBinding> bindings = [];
 
             if (state.IncludeMetal && !(overrides?.FixMetal ?? false))
             {
@@ -375,11 +375,11 @@ namespace CSaVe_Electrochemical_Data
 
             double[] deepI = [.. i
                 .Where((_, k) => e[k] <= cutoff && e[k] < ecorr)
-                .Select(v => Math.Abs(v))];
+                .Select(selector: v => Math.Abs(v))];
 
             if (deepI.Length == 0)
             {
-                double[] cathodicI = [.. i.Where((_, k) => e[k] < ecorr).Select(v => Math.Abs(v))];
+                double[] cathodicI = [.. i.Where((_, k) => e[k] < ecorr).Select(selectov => Math.Abs(v))];
                 if (cathodicI.Length == 0)
                     return Math.Clamp(DefaultIlimOrrAcm2, reaction.IlimMinAcm2, reaction.IlimMaxAcm2);
 
@@ -425,7 +425,7 @@ namespace CSaVe_Electrochemical_Data
             double[] eArr = [.. eWin];
             double[] iArr = [.. iWin];
             double[] eta = [.. eArr.Select(selector: v => v - eEq)];
-            double[] logI = [.. iArr.Select(v => Math.Log10(Math.Max(Math.Abs(v), LogFloorAcm2)))];
+            double[] logI = [.. iArr.Select(selector: v => Math.Log10(Math.Max(Math.Abs(v), LogFloorAcm2)))];
             double zFoverRTln10 = reaction.Z * ElectrochemicalConstants.F
                                   / (ElectrochemicalConstants.R * reaction.TemperatureKelvin * Math.Log(10.0));
 
