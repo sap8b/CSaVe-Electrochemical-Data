@@ -175,7 +175,7 @@ namespace CSaVe_Electrochemical_Data
             double betaCathodicV     = rtFactor / ((1.0 - fitted.BetaOrr) * 4.0);
 
             // ── Step 7: interpolate protection current densities ─────────────────────────────
-            var protectionCurrents = new Dictionary<string, double>();
+            Dictionary<string, double> protectionCurrents = new Dictionary<string, double>();
             foreach (double mv in input.ProtectionPotentialsMv)
             {
                 double targetV    = mv / 1000.0;

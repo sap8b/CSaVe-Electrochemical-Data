@@ -18,36 +18,36 @@ namespace CSaVe_Electrochemical_Data
     {
         // ── Module-level reaction singletons created via ElectrochemicalReactionFactory ───────────────────────
         /// <summary>Fixed thermodynamic constants for the metal oxidation half-reaction (Fe/Fe²⁺, E0 = −0.54 V vs. SHE).</summary>
-        private static readonly IBvReaction MetalReaction = ElectrochemicalReactionFactory.CreateMetalOxidation();
+        //private static readonly IBvReaction MetalReaction = ElectrochemicalReactionFactory.CreateMetalOxidation();
 
         /// <summary>Fixed thermodynamic constants for the ORR half-reaction (O₂/H₂O, E0 = 1.229 V vs. SHE at pH 0).</summary>
-        private static readonly IBvReaction OrrReaction = ElectrochemicalReactionFactory.CreateOrr();
+        //private static readonly IBvReaction OrrReaction = ElectrochemicalReactionFactory.CreateOrr();
 
         /// <summary>Fixed thermodynamic constants for the HER half-reaction (E0 = 0 V vs. SHE at pH 0).</summary>
-        private static readonly IBvReaction HerReaction = ElectrochemicalReactionFactory.CreateHer();
+        //private static readonly IBvReaction HerReaction = ElectrochemicalReactionFactory.CreateHer();
 
         // ── Tafel window offsets relative to Ecorr ────────────────────────────────────────────────
         // Lower offset: skip the near-linear mixed-potential zone where neither branch is dominant.
-        private const double TafelLowerOffsetV  = 0.01;   // 0.01 V below/above Ecorr
+        //private const double TafelLowerOffsetV  = 0.01;   // 0.01 V below/above Ecorr
 
         // Upper offset: stay within the true Tafel region before diffusion effects set in.
-        private const double TafelUpperOffsetV  = 0.15;   // 0.15 V below/above Ecorr
+        //private const double TafelUpperOffsetV  = 0.15;   // 0.15 V below/above Ecorr
 
         // ── Default fall-back values when regression windows have too few points ──────────────────
         // Default metal symmetry factor — symmetric BV as default.
-        private const double DefaultBetaMetal   = 0.5;
+        //private const double DefaultBetaMetal   = 0.5;
 
         // Default metal exchange current density (A/cm²) — representative of mild steel at OCP.
-        private const double DefaultI0MetalAcm2 = 1e-8;
+        //private const double DefaultI0MetalAcm2 = 1e-8;
 
         // Default ORR symmetry factor — symmetric BV as default.
-        private const double DefaultBetaOrr     = 0.5;
+        //private const double DefaultBetaOrr     = 0.5;
 
         // Default ORR exchange current density (A/cm²).
-        private const double DefaultI0OrrAcm2   = 1e-8;
+        //private const double DefaultI0OrrAcm2   = 1e-8;
 
         // Default HER exchange current density (A/cm²).
-        private const double DefaultI0HerAcm2   = 1e-9;
+        //private const double DefaultI0HerAcm2   = 1e-9;
 
         // ── Fitted-parameter box bounds ───────────────────────────────────────────────────────────
         // These are now sourced from the reaction objects (IBvReaction.I0MinAcm2 etc.) so that each
@@ -56,14 +56,14 @@ namespace CSaVe_Electrochemical_Data
 
         // Lowest cathodic potential fraction for ilim_orr estimation (bottom 20 % of range).
         // The ORR plateau is most clearly visible in the deepest cathodic region.
-        private const double IlimOrrDepthFraction = 0.20;
+        //private const double IlimOrrDepthFraction = 0.20;
 
         // Floor applied before log10 to prevent log(0) errors.
         private const double LogFloorAcm2       = 1e-20;
 
         // Exponential argument clip limits — prevents overflow in exp() while retaining all physically meaningful values.
-        private const double ExpClipMin         = -50.0;
-        private const double ExpClipMax         =  50.0;
+        //private const double ExpClipMin         = -50.0;
+        //private const double ExpClipMax         =  50.0;
 
         // Minimum number of Tafel-region points required before running OLS regression.
         private const int MinTafelPoints        = 2;
@@ -73,14 +73,14 @@ namespace CSaVe_Electrochemical_Data
 
         // ── Parameter vector index constants ─────────────────────────────────────────────────────
         // Maps the 7-element parameter array p[] to named model parameters.
-        private const int IdxI0Metal    = 0;
-        private const int IdxBetaMetal  = 1;
-        private const int IdxI0Orr      = 2;
-        private const int IdxBetaOrr    = 3;
-        private const int IdxIlimOrr    = 4;
-        private const int IdxI0Her      = 5;
-        private const int IdxBetaHer    = 6;
-        private const int NumParams     = 7;
+        //private const int IdxI0Metal    = 0;
+        //private const int IdxBetaMetal  = 1;
+        //private const int IdxI0Orr      = 2;
+        //private const int IdxBetaOrr    = 3;
+        //private const int IdxIlimOrr    = 4;
+        //private const int IdxI0Her      = 5;
+        //private const int IdxBetaHer    = 6;
+        //private const int NumParams     = 7;
 
         /// <summary>
         /// Fit the BV model to <paramref name="currentDensityAcm2"/> vs
