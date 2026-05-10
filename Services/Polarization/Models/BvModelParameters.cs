@@ -79,6 +79,25 @@ namespace CSaVe_Electrochemical_Data
         /// <summary>HER equilibrium potential Eₕₑᵣ (V) fixed by the Nernst equation; not a fit parameter.</summary>
         public double EherEquilibriumV { get; init; }
 
+        // ── Reaction inclusion flags ──────────────────────────────────────────────────────────────
+        /// <summary>
+        /// When <c>true</c> (default), the metal oxidation reaction contributes to the model current.
+        /// When <c>false</c>, <see cref="ComputeMetalOxidationComponent"/> is skipped (returns 0).
+        /// </summary>
+        public bool IncludeMetal { get; init; } = true;
+
+        /// <summary>
+        /// When <c>true</c> (default), the ORR reaction contributes to the model current.
+        /// When <c>false</c>, <see cref="ComputeOrrComponent"/> is skipped (returns 0).
+        /// </summary>
+        public bool IncludeOrr { get; init; } = true;
+
+        /// <summary>
+        /// When <c>true</c> (default), the HER reaction contributes to the model current.
+        /// When <c>false</c>, <see cref="ComputeHerComponent"/> is skipped (returns 0).
+        /// </summary>
+        public bool IncludeHer { get; init; } = true;
+
         // ── Corrosion potential (derived, not a fit parameter) ────────────────────────────────────
         /// <summary>
         /// Corrosion potential Ecorr (V vs. reference), defined as the zero-crossing of the net model
@@ -100,9 +119,9 @@ namespace CSaVe_Electrochemical_Data
         /// <param name="potentialV">Electrode potential (V vs. reference).</param>
         /// <returns>Net signed current density (A/cm²); positive = net anodic.</returns>
         public double ComputeCurrentDensity(double potentialV) =>
-            ComputeMetalOxidationComponent(potentialV)
-          + ComputeOrrComponent(potentialV)
-          + ComputeHerComponent(potentialV);
+            (IncludeMetal ? ComputeMetalOxidationComponent(potentialV) : 0.0)
+          + (IncludeOrr   ? ComputeOrrComponent(potentialV)            : 0.0)
+          + (IncludeHer   ? ComputeHerComponent(potentialV)            : 0.0);
 
         /// <summary>
         /// Evaluates the metal-oxidation Butler-Volmer component at a single electrode potential.

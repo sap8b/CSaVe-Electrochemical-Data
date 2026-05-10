@@ -1320,15 +1320,18 @@ namespace CSaVe_Electrochemical_Data
                 I0Her    = TryParsePositiveDouble(HerI0TextBox.Text),
                 BetaHer  = TryParsePositiveDouble(HerBetaTextBox.Text),
                 FixHer   = HerFixCheckBox.IsChecked == true,
+                IncludeHer = HerIncludeCheckBox.IsChecked != false,
 
                 I0Orr    = TryParsePositiveDouble(OrrI0TextBox.Text),
                 BetaOrr  = TryParsePositiveDouble(OrrBetaTextBox.Text),
                 IlimOrr  = TryParsePositiveDouble(OrrIlimTextBox.Text),
                 FixOrr   = OrrFixCheckBox.IsChecked == true,
+                IncludeOrr = OrrIncludeCheckBox.IsChecked != false,
 
                 I0Metal   = TryParsePositiveDouble(MetalI0TextBox.Text),
                 BetaMetal = TryParsePositiveDouble(MetalBetaTextBox.Text),
                 FixMetal  = MetalFixCheckBox.IsChecked == true,
+                IncludeMetal = MeOxIncludeCheckBox.IsChecked != false,
             };
 
             PolarizationAnalysisStatusBox.Text = "Running polarization analysis...";
