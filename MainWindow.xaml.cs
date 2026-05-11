@@ -132,8 +132,36 @@ namespace CSaVe_Electrochemical_Data
         private readonly PlotModel eisNyquistPlotModel = new();
         private readonly PlotModel eisBodePlotModel = new();
         private readonly DataTable polarizationFitResultsTable = new();
+        private readonly Dictionary<string, int> polarizationFitRowIndexByName = new(StringComparer.Ordinal);
         private int polarizationAnalysisRunCount;
         private static readonly Regex PdTokenRegex = new(@"(^|[^a-z])pd([^a-z]|$)", RegexOptions.Compiled);
+        private static readonly string[] PolarizationFitParameterRows =
+        {
+            "Temperature (°C)",
+            "pH",
+            "Cl⁻ concentration (M)",
+            "Metal ion concentration [M²⁺] (M)",
+            "I₀, metal (A/cm²)",
+            "β_metal",
+            "I₀, ORR (A/cm²)",
+            "β_ORR",
+            "i_lim, ORR (A/cm²)",
+            "I₀, HER (A/cm²)",
+            "β_HER",
+            "E_corr (mV)",
+            "i_corr (µA/cm²)",
+            "i@-850 mV (µA/cm²)",
+            "i@-1050 mV (µA/cm²)",
+            "Weighted RMSE (A/cm²)"
+        };
+        private static readonly string[] PolarizationFittedOnlyRows =
+        {
+            "E_corr (mV)",
+            "i_corr (µA/cm²)",
+            "i@-850 mV (µA/cm²)",
+            "i@-1050 mV (µA/cm²)",
+            "Weighted RMSE (A/cm²)"
+        };
 
         public MainWindow()
         {
@@ -1011,30 +1039,16 @@ namespace CSaVe_Electrochemical_Data
         {
             polarizationFitResultsTable.Columns.Clear();
             polarizationFitResultsTable.Rows.Clear();
+            polarizationFitRowIndexByName.Clear();
+            polarizationAnalysisRunCount = 0;
             polarizationFitResultsTable.Columns.Add("Parameter", typeof(string));
 
-            string[] parameterRows =
+            foreach (string rowName in PolarizationFitParameterRows)
             {
-                "Temperature (°C)",
-                "pH",
-                "Cl⁻ concentration (M)",
-                "Metal ion concentration [M²⁺] (M)",
-                "I₀, metal (A/cm²)",
-                "β_metal",
-                "I₀, ORR (A/cm²)",
-                "β_ORR",
-                "i_lim, ORR (A/cm²)",
-                "I₀, HER (A/cm²)",
-                "β_HER",
-                "E_corr (mV)",
-                "i_corr (µA/cm²)",
-                "i@-850 mV (µA/cm²)",
-                "i@-1050 mV (µA/cm²)",
-                "Weighted RMSE (A/cm²)"
-            };
-
-            foreach (string rowName in parameterRows)
+                int rowIndex = polarizationFitResultsTable.Rows.Count;
                 polarizationFitResultsTable.Rows.Add(rowName);
+                polarizationFitRowIndexByName[rowName] = rowIndex;
+            }
 
             PolarizationResultsGrid.ItemsSource = polarizationFitResultsTable.DefaultView;
         }
@@ -1134,13 +1148,23 @@ namespace CSaVe_Electrochemical_Data
 
         private void SetPolarizationFitCell(string parameterName, string columnName, string value)
         {
-            DataRow row = polarizationFitResultsTable.Rows
-                .Cast<DataRow>()
-                .First(r => string.Equals(Convert.ToString(r["Parameter"]), parameterName, StringComparison.Ordinal));
+            if (!polarizationFitRowIndexByName.TryGetValue(parameterName, out int rowIndex))
+                throw new ArgumentException($"Unknown polarization fit table parameter row: '{parameterName}'.", nameof(parameterName));
+            if (!polarizationFitResultsTable.Columns.Contains(columnName))
+                throw new ArgumentException($"Unknown polarization fit table column: '{columnName}'.", nameof(columnName));
+
+            DataRow row = polarizationFitResultsTable.Rows[rowIndex];
             row[columnName] = value;
         }
 
-        private void AppendPolarizationFitResults(PolarizationAnalysisResult result, double iAt850Acm2, double iAt1050Acm2)
+        private void AppendPolarizationFitResults(
+            PolarizationAnalysisResult result,
+            double iAt850Acm2,
+            double iAt1050Acm2,
+            double electrolyteTemperatureC,
+            double electrolytePh,
+            double chlorideConcentrationM,
+            double metalIonConcentrationM)
         {
             polarizationAnalysisRunCount++;
             string staticColumnName = $"Static {polarizationAnalysisRunCount}";
@@ -1153,14 +1177,14 @@ namespace CSaVe_Electrochemical_Data
             bool includeHer = HerIncludeCheckBox.IsChecked != false;
             BvModelParameters fp = result.FittedParameters;
 
-            SetPolarizationFitCell("Temperature (°C)", staticColumnName, ParseUiOrAuto(TC.Text, included: true));
-            SetPolarizationFitCell("Temperature (°C)", fitColumnName, ParseUiOrAuto(TC.Text, included: true));
-            SetPolarizationFitCell("pH", staticColumnName, ParseUiOrAuto(pH.Text, included: true));
-            SetPolarizationFitCell("pH", fitColumnName, ParseUiOrAuto(pH.Text, included: true));
-            SetPolarizationFitCell("Cl⁻ concentration (M)", staticColumnName, ParseUiOrAuto(ClConc.Text, included: true));
-            SetPolarizationFitCell("Cl⁻ concentration (M)", fitColumnName, ParseUiOrAuto(ClConc.Text, included: true));
-            SetPolarizationFitCell("Metal ion concentration [M²⁺] (M)", staticColumnName, ParseUiOrAuto(MetalIonConcTextBox.Text, included: true));
-            SetPolarizationFitCell("Metal ion concentration [M²⁺] (M)", fitColumnName, ParseUiOrAuto(MetalIonConcTextBox.Text, included: true));
+            SetPolarizationFitCell("Temperature (°C)", staticColumnName, FormatFixed(electrolyteTemperatureC, "F3"));
+            SetPolarizationFitCell("Temperature (°C)", fitColumnName, "—");
+            SetPolarizationFitCell("pH", staticColumnName, FormatFixed(electrolytePh, "F3"));
+            SetPolarizationFitCell("pH", fitColumnName, "—");
+            SetPolarizationFitCell("Cl⁻ concentration (M)", staticColumnName, FormatScientific(chlorideConcentrationM));
+            SetPolarizationFitCell("Cl⁻ concentration (M)", fitColumnName, "—");
+            SetPolarizationFitCell("Metal ion concentration [M²⁺] (M)", staticColumnName, FormatScientific(metalIonConcentrationM));
+            SetPolarizationFitCell("Metal ion concentration [M²⁺] (M)", fitColumnName, "—");
 
             SetPolarizationFitCell("I₀, metal (A/cm²)", staticColumnName, ParseUiOrAuto(MetalI0TextBox.Text, includeMetal));
             SetPolarizationFitCell("β_metal", staticColumnName, ParseUiOrAuto(MetalBetaTextBox.Text, includeMetal));
@@ -1178,11 +1202,8 @@ namespace CSaVe_Electrochemical_Data
             SetPolarizationFitCell("I₀, HER (A/cm²)", fitColumnName, fp.IncludeHer ? FormatScientific(fp.I0Her) : "excluded");
             SetPolarizationFitCell("β_HER", fitColumnName, fp.IncludeHer ? FormatFixed(fp.BetaHer, "F4") : "excluded");
 
-            SetPolarizationFitCell("E_corr (mV)", staticColumnName, "n/a");
-            SetPolarizationFitCell("i_corr (µA/cm²)", staticColumnName, "n/a");
-            SetPolarizationFitCell("i@-850 mV (µA/cm²)", staticColumnName, "n/a");
-            SetPolarizationFitCell("i@-1050 mV (µA/cm²)", staticColumnName, "n/a");
-            SetPolarizationFitCell("Weighted RMSE (A/cm²)", staticColumnName, "n/a");
+            foreach (string row in PolarizationFittedOnlyRows)
+                SetPolarizationFitCell(row, staticColumnName, "n/a");
 
             SetPolarizationFitCell("E_corr (mV)", fitColumnName, FormatFixed(result.EcorrV * 1000.0, "F2"));
             SetPolarizationFitCell("i_corr (µA/cm²)", fitColumnName, FormatFixed(result.IcorrAcm2 * 1.0e6, "F2"));
@@ -1476,7 +1497,14 @@ namespace CSaVe_Electrochemical_Data
 
             double iAt850  = result.ProtectionCurrentDensitiesAcm2.TryGetValue("-850",  out double v850)  ? v850  : double.NaN;
             double iAt1050 = result.ProtectionCurrentDensitiesAcm2.TryGetValue("-1050", out double v1050) ? v1050 : double.NaN;
-            AppendPolarizationFitResults(result, iAt850, iAt1050);
+            AppendPolarizationFitResults(
+                result,
+                iAt850,
+                iAt1050,
+                electrolyteTemperatureC,
+                electrolytePh,
+                chlorideConcentrationM,
+                metalIonConcentrationM);
 
             polarizationPlotModel.Series.Clear();
 

@@ -125,17 +125,18 @@ namespace CSaVe_Electrochemical_Data
         private IReadOnlyList<IBvReaction> CreateReactionList(
             double temperatureCelsius,
             double electrolytePh,
-            double metalIonConcentrationM) =>
-            _reactionFactories
-                .Select(f =>
-                {
-                    if (f is MetalOxidationFactory metalFactory)
-                        metalFactory.MetalCationConcentration = metalIonConcentrationM;
+            double metalIonConcentrationM)
+        {
+            var reactions = new List<IBvReaction>(_reactionFactories.Count);
+            var electrolyte = new ElectrolyteConditions(electrolytePh, temperatureCelsius, metalIonConcentrationM);
+            foreach (ElectrochemicalReactionFactory factory in _reactionFactories)
+            {
+                reactions.Add(factory.CreateReaction(electrolyte));
+            }
 
-                    return (IBvReaction)f.CreateReaction(electrolytePh, temperatureCelsius);
-                })
-                .OrderBy(r => r.EquilibriumPotentialVshe)
-                .ToList();
+            reactions.Sort((left, right) => left.EquilibriumPotentialVshe.CompareTo(right.EquilibriumPotentialVshe));
+            return reactions;
+        }
 
         // ── Initial-state estimation ──────────────────────────────────────────────────────────────
 
