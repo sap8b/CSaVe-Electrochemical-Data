@@ -1,3 +1,5 @@
+using CSaVe_Electrochemical_Data.Services.Polarization.Reactions;
+
 using System.Collections.Generic;
 
 namespace CSaVe_Electrochemical_Data
@@ -42,10 +44,13 @@ namespace CSaVe_Electrochemical_Data
         public double ChlorideConcentrationM { get; set; } = 0.6;
 
         /// <summary>
-        /// Dissolved metal-ion concentration [M2-] (mol/L) used by the metal-oxidation Nernst term.
+        /// Dissolved metal-ion concentration [Mz+] (mol/L) used by the selected metal-oxidation Nernst term.
         /// Default 1.0e-6 M.
         /// </summary>
         public double MetalIonConcentrationM { get; set; } = 1.0e-6;
+
+        /// <summary>Selected alloying-metal oxidation reaction. Default Fe.</summary>
+        public MetalSpecies MetalSpecies { get; set; } = MetalSpecies.Fe;
 
         /// <summary>Optional solution resistance in ohms for iR correction. Default 0 Ω (disabled).</summary>
         public double RSolutionOhm { get; set; } = 0.0;

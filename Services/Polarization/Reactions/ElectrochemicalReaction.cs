@@ -15,7 +15,7 @@ namespace CSaVe_Electrochemical_Data.Services.Polarization.Reactions
     /// <see cref="IBvReaction"/> so that reaction objects are interchangeable through the interface.
     /// Universal physical constants are defined in <see cref="ElectrochemicalConstants"/>.
     /// Derive from this class (e.g. <see cref="HerReaction"/>, <see cref="OrrReaction"/>,
-    /// <see cref="MetalOxidationReaction"/>) to add a new reaction without modifying
+    /// <see cref="MetalOxidationReactionBase"/>) to add a new reaction without modifying
     /// <see cref="BvCurveFitter"/> (Open/Closed Principle).
     /// </summary>
     public abstract class ElectrochemicalReaction : IBvReaction

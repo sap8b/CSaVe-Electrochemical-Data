@@ -133,12 +133,8 @@
     </Window.Resources>
 
     <TabControl Margin="8">
-        <TabItem Header="DTA -> CSV">
+        <TabItem Header="Analyze CYCPOL or POTENTIODYNAMIC Files">
             <Grid Margin="14,10,14,10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="230"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -147,92 +143,376 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Button x:Name="LoadDataButton"
-                        Grid.Row="0"
-                        Grid.Column="0"
-                        Margin="0,6,12,0"
-                        Height="46"
-                        Style="{StaticResource PrimaryButton}"
-                        Content="1. Select Folder with DTA files"
-                        ToolTip="Browse for the folder that contains your Gamry .dta files (subfolders are included automatically)"
-                        Click="LoadDataButton_Click"/>
-                <Button x:Name="SelectOutputLocationButton"
-                        Grid.Row="1"
-                        Grid.Column="0"
-                        Margin="0,6,12,0"
-                        Height="46"
-                        Style="{StaticResource PrimaryButton}"
-                        Content="2. Select Folder For Conversions"
-                        IsEnabled="False"
-                        ToolTip="Browse for the destination folder where the converted CSV files will be saved"
-                        Click="SelectOutputLocationButton_Click"/>
-                <Button x:Name="ConvertFiles"
-                        Grid.Row="2"
-                        Grid.Column="0"
-                        Margin="0,6,12,0"
-                        Height="46"
-                        Style="{StaticResource PrimaryButton}"
-                        Content="3. Convert DTA to CSV"
-                        IsEnabled="False"
-                        ToolTip="Convert all found .dta files to .csv files in the selected output folder"
-                        Click="ConvertFiles_Click"/>
-
-                <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,6,0,0">
-                    <TextBlock Text="Parent DTA folder:"
-                               FontWeight="SemiBold"
-                               FontSize="12"
-                               Foreground="#475569"
-                               Margin="0,0,0,3"/>
-                    <TextBox x:Name="ParentFolder"
-                             Style="{StaticResource ModernTextBox}"
-                             HorizontalAlignment="Stretch"
-                             Text="Parent DTA folder"/>
-                </StackPanel>
-                <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,6,0,0">
-                    <TextBlock Text="Output CSV folder:"
-                               FontWeight="SemiBold"
-                               FontSize="12"
-                               Foreground="#475569"
-                               Margin="0,0,0,3"/>
-                    <TextBox x:Name="OutputFolder"
-                             Style="{StaticResource ModernTextBox}"
-                             HorizontalAlignment="Stretch"
-                             Text="Parent CSV folder"/>
-                </StackPanel>
-                <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,6,0,0">
-                    <TextBlock Text="Status:"
-                               FontWeight="SemiBold"
-                               FontSize="12"
-                               Foreground="#475569"
-                               Margin="0,0,0,3"/>
-                    <TextBox x:Name="StatusBox"
+                <Grid Grid.Row="0" Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="BrowseAnodicPolarizationButton"
+                            Grid.Column="0"
+                            Width="260"
+                            Height="32"
+                            Style="{StaticResource BrowseButton}"
+                            Content="1. Import anodic curve (or full curve)"
+                            ToolTip="Select a CSV file containing the anodic branch (or a single file that contains the full sweep)"
+                            Click="BrowseAnodicPolarizationButton_Click"/>
+                    <TextBox x:Name="AnodicPolarizationFilePath"
+                             Grid.Column="2"
+                             VerticalAlignment="Center"
                              Style="{StaticResource ReadOnlyTextBox}"
-                             HorizontalAlignment="Stretch"
-                             Text="Status"/>
-                </StackPanel>
+                             Text="No file selected"
+                             ToolTip="Path to the selected anodic (or full) polarization CSV file"/>
+                </Grid>
 
-                <TextBlock Grid.Row="3"
-                           Grid.Column="0"
-                           Grid.ColumnSpan="2"
-                           Text="Data files found:"
-                           FontWeight="SemiBold"
-                           FontSize="13"
-                           Foreground="#1E293B"
-                           Margin="0,14,0,4"/>
-                <ScrollViewer Grid.Row="4"
-                              Grid.Column="0"
-                              Grid.ColumnSpan="2"
-                              VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Auto">
-                    <TextBox x:Name="DataFilesTextBox"
+                <Grid Grid.Row="1" Margin="0,0,0,8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="BrowseCathodicPolarizationButton"
+                            Grid.Column="0"
+                            Width="260"
+                            Height="32"
+                            Style="{StaticResource BrowseButton}"
+                            Content="2. Import cathodic curve (optional)"
+                            ToolTip="Optionally select a separate CSV file containing only the cathodic branch. Leave unselected for single-file mode."
+                            Click="BrowseCathodicPolarizationButton_Click"/>
+                    <TextBox x:Name="CathodicPolarizationFilePath"
+                             Grid.Column="2"
+                             VerticalAlignment="Center"
                              Style="{StaticResource ReadOnlyTextBox}"
-                             Text="Datafiles"
-                             TextWrapping="NoWrap"
-                             AcceptsReturn="True"
-                             IsReadOnly="True"
-                             VerticalScrollBarVisibility="Auto"
-                             HorizontalScrollBarVisibility="Auto"/>
-                </ScrollViewer>
+                             Text="No file selected (optional)"
+                             ToolTip="Path to the optional cathodic polarization CSV file (leave empty for single-file mode)"/>
+                </Grid>
+
+                <DockPanel Grid.Row="2" Margin="0,0,0,8">
+                    <TextBlock Text="Exposed area (cm2):" VerticalAlignment="Center" Margin="0,0,8,0"
+                               ToolTip="Electrode exposed area used to normalise current to current density"/>
+                    <TextBox x:Name="PolarizationAreaText"
+                             Width="80"
+                             Margin="0,0,8,0"
+                             Style="{StaticResource ModernTextBox}"
+                             Text="0.495"
+                             ToolTip="Electrode exposed area (cm2) — used to convert raw current (A) to current density (A/cm2)"/>
+                    <Button x:Name="RunPolarizationAnalysisButton"
+                            Width="220"
+                            Height="36"
+                            Style="{StaticResource PrimaryButton}"
+                            Content="Run Butler-Volmer Analysis"
+                            ToolTip="Run the Butler-Volmer curve-fitting analysis using the selected CSV file(s) and the parameters on the right"
+                            Click="RunPolarizationAnalysisButton_Click"/>
+                </DockPanel>
+
+                <TextBox x:Name="PolarizationAnalysisStatusBox"
+                         Grid.Row="3"
+                         Margin="0,0,0,8"
+                         Style="{StaticResource ReadOnlyTextBox}"
+                         Text="Status"
+                         ToolTip="Analysis status and error messages"/>
+
+                <!-- Row 4: Plot (left) + BV starting parameters and results (right) -->
+                <Grid Grid.Row="4" Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="390"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- OxyPlot polarization chart + Save button -->
+                    <Grid Grid.Column="0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Button x:Name="SavePolarizationPlotButton"
+                                Grid.Row="0"
+                                HorizontalAlignment="Left"
+                                Height="28"
+                                Margin="0,0,0,4"
+                                Style="{StaticResource BrowseButton}"
+                                Content="💾  Save Plot as PNG"
+                                ToolTip="Export the current polarization chart and legend to a PNG image file"
+                                Click="SavePolarizationPlotButton_Click"/>
+                        <oxy:PlotView x:Name="PolarizationPlotView"
+                                      Grid.Row="1"
+                                      ToolTip="Polarization plot: |i| vs E (Butler-Volmer fit). Use 'Save Plot as PNG' to export."/>
+                    </Grid>
+
+                    <!-- Right panel: BV starting parameters + fit results DataGrid -->
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <GroupBox Header="Electrolyte Parameters" Grid.Row="0">
+                            <Grid Margin="6,6,6,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="8"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="8"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Grid.Column="0">
+                                    <TextBlock Text="Temperature (C)"
+                                               FontSize="11"
+                                               Foreground="#64748B"
+                                               Margin="0,0,0,2"/>
+                                    <TextBox x:Name="TC"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Text="25"
+                                             ToolTip="Solution temperature used for BV equilibrium potentials and the ORR limiting-current estimate"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="0" Grid.Column="2">
+                                    <TextBlock Text="pH"
+                                               FontSize="11"
+                                               Foreground="#64748B"
+                                               Margin="0,0,0,2"/>
+                                    <TextBox x:Name="pH"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Text="8.1"
+                                             ToolTip="Solution pH used to compute HER and ORR Nernst equilibrium potentials"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="2" Grid.Column="0">
+                                    <TextBlock Text="Chloride concentration (M)"
+                                               FontSize="11"
+                                               Foreground="#64748B"
+                                               Margin="0,0,0,2"/>
+                                    <TextBox x:Name="ClConc"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Text="0.6"
+                                             ToolTip="Chloride concentration (mol/L) — used for equilibrium potential shifts and the ORR limiting-current estimate"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="2" Grid.Column="2">
+                                    <TextBlock Text="Metal ion concentration (M)"
+                                               FontSize="11"
+                                               Foreground="#64748B"
+                                               Margin="0,0,0,2"/>
+                                    <TextBox x:Name="MetalIonConcTextBox"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Text="1.0e-6"
+                                             ToolTip="Dissolved metal-ion concentration used in the Nernst equation for the metal-oxidation equilibrium potential"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="4" Grid.Column="0">
+                                    <TextBlock Text="Diffusion layer δ (µm)"
+                                               FontSize="11"
+                                               Foreground="#64748B"
+                                               Margin="0,0,0,2"/>
+                                    <TextBox x:Name="DiffLayerThicknessTextBox"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Text="850"
+                                             ToolTip="O2 diffusion-layer thickness δ (µm). 850 µm is typical for a quiescent solution; decrease for stirred or flowing conditions. Used with the 'Calc iLim' button to estimate the ORR limiting current."/>
+                                </StackPanel>
+                            </Grid>
+                        </GroupBox>
+
+                        <!-- BV Starting Parameters GroupBox -->
+                        <GroupBox Header="BV Starting Parameters" Grid.Row="2">
+                            <Grid Margin="4,4,4,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="58"/>
+                                    <ColumnDefinition Width="6"/>
+                                    <ColumnDefinition Width="55"/>
+                                    <ColumnDefinition Width="6"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="6"/>
+                                    <ColumnDefinition Width="58"/>
+                                    <ColumnDefinition Width="6"/>
+                                    <ColumnDefinition Width="34"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="6"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="4"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="4"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="2"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="4"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <WrapPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="9" Margin="0,0,0,2">
+                                    <TextBlock Text="Metal species:"
+                                               VerticalAlignment="Center"
+                                               FontSize="11"
+                                               FontWeight="SemiBold"
+                                               Foreground="#475569"
+                                               Margin="0,0,6,0"/>
+                                    <ComboBox x:Name="MetalSpeciesComboBox"
+                                              Width="70"
+                                              Margin="0,0,10,0"
+                                              ToolTip="Select the metal oxidation reaction used in the BV model.">
+                                        <ComboBoxItem Content="Fe" IsSelected="True"/>
+                                        <ComboBoxItem Content="Cr"/>
+                                        <ComboBoxItem Content="Ni"/>
+                                        <ComboBoxItem Content="Mo"/>
+                                        <ComboBoxItem Content="Cu"/>
+                                        <ComboBoxItem Content="Al"/>
+                                    </ComboBox>
+                                    <Button x:Name="ImportFitSetupButton"
+                                            Height="24"
+                                            Margin="0,0,8,0"
+                                            Padding="10,0"
+                                            Style="{StaticResource BrowseButton}"
+                                            Content="Import from CSV file"
+                                            ToolTip="Import a previously exported one-column fit CSV to restore electrolyte and BV starting parameters."
+                                            Click="ImportFitSetupButton_Click"/>
+                                    <Button x:Name="ExportFitsToCsvButton"
+                                            Height="24"
+                                            Padding="10,0"
+                                            Style="{StaticResource BrowseButton}"
+                                            Content="Export Fits to CSV"
+                                            ToolTip="Export the newest Static/Fit result columns into a one-column CSV file for later re-use."
+                                            Click="ExportFitsToCsvButton_Click"/>
+                                </WrapPanel>
+ 
+                                <!-- Column headers -->
+                                <TextBlock Grid.Row="2" Grid.Column="2"
+                                           Text="Include" FontSize="11"
+                                           FontWeight="SemiBold" Foreground="#475569"
+                                           HorizontalAlignment="Center"
+                                           ToolTip="Check to include this reaction in the Butler-Volmer model"/>
+                                <TextBlock Grid.Row="2" Grid.Column="4"
+                                           Text="i0 (A/cm2)" FontSize="11"
+                                           FontWeight="SemiBold" Foreground="#475569"
+                                           ToolTip="Exchange current density starting value (A/cm2) — leave blank for auto-estimate"/>
+                                <TextBlock Grid.Row="2" Grid.Column="6"
+                                           Text="beta" FontSize="11"
+                                           FontWeight="SemiBold" Foreground="#475569"
+                                           ToolTip="Symmetry factor β (0–1) starting value — 0.5 is symmetric; values closer to 0 or 1 bias the anodic or cathodic branch"/>
+                                <TextBlock Grid.Row="2" Grid.Column="8"
+                                           Text="Fix" FontSize="11"
+                                           FontWeight="SemiBold" Foreground="#475569"
+                                           HorizontalAlignment="Center"
+                                           ToolTip="Check to hold this reaction's parameters fixed at the starting values during fitting"/>
+ 
+                                <!-- HER row -->
+                                <TextBlock Grid.Row="4" Grid.Column="0"
+                                           Text="HER" VerticalAlignment="Center"
+                                           FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"
+                                           ToolTip="Hydrogen Evolution Reaction (H-/H2)"/>
+                                <CheckBox x:Name="HerIncludeCheckBox"
+                                          Grid.Row="4" Grid.Column="2"
+                                          IsChecked="True"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Center"
+                                          ToolTip="Include HER in the Butler-Volmer model"/>
+                                <TextBox x:Name="HerI0TextBox"
+                                         Grid.Row="4" Grid.Column="4"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="1.0e-14"
+                                         ToolTip="HER exchange current density starting value (A/cm2)"/>
+                                <TextBox x:Name="HerBetaTextBox"
+                                         Grid.Row="4" Grid.Column="6"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="0.95"
+                                         ToolTip="HER symmetry factor β starting value"/>
+                                <CheckBox x:Name="HerFixCheckBox"
+                                          Grid.Row="4" Grid.Column="8"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Center"
+                                          ToolTip="Fix HER parameters at starting values (no fitting)"/>
+ 
+                                <!-- ORR row (i₀, β, Fix) -->
+                                <TextBlock Grid.Row="6" Grid.Column="0"
+                                           Text="ORR" VerticalAlignment="Center"
+                                           FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"
+                                           ToolTip="Oxygen Reduction Reaction (O2/H2O)"/>
+                                <CheckBox x:Name="OrrIncludeCheckBox"
+                                          Grid.Row="6" Grid.Column="2"
+                                          IsChecked="True"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Center"
+                                          ToolTip="Include ORR in the Butler-Volmer model"/>
+                                <TextBox x:Name="OrrI0TextBox"
+                                         Grid.Row="6" Grid.Column="4"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="1.0e-14"
+                                         ToolTip="ORR exchange current density starting value (A/cm2)"/>
+                                <TextBox x:Name="OrrBetaTextBox"
+                                         Grid.Row="6" Grid.Column="6"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="0.95"
+                                         ToolTip="ORR symmetry factor β starting value"/>
+                                <CheckBox x:Name="OrrFixCheckBox"
+                                          Grid.Row="6" Grid.Column="8"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Center"
+                                          ToolTip="Fix ORR parameters at starting values (no fitting)"/>
+ 
+                                <!-- ORR sub-row: i_lim (only ORR has a limiting current) -->
+                                <TextBlock Grid.Row="8" Grid.Column="0"
+                                           Text="i_lim" VerticalAlignment="Center"
+                                           FontSize="11" Foreground="#64748B" Margin="0,0,8,0"
+                                           ToolTip="ORR limiting current density (A/cm2) — controls the mass-transport plateau at highly negative potentials"/>
+                                <TextBox x:Name="OrrIlimTextBox"
+                                         Grid.Row="8" Grid.Column="4"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="1.0e-5"
+                                         ToolTip="ORR limiting current density i_lim (A/cm2). Click 'Calc iLim' to estimate from temperature, Cl⁻ concentration, and diffusion-layer thickness."/>
+                                <Button x:Name="CalcIlimButton"
+                                        Grid.Row="8" Grid.Column="6" Grid.ColumnSpan="3"
+                                        Height="22"
+                                        FontSize="10"
+                                        Style="{StaticResource BrowseButton}"
+                                        Content="Calc iLim"
+                                        ToolTip="Estimate the ORR limiting current density from temperature, Cl⁻ concentration, and diffusion-layer thickness using the O2 solubility and diffusivity models ported from O2.m"
+                                        Click="CalcIlimButton_Click"/>
+ 
+                                <!-- Metal Oxidation row -->
+                                <TextBlock Grid.Row="10" Grid.Column="0"
+                                           Text="Me Ox" VerticalAlignment="Center"
+                                           FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"
+                                           ToolTip="Selected metal oxidation reaction (e.g. Fe -> Fe²⁺ + 2e⁻)"/>
+                                <CheckBox x:Name="MeOxIncludeCheckBox"
+                                          Grid.Row="10" Grid.Column="2"
+                                          IsChecked="True"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Center"
+                                          ToolTip="Include the selected metal oxidation reaction in the Butler-Volmer model"/>
+                                <TextBox x:Name="MetalI0TextBox"
+                                         Grid.Row="10" Grid.Column="4"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="1.0e-14"
+                                         ToolTip="Metal-oxidation exchange current density starting value (A/cm2)"/>
+                                <TextBox x:Name="MetalBetaTextBox"
+                                         Grid.Row="10" Grid.Column="6"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="0.95"
+                                         ToolTip="Metal-oxidation symmetry factor β starting value"/>
+                                <CheckBox x:Name="MetalFixCheckBox"
+                                          Grid.Row="10" Grid.Column="8"
+                                          VerticalAlignment="Center"
+                                          HorizontalAlignment="Center"
+                                          ToolTip="Fix metal-oxidation parameters at starting values (no fitting)"/>
+                            </Grid>
+                        </GroupBox>
+
+                        <!-- Fit results DataGrid -->
+                        <DataGrid x:Name="PolarizationResultsGrid"
+                                  Grid.Row="4"
+                                  AutoGenerateColumns="True"
+                                  IsReadOnly="True"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  ToolTip="BV fit results table — the newest Static/Fit columns can be exported to a one-column CSV for later import"/>
+                    </Grid>
+                </Grid>
             </Grid>
         </TabItem>
 
@@ -473,8 +753,12 @@
             </ScrollViewer>
         </TabItem>
 
-        <TabItem Header="Analyze CYCPOL or POTENTIODYNAMIC Files">
+        <TabItem Header="DTA -> CSV">
             <Grid Margin="14,10,14,10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="230"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -483,407 +767,92 @@
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
-                <Grid Grid.Row="0" Margin="0,0,0,4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="10"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Button x:Name="BrowseAnodicPolarizationButton"
-                            Grid.Column="0"
-                            Width="260"
-                            Height="32"
-                            Style="{StaticResource BrowseButton}"
-                            Content="1. Import anodic curve (or full curve)"
-                            ToolTip="Select a CSV file containing the anodic branch (or a single file that contains the full sweep)"
-                            Click="BrowseAnodicPolarizationButton_Click"/>
-                    <TextBox x:Name="AnodicPolarizationFilePath"
-                             Grid.Column="2"
-                             VerticalAlignment="Center"
-                             Style="{StaticResource ReadOnlyTextBox}"
-                             Text="No file selected"
-                             ToolTip="Path to the selected anodic (or full) polarization CSV file"/>
-                </Grid>
+                <Button x:Name="LoadDataButton"
+                        Grid.Row="0"
+                        Grid.Column="0"
+                        Margin="0,6,12,0"
+                        Height="46"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="1. Select Folder with DTA files"
+                        ToolTip="Browse for the folder that contains your Gamry .dta files (subfolders are included automatically)"
+                        Click="LoadDataButton_Click"/>
+                <Button x:Name="SelectOutputLocationButton"
+                        Grid.Row="1"
+                        Grid.Column="0"
+                        Margin="0,6,12,0"
+                        Height="46"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="2. Select Folder For Conversions"
+                        IsEnabled="False"
+                        ToolTip="Browse for the destination folder where the converted CSV files will be saved"
+                        Click="SelectOutputLocationButton_Click"/>
+                <Button x:Name="ConvertFiles"
+                        Grid.Row="2"
+                        Grid.Column="0"
+                        Margin="0,6,12,0"
+                        Height="46"
+                        Style="{StaticResource PrimaryButton}"
+                        Content="3. Convert DTA to CSV"
+                        IsEnabled="False"
+                        ToolTip="Convert all found .dta files to .csv files in the selected output folder"
+                        Click="ConvertFiles_Click"/>
 
-                <Grid Grid.Row="1" Margin="0,0,0,8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="10"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <Button x:Name="BrowseCathodicPolarizationButton"
-                            Grid.Column="0"
-                            Width="260"
-                            Height="32"
-                            Style="{StaticResource BrowseButton}"
-                            Content="2. Import cathodic curve (optional)"
-                            ToolTip="Optionally select a separate CSV file containing only the cathodic branch. Leave unselected for single-file mode."
-                            Click="BrowseCathodicPolarizationButton_Click"/>
-                    <TextBox x:Name="CathodicPolarizationFilePath"
-                             Grid.Column="2"
-                             VerticalAlignment="Center"
-                             Style="{StaticResource ReadOnlyTextBox}"
-                             Text="No file selected (optional)"
-                             ToolTip="Path to the optional cathodic polarization CSV file (leave empty for single-file mode)"/>
-                </Grid>
-
-                <DockPanel Grid.Row="2" Margin="0,0,0,8">
-                    <TextBlock Text="Exposed area (cm2):" VerticalAlignment="Center" Margin="0,0,8,0"
-                               ToolTip="Electrode exposed area used to normalise current to current density"/>
-                    <TextBox x:Name="PolarizationAreaText"
-                             Width="80"
-                             Margin="0,0,8,0"
+                <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,6,0,0">
+                    <TextBlock Text="Parent DTA folder:"
+                               FontWeight="SemiBold"
+                               FontSize="12"
+                               Foreground="#475569"
+                               Margin="0,0,0,3"/>
+                    <TextBox x:Name="ParentFolder"
                              Style="{StaticResource ModernTextBox}"
-                             Text="0.495"
-                             ToolTip="Electrode exposed area (cm2) — used to convert raw current (A) to current density (A/cm2)"/>
-                    <Button x:Name="RunPolarizationAnalysisButton"
-                            Width="220"
-                            Height="36"
-                            Style="{StaticResource PrimaryButton}"
-                            Content="Run Butler-Volmer Analysis"
-                            ToolTip="Run the Butler-Volmer curve-fitting analysis using the selected CSV file(s) and the parameters on the right"
-                            Click="RunPolarizationAnalysisButton_Click"/>
-                </DockPanel>
-
-                <TextBox x:Name="PolarizationAnalysisStatusBox"
-                         Grid.Row="3"
-                         Margin="0,0,0,8"
-                         Style="{StaticResource ReadOnlyTextBox}"
-                         Text="Status"
-                         ToolTip="Analysis status and error messages"/>
-
-                <!-- Row 4: Plot (left) + BV starting parameters and results (right) -->
-                <Grid Grid.Row="4" Margin="0,0,0,4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="8"/>
-                        <ColumnDefinition Width="390"/>
-                    </Grid.ColumnDefinitions>
-
-                    <!-- OxyPlot polarization chart + Save button -->
-                    <Grid Grid.Column="0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-                        <Button x:Name="SavePolarizationPlotButton"
-                                Grid.Row="0"
-                                HorizontalAlignment="Left"
-                                Height="28"
-                                Margin="0,0,0,4"
-                                Style="{StaticResource BrowseButton}"
-                                Content="💾  Save Plot as PNG"
-                                ToolTip="Export the current polarization chart and legend to a PNG image file"
-                                Click="SavePolarizationPlotButton_Click"/>
-                        <oxy:PlotView x:Name="PolarizationPlotView"
-                                      Grid.Row="1"
-                                      ToolTip="Polarization plot: |i| vs E (Butler-Volmer fit). Use 'Save Plot as PNG' to export."/>
-                    </Grid>
-
-                    <!-- Right panel: BV starting parameters + fit results DataGrid -->
-                    <Grid Grid.Column="2">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="8"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-
-                        <GroupBox Header="Electrolyte Parameters" Grid.Row="0">
-                            <Grid Margin="6,6,6,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="10"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="8"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="8"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-
-                                <StackPanel Grid.Row="0" Grid.Column="0">
-                                    <TextBlock Text="Temperature (C)"
-                                               FontSize="11"
-                                               Foreground="#64748B"
-                                               Margin="0,0,0,2"/>
-                                    <TextBox x:Name="TC"
-                                             Style="{StaticResource ModernTextBox}"
-                                             Text="25"
-                                             ToolTip="Solution temperature used for BV equilibrium potentials and the ORR limiting-current estimate"/>
-                                </StackPanel>
-                                <StackPanel Grid.Row="0" Grid.Column="2">
-                                    <TextBlock Text="pH"
-                                               FontSize="11"
-                                               Foreground="#64748B"
-                                               Margin="0,0,0,2"/>
-                                    <TextBox x:Name="pH"
-                                             Style="{StaticResource ModernTextBox}"
-                                             Text="8.1"
-                                             ToolTip="Solution pH used to compute HER and ORR Nernst equilibrium potentials"/>
-                                </StackPanel>
-                                <StackPanel Grid.Row="2" Grid.Column="0">
-                                    <TextBlock Text="Chloride concentration (M)"
-                                               FontSize="11"
-                                               Foreground="#64748B"
-                                               Margin="0,0,0,2"/>
-                                    <TextBox x:Name="ClConc"
-                                             Style="{StaticResource ModernTextBox}"
-                                             Text="0.6"
-                                             ToolTip="Chloride concentration (mol/L) — used for equilibrium potential shifts and the ORR limiting-current estimate"/>
-                                </StackPanel>
-                                <StackPanel Grid.Row="2" Grid.Column="2">
-                                    <TextBlock Text="Metal ion concentration (M)"
-                                               FontSize="11"
-                                               Foreground="#64748B"
-                                               Margin="0,0,0,2"/>
-                                    <TextBox x:Name="MetalIonConcTextBox"
-                                             Style="{StaticResource ModernTextBox}"
-                                             Text="1.0e-6"
-                                             ToolTip="Dissolved metal-ion concentration used in the Nernst equation for the metal-oxidation equilibrium potential"/>
-                                </StackPanel>
-                                <StackPanel Grid.Row="4" Grid.Column="0">
-                                    <TextBlock Text="Diffusion layer δ (µm)"
-                                               FontSize="11"
-                                               Foreground="#64748B"
-                                               Margin="0,0,0,2"/>
-                                    <TextBox x:Name="DiffLayerThicknessTextBox"
-                                             Style="{StaticResource ModernTextBox}"
-                                             Text="850"
-                                             ToolTip="O2 diffusion-layer thickness δ (µm). 850 µm is typical for a quiescent solution; decrease for stirred or flowing conditions. Used with the 'Calc iLim' button to estimate the ORR limiting current."/>
-                                </StackPanel>
-                            </Grid>
-                        </GroupBox>
-
-                        <!-- BV Starting Parameters GroupBox -->
-                        <GroupBox Header="BV Starting Parameters" Grid.Row="2">
-                            <Grid Margin="4,4,4,4">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="48"/>
-                                    <ColumnDefinition Width="6"/>
-                                    <ColumnDefinition Width="55"/>
-                                    <ColumnDefinition Width="6"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="6"/>
-                                    <ColumnDefinition Width="52"/>
-                                    <ColumnDefinition Width="6"/>
-                                    <ColumnDefinition Width="34"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="4"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="4"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="2"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="4"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-
-                                <!-- Column headers -->
-                                <TextBlock Grid.Row="0" Grid.Column="2"
-                                           Text="Include" FontSize="11"
-                                           FontWeight="SemiBold" Foreground="#475569"
-                                           HorizontalAlignment="Center"
-                                           ToolTip="Check to include this reaction in the Butler-Volmer model"/>
-                                <TextBlock Grid.Row="0" Grid.Column="4"
-                                           Text="i0 (A/cm2)" FontSize="11"
-                                           FontWeight="SemiBold" Foreground="#475569"
-                                           ToolTip="Exchange current density starting value (A/cm2) — leave blank for auto-estimate"/>
-                                <TextBlock Grid.Row="0" Grid.Column="6"
-                                           Text="beta" FontSize="11"
-                                           FontWeight="SemiBold" Foreground="#475569"
-                                           ToolTip="Symmetry factor β (0–1) starting value — 0.5 is symmetric; values closer to 0 or 1 bias the anodic or cathodic branch"/>
-                                <TextBlock Grid.Row="0" Grid.Column="8"
-                                           Text="Fix" FontSize="11"
-                                           FontWeight="SemiBold" Foreground="#475569"
-                                           HorizontalAlignment="Center"
-                                           ToolTip="Check to hold this reaction's parameters fixed at the starting values during fitting"/>
-
-                                <!-- HER row -->
-                                <TextBlock Grid.Row="2" Grid.Column="0"
-                                           Text="HER" VerticalAlignment="Center"
-                                           FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"
-                                           ToolTip="Hydrogen Evolution Reaction (H-/H2)"/>
-                                <CheckBox x:Name="HerIncludeCheckBox"
-                                          Grid.Row="2" Grid.Column="2"
-                                          IsChecked="True"
-                                          VerticalAlignment="Center"
-                                          HorizontalAlignment="Center"
-                                          ToolTip="Include HER in the Butler-Volmer model"/>
-                                <TextBox x:Name="HerI0TextBox"
-                                         Grid.Row="2" Grid.Column="4"
-                                         Style="{StaticResource ModernTextBox}"
-                                         Text="1.0e-14"
-                                         ToolTip="HER exchange current density starting value (A/cm2)"/>
-                                <TextBox x:Name="HerBetaTextBox"
-                                         Grid.Row="2" Grid.Column="6"
-                                         Style="{StaticResource ModernTextBox}"
-                                         Text="0.95"
-                                         ToolTip="HER symmetry factor β starting value"/>
-                                <CheckBox x:Name="HerFixCheckBox"
-                                          Grid.Row="2" Grid.Column="8"
-                                          VerticalAlignment="Center"
-                                          HorizontalAlignment="Center"
-                                          ToolTip="Fix HER parameters at starting values (no fitting)"/>
-
-                                <!-- ORR row (i₀, β, Fix) -->
-                                <TextBlock Grid.Row="4" Grid.Column="0"
-                                           Text="ORR" VerticalAlignment="Center"
-                                           FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"
-                                           ToolTip="Oxygen Reduction Reaction (O2/H2O)"/>
-                                <CheckBox x:Name="OrrIncludeCheckBox"
-                                          Grid.Row="4" Grid.Column="2"
-                                          IsChecked="True"
-                                          VerticalAlignment="Center"
-                                          HorizontalAlignment="Center"
-                                          ToolTip="Include ORR in the Butler-Volmer model"/>
-                                <TextBox x:Name="OrrI0TextBox"
-                                         Grid.Row="4" Grid.Column="4"
-                                         Style="{StaticResource ModernTextBox}"
-                                         Text="1.0e-14"
-                                         ToolTip="ORR exchange current density starting value (A/cm2)"/>
-                                <TextBox x:Name="OrrBetaTextBox"
-                                         Grid.Row="4" Grid.Column="6"
-                                         Style="{StaticResource ModernTextBox}"
-                                         Text="0.95"
-                                         ToolTip="ORR symmetry factor β starting value"/>
-                                <CheckBox x:Name="OrrFixCheckBox"
-                                          Grid.Row="4" Grid.Column="8"
-                                          VerticalAlignment="Center"
-                                          HorizontalAlignment="Center"
-                                          ToolTip="Fix ORR parameters at starting values (no fitting)"/>
-
-                                <!-- ORR sub-row: i_lim (only ORR has a limiting current) -->
-                                <TextBlock Grid.Row="6" Grid.Column="0"
-                                           Text="i_lim" VerticalAlignment="Center"
-                                           FontSize="11" Foreground="#64748B" Margin="0,0,8,0"
-                                           ToolTip="ORR limiting current density (A/cm2) — controls the mass-transport plateau at highly negative potentials"/>
-                                <TextBox x:Name="OrrIlimTextBox"
-                                         Grid.Row="6" Grid.Column="4"
-                                         Style="{StaticResource ModernTextBox}"
-                                         Text="1.0e-5"
-                                         ToolTip="ORR limiting current density i_lim (A/cm2). Click 'Calc iLim' to estimate from temperature, Cl⁻ concentration, and diffusion-layer thickness."/>
-                                <Button x:Name="CalcIlimButton"
-                                        Grid.Row="6" Grid.Column="6" Grid.ColumnSpan="3"
-                                        Height="22"
-                                        FontSize="10"
-                                        Style="{StaticResource BrowseButton}"
-                                        Content="Calc iLim"
-                                        ToolTip="Estimate the ORR limiting current density from temperature, Cl⁻ concentration, and diffusion-layer thickness using the O2 solubility and diffusivity models ported from O2.m"
-                                        Click="CalcIlimButton_Click"/>
-
-                                <!-- Metal Oxidation row -->
-                                <TextBlock Grid.Row="8" Grid.Column="0"
-                                           Text="Me Ox" VerticalAlignment="Center"
-                                           FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"
-                                           ToolTip="Metal Oxidation reaction (e.g. Fe -> Fe2- + 2e-)"/>
-                                <CheckBox x:Name="MeOxIncludeCheckBox"
-                                          Grid.Row="8" Grid.Column="2"
-                                          IsChecked="True"
-                                          VerticalAlignment="Center"
-                                          HorizontalAlignment="Center"
-                                          ToolTip="Include metal oxidation in the Butler-Volmer model"/>
-                                <TextBox x:Name="MetalI0TextBox"
-                                         Grid.Row="8" Grid.Column="4"
-                                         Style="{StaticResource ModernTextBox}"
-                                         Text="1.0e-14"
-                                         ToolTip="Metal-oxidation exchange current density starting value (A/cm2)"/>
-                                <TextBox x:Name="MetalBetaTextBox"
-                                         Grid.Row="8" Grid.Column="6"
-                                         Style="{StaticResource ModernTextBox}"
-                                         Text="0.95"
-                                         ToolTip="Metal-oxidation symmetry factor β starting value"/>
-                                <CheckBox x:Name="MetalFixCheckBox"
-                                          Grid.Row="8" Grid.Column="8"
-                                          VerticalAlignment="Center"
-                                          HorizontalAlignment="Center"
-                                          ToolTip="Fix metal-oxidation parameters at starting values (no fitting)"/>
-                            </Grid>
-                        </GroupBox>
-
-                        <!-- Fit results DataGrid -->
-                        <DataGrid x:Name="PolarizationResultsGrid"
-                                  Grid.Row="4"
-                                  AutoGenerateColumns="True"
-                                  IsReadOnly="True"
-                                  VerticalScrollBarVisibility="Auto"
-                                  HorizontalScrollBarVisibility="Auto"
-                                  ToolTip="BV fit results table — each analysis run adds a 'Static' column (starting values) and a 'Fit' column (fitted values)"/>
-                    </Grid>
-                </Grid>
-            </Grid>
-        </TabItem>
-
-        <TabItem Header="Analyze EIS Files">
-            <Grid Margin="14,10,14,10">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
-
-                <DockPanel Grid.Row="0" Margin="0,0,0,8">
-                    <Button x:Name="BrowseEisFilesButton"
-                            Width="220"
-                            Height="32"
-                            Margin="0,0,10,0"
-                            Style="{StaticResource BrowseButton}"
-                            Content="Browse EIS CSV(s)"
-                            ToolTip="Select one or more EIS CSV files for equivalent-circuit fitting"
-                            Click="BrowseEisFilesButton_Click"/>
-                    <TextBox x:Name="EisFilesStatusText"
+                             HorizontalAlignment="Stretch"
+                             Text="Parent DTA folder"/>
+                </StackPanel>
+                <StackPanel Grid.Row="1" Grid.Column="1" Margin="0,6,0,0">
+                    <TextBlock Text="Output CSV folder:"
+                               FontWeight="SemiBold"
+                               FontSize="12"
+                               Foreground="#475569"
+                               Margin="0,0,0,3"/>
+                    <TextBox x:Name="OutputFolder"
+                             Style="{StaticResource ModernTextBox}"
+                             HorizontalAlignment="Stretch"
+                             Text="Parent CSV folder"/>
+                </StackPanel>
+                <StackPanel Grid.Row="2" Grid.Column="1" Margin="0,6,0,0">
+                    <TextBlock Text="Status:"
+                               FontWeight="SemiBold"
+                               FontSize="12"
+                               Foreground="#475569"
+                               Margin="0,0,0,3"/>
+                    <TextBox x:Name="StatusBox"
                              Style="{StaticResource ReadOnlyTextBox}"
-                             Text="No files selected"
-                             ToolTip="Number of EIS CSV files selected for analysis"/>
-                </DockPanel>
+                             HorizontalAlignment="Stretch"
+                             Text="Status"/>
+                </StackPanel>
 
-                <DockPanel Grid.Row="1" Margin="0,0,0,8">
-                    <TextBlock Text="Model:" VerticalAlignment="Center" Margin="0,0,8,0"
-                               ToolTip="Equivalent-circuit model to fit to the EIS data"/>
-                    <ComboBox x:Name="EisModelComboBox" Width="260" Margin="0,0,10,0"
-                              ToolTip="Select the equivalent-circuit model: randles_cpe_w (Randles with CPE and Warburg), randles_rc (simple Randles), or coating_two_time_constants">
-                        <ComboBoxItem Content="randles_cpe_w" IsSelected="True"/>
-                        <ComboBoxItem Content="randles_rc"/>
-                        <ComboBoxItem Content="coating_two_time_constants"/>
-                    </ComboBox>
-                    <Button x:Name="RunEisAnalysisButton"
-                            Width="180"
-                            Height="36"
-                            Style="{StaticResource PrimaryButton}"
-                            Content="Run EIS Fit"
-                            ToolTip="Fit the selected equivalent-circuit model to the loaded EIS CSV file(s) using the Python analysis service"
-                            Click="RunEisAnalysisButton_Click"/>
-                </DockPanel>
-
-                <TextBox x:Name="EisAnalysisStatusBox"
-                         Grid.Row="2"
-                         Margin="0,0,0,8"
-                         Style="{StaticResource ReadOnlyTextBox}"
-                         Text="Status"
-                         ToolTip="EIS analysis status and error messages"/>
-
-                <Grid Grid.Row="3" Margin="0,0,0,8">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <oxy:PlotView x:Name="EisNyquistPlotView" Grid.Column="0" Margin="0,0,8,0"
-                                  ToolTip="Nyquist plot: -Z'' (imaginary) vs Z' (real) for the first selected EIS file"/>
-                    <oxy:PlotView x:Name="EisBodePlotView" Grid.Column="1"
-                                  ToolTip="Bode plot: impedance magnitude |Z| and phase angle vs frequency for the first selected EIS file"/>
-                </Grid>
-
-                <DataGrid x:Name="EisResultsGrid"
-                          Grid.Row="4"
-                          AutoGenerateColumns="True"
-                          IsReadOnly="True"/>
+                <TextBlock Grid.Row="3"
+                           Grid.Column="0"
+                           Grid.ColumnSpan="2"
+                           Text="Data files found:"
+                           FontWeight="SemiBold"
+                           FontSize="13"
+                           Foreground="#1E293B"
+                           Margin="0,14,0,4"/>
+                <ScrollViewer Grid.Row="4"
+                              Grid.Column="0"
+                              Grid.ColumnSpan="2"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Auto">
+                    <TextBox x:Name="DataFilesTextBox"
+                             Style="{StaticResource ReadOnlyTextBox}"
+                             Text="Datafiles"
+                             TextWrapping="NoWrap"
+                             AcceptsReturn="True"
+                             IsReadOnly="True"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto"/>
+                </ScrollViewer>
             </Grid>
         </TabItem>
     </TabControl>

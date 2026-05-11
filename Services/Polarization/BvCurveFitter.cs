@@ -9,9 +9,8 @@ namespace CSaVe_Electrochemical_Data
     /// <summary>
     /// Fits a Butler-Volmer model to a merged polarization curve using a dynamic parameter vector
     /// that only includes the reactions selected for the analysis run.
-    /// Reactions are stored in a list sorted ascending by equilibrium potential (Nernst), so the
-    /// algorithm is independent of the number and type of reactions — any factory added to the
-    /// default constructor list is automatically included.
+    /// The fitted reaction set always includes ORR and HER plus the currently selected
+    /// alloying-metal oxidation reaction, sorted ascending by equilibrium potential.
     /// </summary>
     public sealed class BvCurveFitter : IBvCurveFitter
     {
@@ -31,26 +30,8 @@ namespace CSaVe_Electrochemical_Data
         private const int MinTafelPoints = 2;
         private const int MinHerPoints = 5;
 
-        private readonly IReadOnlyList<ElectrochemicalReactionFactory> _reactionFactories;
-
         public BvCurveFitter()
-            : this(new ElectrochemicalReactionFactory[]
-            {
-                new MetalOxidationFactory(),
-                new ORRFactory(),
-                new HERFactory()
-            })
         {
-        }
-
-        internal BvCurveFitter(IEnumerable<ElectrochemicalReactionFactory> reactionFactories)
-        {
-            if (reactionFactories == null)
-                throw new ArgumentNullException(nameof(reactionFactories));
-
-            _reactionFactories = reactionFactories.ToArray();
-            if (_reactionFactories.Count == 0)
-                throw new ArgumentException("At least one reaction factory must be provided.", nameof(reactionFactories));
         }
 
         public BvModelParameters Fit(
@@ -60,6 +41,7 @@ namespace CSaVe_Electrochemical_Data
             double temperatureCelsius,
             double electrolytePh,
             double metalIonConcentrationM,
+            MetalSpecies metalSpecies,
             BvUserOverrides overrides = null)
         {
             if (potentialV.Count != currentDensityAcm2.Count)
@@ -83,7 +65,7 @@ namespace CSaVe_Electrochemical_Data
                     ? metalIonConcentrationM
                     : DefaultMetalIonConcentrationM;
 
-            IReadOnlyList<IBvReaction> reactions = CreateReactionList(temperatureCelsius, effectivePh, effectiveMetalIonConcentrationM);
+            IReadOnlyList<IBvReaction> reactions = CreateReactionList(temperatureCelsius, effectivePh, effectiveMetalIonConcentrationM, metalSpecies);
             double ecorr0 = EstimateEcorr(e, i, ecorrHintV);
 
             FitState initialState = EstimateInitialState(e, i, ecorr0, reactions, includeMetal, includeOrr, includeHer);
@@ -118,21 +100,23 @@ namespace CSaVe_Electrochemical_Data
         // ── Reaction list (replaces the old fixed ReactionSet) ────────────────────────────────────
 
         /// <summary>
-        /// Creates one reaction per registered factory, sorted ascending by equilibrium potential.
-        /// The order determines the per-reaction estimation sequence in
+        /// Creates the selected metal reaction plus ORR and HER, sorted ascending by equilibrium
+        /// potential. The order determines the per-reaction estimation sequence in
         /// <see cref="EstimateInitialState"/>.
         /// </summary>
-        private IReadOnlyList<IBvReaction> CreateReactionList(
+        private static IReadOnlyList<IBvReaction> CreateReactionList(
             double temperatureCelsius,
             double electrolytePh,
-            double metalIonConcentrationM)
+            double metalIonConcentrationM,
+            MetalSpecies metalSpecies)
         {
-            var reactions = new List<IBvReaction>(_reactionFactories.Count);
-            var electrolyte = new ElectrolyteConditions(electrolytePh, temperatureCelsius, metalIonConcentrationM);
-            foreach (ElectrochemicalReactionFactory factory in _reactionFactories)
+            var electrolyte = new ElectrolyteConditions(electrolytePh, temperatureCelsius, metalIonConcentrationM, metalSpecies);
+            var reactions = new List<IBvReaction>(3)
             {
-                reactions.Add(factory.CreateReaction(electrolyte));
-            }
+                ElectrochemicalReactionFactory.CreateMetalOxidationFactory(metalSpecies).CreateReaction(electrolyte),
+                new ORRFactory().CreateReaction(electrolyte),
+                new HERFactory().CreateReaction(electrolyte)
+            };
 
             reactions.Sort((left, right) => left.EquilibriumPotentialVshe.CompareTo(right.EquilibriumPotentialVshe));
             return reactions;

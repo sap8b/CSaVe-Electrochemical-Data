@@ -1,3 +1,5 @@
+using CSaVe_Electrochemical_Data.Services.Polarization.Reactions;
+
 using System.Collections.Generic;
 
 namespace CSaVe_Electrochemical_Data
@@ -18,7 +20,8 @@ namespace CSaVe_Electrochemical_Data
         /// <param name="ecorrHintV">Initial estimate for the corrosion potential (V).</param>
         /// <param name="temperatureCelsius">Electrolyte temperature (oC).</param>
         /// <param name="electrolytePh">Electrolyte pH.</param>
-        /// <param name="metalIonConcentrationM">Dissolved metal-ion concentration [M2-] (mol/L).</param>
+        /// <param name="metalIonConcentrationM">Dissolved metal-ion concentration [Mz+] (mol/L).</param>
+        /// <param name="metalSpecies">Selected alloying-metal oxidation reaction to fit.</param>
         /// <param name="overrides">
         /// Optional user-specified starting values and per-reaction fix flags.
         /// Pass <c>null</c> to use fully automatic initialisation and unconstrained LM fitting.
@@ -31,6 +34,7 @@ namespace CSaVe_Electrochemical_Data
             double temperatureCelsius,
             double electrolytePh,
             double metalIonConcentrationM,
+            MetalSpecies metalSpecies,
             BvUserOverrides overrides = null);
     }
 }
