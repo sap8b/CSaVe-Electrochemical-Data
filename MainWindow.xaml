@@ -371,14 +371,14 @@
                                             Margin="0,0,8,0"
                                             Padding="10,0"
                                             Style="{StaticResource BrowseButton}"
-                                            Content="Import from CSV file"
+                                            Content="Import Fits"
                                             ToolTip="Import a previously exported one-column fit CSV to restore electrolyte and BV starting parameters."
                                             Click="ImportFitSetupButton_Click"/>
                                     <Button x:Name="ExportFitsToCsvButton"
                                             Height="24"
                                             Padding="10,0"
                                             Style="{StaticResource BrowseButton}"
-                                            Content="Export Fits to CSV"
+                                            Content="Export Fits"
                                             ToolTip="Export the newest Static/Fit result columns into a one-column CSV file for later re-use."
                                             Click="ExportFitsToCsvButton_Click"/>
                                 </WrapPanel>
