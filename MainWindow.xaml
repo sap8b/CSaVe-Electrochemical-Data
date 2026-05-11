@@ -674,6 +674,22 @@
                                           Grid.Row="8" Grid.Column="8"
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Center"/>
+                                <!-- Electrolyte row -->
+                                <TextBlock Grid.Row="10" Grid.Column="0"
+                                           Text="Electrolyte" VerticalAlignment="Center"
+                                           FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"/>
+                                <TextBox x:Name="TC"
+                                         Grid.Row="10" Grid.Column="4"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="25"/>
+                                <TextBox x:Name="pH"
+                                         Grid.Row="10" Grid.Column="6"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="8.1"/>
+                                <TextBox x:Name="ClConc"
+                                         Grid.Row="10" Grid.Column="8"
+                                         Style="{StaticResource ModernTextBox}"
+                                         Text="0.6"/>
                             </Grid>
                         </GroupBox>
 
@@ -689,12 +705,12 @@
 
                 <!-- Row 5: Summary text -->
                 <TextBox x:Name="PolarizationSummaryBox"
-                         Grid.Row="5"
+                         Grid.Row="4"
                          AcceptsReturn="True"
                          VerticalScrollBarVisibility="Auto"
                          TextWrapping="Wrap"
                          Style="{StaticResource ReadOnlyTextBox}"
-                         Text="Summary statistics will appear here."/>
+                         Text="Summary statistics will appear here." Margin="0,218,401,0" Grid.RowSpan="2"/>
             </Grid>
         </TabItem>
 
