@@ -72,7 +72,7 @@ namespace CSaVe_Electrochemical_Data
 
         /// <summary>
         /// Estimates the ORR limiting current density using
-        ///   i_lim = n·F·D_O2·c_O2 / δ
+        ///   i_lim = n*F*D_O2*c_O2 / δ
         /// where n = 4, F = 96 485 C/mol, D_O2 and c_O2 are computed from T and Cl⁻,
         /// and δ is the diffusion-layer thickness.
         /// </summary>
@@ -124,9 +124,9 @@ namespace CSaVe_Electrochemical_Data
             double denom3 = 1.0 + d3 * tempK;
             double expTerm = (num3 / denom3) * salinity;
 
-            double kH = Math.Exp(lnHs0 + expTerm);   // Henry's constant (atm·L/mol)
+            double kH = Math.Exp(lnHs0 + expTerm);   // Henry's constant (atm*L/mol)
 
-            // Dissolved O2 concentration: c [mol/L] = p_O2 [atm] / K_H [atm·L/mol]
+            // Dissolved O2 concentration: c [mol/L] = p_O2 [atm] / K_H [atm*L/mol]
             double cMolL  = P_O2_atm / kH;
             double cGPerL  = cMolL * M_O2;
             return cGPerL / 1000.0;  // g/cm³
@@ -149,7 +149,7 @@ namespace CSaVe_Electrochemical_Data
         }
 
         /// <summary>
-        /// Rational temperature model: y = (a + b·x) / (1 + c·x).
+        /// Rational temperature model: y = (a + b*x) / (1 + c*x).
         /// Ported from MATLAB LinearLinear().
         /// </summary>
         private static double LinearLinear(double a, double b, double c, double x)

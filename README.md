@@ -26,7 +26,7 @@ This project was written in C# and XAML using Microsoft Visual Studio 2019.
 All three electrochemical half-reactions are modelled with the **full Butler-Volmer equation**
 referenced to a Nernst-equation equilibrium potential:
 
-| Reaction | E₀ (vs. SHE) | z | Notes |
+| Reaction | E0 (vs. SHE) | z | Notes |
 |---|---|---|---|
 | Metal oxidation (Fe/Fe2-) | −0.44 V | 2 | Net anodic current; cathodic reverse term included |
 | ORR (O2/H2O) | +1.229 V | 4 | BV kinetics + Koutecky-Levich mass-transport correction |

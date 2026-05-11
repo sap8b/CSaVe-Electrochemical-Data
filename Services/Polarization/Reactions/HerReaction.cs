@@ -4,7 +4,7 @@ namespace CSaVe_Electrochemical_Data
 {
     /// <summary>
     /// Represents the hydrogen evolution half-reaction (2H- + 2e- -> H2).
-    /// Standard reduction potential: E₀ = 0.000 V vs. SHE at pH 0.
+    /// Standard reduction potential: E0 = 0.000 V vs. SHE at pH 0.
     /// Electrons transferred: z = 2.
     /// HER is limited only by proton/water diffusion, which is very large in practice.
     /// </summary>

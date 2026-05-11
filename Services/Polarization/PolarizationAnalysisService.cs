@@ -286,7 +286,7 @@ namespace CSaVe_Electrochemical_Data
         }
 
         /// <summary>
-        /// Applies direct iR correction to measured polarization points using E_corrected = E_measured − I·R.
+        /// Applies direct iR correction to measured polarization points using E_corrected = E_measured − I*R.
         /// </summary>
         private static IReadOnlyList<PolarizationPoint> ApplyIrCorrection(
             IReadOnlyList<PolarizationPoint> points,

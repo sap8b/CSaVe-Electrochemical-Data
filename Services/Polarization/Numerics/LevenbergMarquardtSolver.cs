@@ -11,7 +11,7 @@ namespace CSaVe_Electrochemical_Data
     ///   Iterate up to <see cref="MaxIterations"/> times:
     ///     1. Evaluate residual vector r = f(p).
     ///     2. Approximate Jacobian J by forward finite differences with step h_j = max(|p_j|, 1) * 1e-6.
-    ///     3. Form the normal equations:  (J'J + λ·diag(J'J)) Δp = −J'r  (Marquardt scaling).
+    ///     3. Form the normal equations:  (J'J + λ*diag(J'J)) Δp = −J'r  (Marquardt scaling).
     ///     4. Solve for Δp using Gaussian elimination with partial pivoting.
     ///     5. Project p + Δp onto box constraints by clamping each component.
     ///     6. Accept step if new ‖r‖2 &lt; old ‖r‖2; reduce λ by factor 10.
@@ -193,7 +193,7 @@ namespace CSaVe_Electrochemical_Data
         }
 
         /// <summary>
-        /// Solve the n×n linear system A·x = b using Gaussian elimination with partial pivoting.
+        /// Solve the n×n linear system A*x = b using Gaussian elimination with partial pivoting.
         /// Returns <c>false</c> and sets <paramref name="x"/> to an empty array if the matrix is
         /// numerically singular.
         /// </summary>

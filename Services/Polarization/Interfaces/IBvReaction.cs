@@ -30,11 +30,11 @@ namespace CSaVe_Electrochemical_Data
 
         /// <summary>
         /// Equilibrium potential vs. SHE (V) evaluated from the Nernst equation:
-        /// E_eq = E0 − (R·T / z·F) · ln(10) · pH.
+        /// E_eq = E0 − (R*T / z*F) * ln(10) * pH.
         /// </summary>
         double EquilibriumPotentialVshe { get; }
 
-        /// <summary>Thermal voltage V_T = R·T / (z·F) (V).</summary>
+        /// <summary>Thermal voltage V_T = R*T / (z*F) (V).</summary>
         double ThermalVoltageV { get; }
 
         // ── Fitted-parameter box bounds ───────────────────────────────────────────────────────────

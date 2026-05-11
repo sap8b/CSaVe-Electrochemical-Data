@@ -4,7 +4,7 @@ namespace CSaVe_Electrochemical_Data
 {
     /// <summary>
     /// Represents the oxygen reduction half-reaction (O2 + 2H2O + 4e- -> 4OH-).
-    /// Standard reduction potential: E₀ = 1.229 V vs. SHE at pH 0.
+    /// Standard reduction potential: E0 = 1.229 V vs. SHE at pH 0.
     /// Electrons transferred: z = 4.
     /// </summary>
     public sealed class OrrReaction : ElectrochemicalReaction
