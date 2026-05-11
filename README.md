@@ -14,12 +14,11 @@ This project started as a Windows Presentation Foundation (WPF) project for use 
 This project was written in C# and XAML using Microsoft Visual Studio 2019. 
 
 ## Current tabs
-- **Tab 1**: DTA -> CSV conversion
+- **Tab 1**: Polarization analysis (Butler-Volmer fitting, CSV import/export for setup values, and metal-species selection)
 - **Tab 2**: CSVs -> XML export (enabled only for CYCPOL/POTENTIODYNAMIC-derived CSV inputs)
-- **Tab 3**: Polarization analysis (Butler-Volmer-oriented fitting workflow scaffold with replicate summaries)
-- **Tab 4**: EIS analysis (matrix-based equivalent-circuit fitting via NumPy/SciPy)
+- **Tab 3**: DTA -> CSV conversion
 
-## Polarization Analysis (Tab 3)
+## Polarization Analysis (Tab 1)
 
 ### Butler-Volmer model
 
@@ -28,7 +27,7 @@ referenced to a Nernst-equation equilibrium potential:
 
 | Reaction | E0 (vs. SHE) | z | Notes |
 |---|---|---|---|
-| Metal oxidation (Fe/Fe2-) | −0.44 V | 2 | Net anodic current; cathodic reverse term included |
+| Metal oxidation (Fe, Cr, Ni, Mo, Cu, or Al) | species-dependent | species-dependent | Net anodic current; cathodic reverse term included |
 | ORR (O2/H2O) | +1.229 V | 4 | BV kinetics + Koutecky-Levich mass-transport correction |
 | HER (H-/H2) | 0.00 V | 2 | BV kinetics only |
 
@@ -43,7 +42,7 @@ The corrosion potential Ecorr is derived post-fit as the zero-crossing of i_net.
 
 ### Polarization plot legend
 
-The plot in Tab 3 shows the following curves (|i| vs. E, logarithmic current axis):
+The plot in Tab 1 shows the following curves (|i| vs. E, logarithmic current axis):
 
 | Series | Style | Description |
 |---|---|---|
@@ -65,20 +64,6 @@ The plot in Tab 3 shows the following curves (|i| vs. E, logarithmic current axi
 | ORR limiting current density | iₗᵢₘ,ORR | A/cm2 |
 | HER exchange current density | I₀,HER | A/cm2 |
 | HER symmetry factor | βₕₑᵣ | — |
-
-## Python requirements (system Python)
-The analysis tabs assume a system Python install available as `python` (or override with env var `CSAVE_PYTHON_EXECUTABLE`).
-
-Install dependencies:
-
-```bash
-pip install -r Python/requirements.txt
-```
-
-Required packages:
-- `numpy`
-- `scipy`
-- `matplotlib` (used by existing diagnostic utility)
 
 ## Installation
 The app is available here: https://www.microsoft.com/store/productId/9MWJ4GK6S7ZK

@@ -1,3 +1,5 @@
+using CSaVe_Electrochemical_Data.Services.Polarization.Reactions;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -140,7 +142,7 @@ namespace CSaVe_Electrochemical_Data
             // ── Step 4: BV fitting ────────────────────────────────────────────────────────────
             BvModelParameters fitted = _curveFitter.Fit(
                 ePot.ToList(), iDensity.ToList(), ecorrHint, input.TemperatureCelsius,
-                input.ElectrolytePh, input.MetalIonConcentrationM,
+                input.ElectrolytePh, input.MetalIonConcentrationM, input.MetalSpecies,
                 input.UserOverrides);
 
             // ── Step 5: compute display-resolution model curves ───────────────────────────────
@@ -170,12 +172,16 @@ namespace CSaVe_Electrochemical_Data
                 : double.NaN;
 
             // Effective Tafel slopes derived from BV symmetry factors for display.
-            // ba (metal anodic) = 2.303 * R * T / (BetaMetal * z_metal * F)  with z_metal = 2
-            // bc (ORR cathodic) = 2.303 * R * T / ((1-BetaOrr) * z_ORR * F) with z_ORR   = 4
+            // ba (metal anodic) = 2.303 * R * T / (BetaMetal * z_metal * F) using the selected metal reaction z.
+            // bc (ORR cathodic) = 2.303 * R * T / ((1-BetaOrr) * z_ORR * F) with z_ORR = 4.
             double temperatureKelvin = input.TemperatureCelsius + 273.15;
             double rtFactor          = 2.303 * ElectrochemicalConstants.R * temperatureKelvin / ElectrochemicalConstants.F;
+            BvModelParameters.ReactionParameters metalReaction =
+                fitted.GetReactionParam(ReactionType.MetalOxidation)
+                ?? throw new InvalidOperationException("The selected metal oxidation reaction was not created for the fitted model.");
+            double metalElectronCount = metalReaction.Reaction.Z;
             double betaAnodicV = fitted.IncludeMetal
-                ? rtFactor / (fitted.BetaMetal * 2.0)
+                ? rtFactor / (fitted.BetaMetal * metalElectronCount)
                 : double.NaN;
             double betaCathodicV = fitted.IncludeOrr
                 ? rtFactor / ((1.0 - fitted.BetaOrr) * 4.0)
