@@ -18,8 +18,8 @@ namespace CSaVe_Electrochemical_Data
     ///      branches share the same aligned OCP.
     ///   4. Discard the short "wrong-side" segment from each branch that extends across
     ///      the aligned OCP:
-    ///        – Anodic branch  → keep only points where V &gt;= alignedOcp
-    ///        – Cathodic branch → keep only points where V &lt;  alignedOcp
+    ///        – Anodic branch  -> keep only points where V &gt;= alignedOcp
+    ///        – Cathodic branch -> keep only points where V &lt;  alignedOcp
     ///   5. Merge and sort by potential ascending.
     /// </remarks>
     public interface IPolarizationCurveJoiner

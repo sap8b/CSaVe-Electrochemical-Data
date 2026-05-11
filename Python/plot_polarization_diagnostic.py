@@ -531,7 +531,7 @@ def main():
 
         # Cathodic branch: sort by Vapp ascending (from V_min upward toward
         # E_corr), then by abs(totali) ascending within the same bucket, so the
-        # concatenated trace reads V_min → E_corr → V_max with no back-jump.
+        # concatenated trace reads V_min -> E_corr -> V_max with no back-jump.
         if len(V_cat_xml) > 0:
             cat_sort_idx = np.lexsort((np.abs(I_cat_xml), V_cat_xml))
             V_cat_sorted = V_cat_xml[cat_sort_idx]

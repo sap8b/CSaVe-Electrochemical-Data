@@ -178,7 +178,7 @@ namespace CSaVe_Electrochemical_Data
             if (orrRfs != null && orrRfs.IsIncluded)
                 orrRfs.Ilim = EstimateIlimOrr(e, i, ecorr, orrRfs.Reaction);
 
-            // Estimate kinetic parameters for each included reaction in sorted (low→high E_eq) order.
+            // Estimate kinetic parameters for each included reaction in sorted (low->high E_eq) order.
             foreach (ReactionFitState rfs in rfsList)
             {
                 if (!rfs.IsIncluded)

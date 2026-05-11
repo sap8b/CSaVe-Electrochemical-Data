@@ -14,8 +14,8 @@ This project started as a Windows Presentation Foundation (WPF) project for use 
 This project was written in C# and XAML using Microsoft Visual Studio 2019. 
 
 ## Current tabs
-- **Tab 1**: DTA → CSV conversion
-- **Tab 2**: CSVs → XML export (enabled only for CYCPOL/POTENTIODYNAMIC-derived CSV inputs)
+- **Tab 1**: DTA -> CSV conversion
+- **Tab 2**: CSVs -> XML export (enabled only for CYCPOL/POTENTIODYNAMIC-derived CSV inputs)
 - **Tab 3**: Polarization analysis (Butler-Volmer-oriented fitting workflow scaffold with replicate summaries)
 - **Tab 4**: EIS analysis (matrix-based equivalent-circuit fitting via NumPy/SciPy)
 

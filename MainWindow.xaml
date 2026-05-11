@@ -781,7 +781,7 @@
                                 <TextBlock Grid.Row="8" Grid.Column="0"
                                            Text="Me Ox" VerticalAlignment="Center"
                                            FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"
-                                           ToolTip="Metal Oxidation reaction (e.g. Fe → Fe2- + 2e-)"/>
+                                           ToolTip="Metal Oxidation reaction (e.g. Fe -> Fe2- + 2e-)"/>
                                 <CheckBox x:Name="MeOxIncludeCheckBox"
                                           Grid.Row="8" Grid.Column="2"
                                           IsChecked="True"

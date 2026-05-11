@@ -1299,7 +1299,7 @@ namespace CSaVe_Electrochemical_Data
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // Tab 2: Combine CSVs → XML  event handlers
+        // Tab 2: Combine CSVs -> XML  event handlers
         // ─────────────────────────────────────────────────────────────────────────
 
         private void BrowseAnodicButton_Click(object sender, RoutedEventArgs e)
@@ -1354,9 +1354,9 @@ namespace CSaVe_Electrochemical_Data
         /// <summary>
         /// Derives the suggested XML output filename from the primary CSV path.
         /// Strips trailing suffix patterns (case-insensitive):
-        ///   Anodic{digits}  — e.g. "HY80Anodic1"  → "HY80"
-        ///   Cycpol{digits}  — e.g. "SteelCycpol2" → "Steel"
-        ///   Pol{digits}     — e.g. "SamplePol"    → "Sample"
+        ///   Anodic{digits}  — e.g. "HY80Anodic1"  -> "HY80"
+        ///   Cycpol{digits}  — e.g. "SteelCycpol2" -> "Steel"
+        ///   Pol{digits}     — e.g. "SamplePol"    -> "Sample"
         /// Then appends "_polarization.xml".
         /// </summary>
         private void AutoPopulateXmlFilename(string primaryPath)

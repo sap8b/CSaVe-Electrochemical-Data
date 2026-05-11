@@ -25,7 +25,7 @@ namespace CSaVe_Electrochemical_Data
         // ── Temperature-parameterised b-vector for the diffusivity Stokes model ─────────────────
         // Each row i contains [a, b, c] for LinearLinear(a, b, c, T_K):
         //   b_i(T_K) = (a + b*T_K) / (1 + c*T_K)
-        // Row index matches MATLAB params(i,:) (1-based → 0-based).
+        // Row index matches MATLAB params(i,:) (1-based -> 0-based).
         private static readonly double[,] DiffParams = new double[6, 3]
         {
             {  0.193015581,  -0.000936823,  -3738.145703 },   // b[0] – prefactor K

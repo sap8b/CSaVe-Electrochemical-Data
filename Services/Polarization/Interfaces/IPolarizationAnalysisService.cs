@@ -2,8 +2,8 @@ namespace CSaVe_Electrochemical_Data
 {
     /// <summary>
     /// Orchestrates the full polarization-curve analysis pipeline:
-    /// CSV reading → monotonicity filtering → curve joining (if two files) →
-    /// Ecorr estimation → BV fitting → metric extraction → result assembly.
+    /// CSV reading -> monotonicity filtering -> curve joining (if two files) ->
+    /// Ecorr estimation -> BV fitting -> metric extraction -> result assembly.
     /// </summary>
     public interface IPolarizationAnalysisService
     {

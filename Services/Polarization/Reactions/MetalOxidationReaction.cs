@@ -5,7 +5,7 @@ using System;
 namespace CSaVe_Electrochemical_Data
 {
     /// <summary>
-    /// Represents the metal oxidation (dissolution) half-reaction (e.g. Fe → Fe2- + 2e-).
+    /// Represents the metal oxidation (dissolution) half-reaction (e.g. Fe -> Fe2- + 2e-).
     /// Uses an textbook −0.44 V for Fe/Fe2- standard potential of E₀ = −0.44 V vs. SHE.
     /// Electrons transferred: z = 2.
     /// Includes a Nernst concentration correction for the dissolved metal cation activity.
