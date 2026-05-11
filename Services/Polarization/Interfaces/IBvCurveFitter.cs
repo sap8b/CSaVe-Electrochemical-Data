@@ -17,6 +17,8 @@ namespace CSaVe_Electrochemical_Data
         /// <param name="currentDensityAcm2">Signed current density (A/cm²) at each potential.</param>
         /// <param name="ecorrHintV">Initial estimate for the corrosion potential (V).</param>
         /// <param name="temperatureCelsius">Electrolyte temperature (°C).</param>
+        /// <param name="electrolytePh">Electrolyte pH.</param>
+        /// <param name="metalIonConcentrationM">Dissolved metal-ion concentration [M²⁺] (mol/L).</param>
         /// <param name="overrides">
         /// Optional user-specified starting values and per-reaction fix flags.
         /// Pass <c>null</c> to use fully automatic initialisation and unconstrained LM fitting.
@@ -27,6 +29,8 @@ namespace CSaVe_Electrochemical_Data
             IReadOnlyList<double> currentDensityAcm2,
             double ecorrHintV,
             double temperatureCelsius,
+            double electrolytePh,
+            double metalIonConcentrationM,
             BvUserOverrides overrides = null);
     }
 }
