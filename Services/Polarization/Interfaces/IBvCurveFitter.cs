@@ -20,7 +20,7 @@ namespace CSaVe_Electrochemical_Data
         /// <param name="ecorrHintV">Initial estimate for the corrosion potential (V).</param>
         /// <param name="temperatureCelsius">Electrolyte temperature (oC).</param>
         /// <param name="electrolytePh">Electrolyte pH.</param>
-        /// <param name="metalIonConcentrationM">Dissolved metal-ion concentration [Mz+] (mol/L).</param>
+        /// <param name="metalIonConcentrationM">Dissolved metal-ion concentration [M^z+] (mol/L), where z is the selected metal charge number.</param>
         /// <param name="metalSpecies">Selected alloying-metal oxidation reaction to fit.</param>
         /// <param name="overrides">
         /// Optional user-specified starting values and per-reaction fix flags.

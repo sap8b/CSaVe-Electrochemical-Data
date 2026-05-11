@@ -347,7 +347,8 @@
                                 </Grid.RowDefinitions>
 
                                 <WrapPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="9" Margin="0,0,0,2">
-                                    <TextBlock Text="Metal species:"
+                                    <TextBlock x:Name="MetalSpeciesLabel"
+                                               Text="Metal species:"
                                                VerticalAlignment="Center"
                                                FontSize="11"
                                                FontWeight="SemiBold"
@@ -356,6 +357,7 @@
                                     <ComboBox x:Name="MetalSpeciesComboBox"
                                               Width="70"
                                               Margin="0,0,10,0"
+                                              AutomationProperties.LabeledBy="{Binding ElementName=MetalSpeciesLabel}"
                                               ToolTip="Select the metal oxidation reaction used in the BV model.">
                                         <ComboBoxItem Content="Fe" IsSelected="True"/>
                                         <ComboBoxItem Content="Cr"/>

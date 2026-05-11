@@ -1171,12 +1171,12 @@ namespace CSaVe_Electrochemical_Data
             return string.IsNullOrWhiteSpace(trimmed) ? "auto" : trimmed;
         }
 
-        private static string EscapeSingleColumnCsvValue(string value)
+        private static string QuoteCsvValue(string value)
         {
             return $"\"{(value ?? string.Empty).Replace("\"", "\"\"")}\"";
         }
 
-        private static string ParseSingleColumnCsvValue(string line)
+        private static string UnquoteCsvValue(string line)
         {
             string trimmed = line?.Trim() ?? string.Empty;
             if (trimmed.Length >= 2 && trimmed[0] == '\"' && trimmed[^1] == '\"')
@@ -1841,8 +1841,8 @@ namespace CSaVe_Electrochemical_Data
                 foreach (DataRow row in polarizationFitResultsTable.Rows)
                 {
                     string parameterName = row["Parameter"]?.ToString() ?? string.Empty;
-                    lines.Add(EscapeSingleColumnCsvValue($"Static|{parameterName}|{row[staticColumnName]?.ToString() ?? string.Empty}"));
-                    lines.Add(EscapeSingleColumnCsvValue($"Fit|{parameterName}|{row[fitColumnName]?.ToString() ?? string.Empty}"));
+                    lines.Add(QuoteCsvValue($"Static|{parameterName}|{row[staticColumnName]?.ToString() ?? string.Empty}"));
+                    lines.Add(QuoteCsvValue($"Fit|{parameterName}|{row[fitColumnName]?.ToString() ?? string.Empty}"));
                 }
 
                 File.WriteAllLines(dlg.FileName, lines);
@@ -1872,7 +1872,7 @@ namespace CSaVe_Electrochemical_Data
 
                 foreach (string line in File.ReadLines(dlg.FileName))
                 {
-                    string value = ParseSingleColumnCsvValue(line);
+                    string value = UnquoteCsvValue(line);
                     if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "Entry", StringComparison.OrdinalIgnoreCase))
                         continue;
 

@@ -37,6 +37,11 @@ namespace CSaVe_Electrochemical_Data.Services.Polarization.Reactions
         public abstract ElectrochemicalReaction CreateReaction(ElectrolyteConditions electrolyte);
 
         // ── Convenience static factory methods ────────────────────────────────────────────────────
+        /// <summary>
+        /// Creates the species-specific factory for the selected alloying-metal oxidation reaction.
+        /// </summary>
+        /// <param name="metalSpecies">Metal species whose oxidation half-reaction should be modelled.</param>
+        /// <returns>The matching species-specific metal-oxidation factory.</returns>
         public static ElectrochemicalReactionFactory CreateMetalOxidationFactory(MetalSpecies metalSpecies)
             => metalSpecies switch
             {
@@ -49,7 +54,11 @@ namespace CSaVe_Electrochemical_Data.Services.Polarization.Reactions
                 _ => throw new ArgumentOutOfRangeException(nameof(metalSpecies), metalSpecies, "Unsupported metal species.")
             };
 
-        /// <summary>Creates a selected metal-oxidation reaction via the matching species factory.</summary>
+        /// <summary>Creates the selected metal-oxidation reaction via the matching species factory.</summary>
+        /// <param name="metalSpecies">Metal species whose oxidation half-reaction should be modelled.</param>
+        /// <param name="pH">Electrolyte pH.</param>
+        /// <param name="temperatureCelsius">Electrolyte temperature in degrees Celsius.</param>
+        /// <param name="metalIonConcentrationM">Dissolved metal-ion concentration [M^z+] in mol/L.</param>
         public static ElectrochemicalReaction CreateMetalOxidation(MetalSpecies metalSpecies = MetalSpecies.Fe, double pH = 8.0, double temperatureCelsius = 25.0, double metalIonConcentrationM = 1.0e-6)
             => CreateMetalOxidationFactory(metalSpecies).CreateReaction(new ElectrolyteConditions(pH, temperatureCelsius, metalIonConcentrationM, metalSpecies));
 

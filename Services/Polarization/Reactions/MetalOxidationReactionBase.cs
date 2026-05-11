@@ -23,6 +23,7 @@ namespace CSaVe_Electrochemical_Data
         }
 
         public override double EquilibriumPotentialVshe =>
+            // Natural log is correct here because the Nernst term is formulated directly with RT/zF.
             base.EquilibriumPotentialVshe + ThermalVoltageV * Math.Log(_metalCationConcentration);
 
         public override double IlimMinAcm2 => 1.0e-14;

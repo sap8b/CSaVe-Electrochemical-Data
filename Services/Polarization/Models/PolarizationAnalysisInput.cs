@@ -44,7 +44,8 @@ namespace CSaVe_Electrochemical_Data
         public double ChlorideConcentrationM { get; set; } = 0.6;
 
         /// <summary>
-        /// Dissolved metal-ion concentration [Mz+] (mol/L) used by the selected metal-oxidation Nernst term.
+        /// Dissolved metal-ion concentration [M^z+] (mol/L), where z is the selected metal charge number,
+        /// used by the selected metal-oxidation Nernst term.
         /// Default 1.0e-6 M.
         /// </summary>
         public double MetalIonConcentrationM { get; set; } = 1.0e-6;
