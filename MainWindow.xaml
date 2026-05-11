@@ -473,7 +473,6 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
                 <Grid Grid.Row="0" Margin="0,0,0,4">
@@ -553,11 +552,65 @@
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="8"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="8"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
+                        <GroupBox Header="Electrolyte Parameters" Grid.Row="0">
+                            <Grid Margin="6,6,6,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="10"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="8"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Grid.Column="0">
+                                    <TextBlock Text="Temperature (°C)"
+                                               FontSize="11"
+                                               Foreground="#64748B"
+                                               Margin="0,0,0,2"/>
+                                    <TextBox x:Name="TC"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Text="25"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="0" Grid.Column="2">
+                                    <TextBlock Text="pH"
+                                               FontSize="11"
+                                               Foreground="#64748B"
+                                               Margin="0,0,0,2"/>
+                                    <TextBox x:Name="pH"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Text="8.1"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="2" Grid.Column="0">
+                                    <TextBlock Text="Cl⁻ concentration (M)"
+                                               FontSize="11"
+                                               Foreground="#64748B"
+                                               Margin="0,0,0,2"/>
+                                    <TextBox x:Name="ClConc"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Text="0.6"/>
+                                </StackPanel>
+                                <StackPanel Grid.Row="2" Grid.Column="2">
+                                    <TextBlock Text="Metal ion concentration [M²⁺] (M)"
+                                               FontSize="11"
+                                               Foreground="#64748B"
+                                               Margin="0,0,0,2"/>
+                                    <TextBox x:Name="MetalIonConcTextBox"
+                                             Style="{StaticResource ModernTextBox}"
+                                             Text="1.0e-6"/>
+                                </StackPanel>
+                            </Grid>
+                        </GroupBox>
+
                         <!-- BV Starting Parameters GroupBox -->
-                        <GroupBox Header="BV Starting Parameters" Grid.Row="0">
+                        <GroupBox Header="BV Starting Parameters" Grid.Row="2">
                             <Grid Margin="4,4,4,4">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="48"/>
@@ -674,43 +727,18 @@
                                           Grid.Row="8" Grid.Column="8"
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Center"/>
-                                <!-- Electrolyte row -->
-                                <TextBlock Grid.Row="10" Grid.Column="0"
-                                           Text="Electrolyte" VerticalAlignment="Center"
-                                           FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"/>
-                                <TextBox x:Name="TC"
-                                         Grid.Row="10" Grid.Column="4"
-                                         Style="{StaticResource ModernTextBox}"
-                                         Text="25"/>
-                                <TextBox x:Name="pH"
-                                         Grid.Row="10" Grid.Column="6"
-                                         Style="{StaticResource ModernTextBox}"
-                                         Text="8.1"/>
-                                <TextBox x:Name="ClConc"
-                                         Grid.Row="10" Grid.Column="8"
-                                         Style="{StaticResource ModernTextBox}"
-                                         Text="0.6"/>
                             </Grid>
                         </GroupBox>
 
                         <!-- Fit results DataGrid -->
                         <DataGrid x:Name="PolarizationResultsGrid"
-                                  Grid.Row="2"
+                                  Grid.Row="4"
                                   AutoGenerateColumns="True"
                                   IsReadOnly="True"
                                   VerticalScrollBarVisibility="Auto"
                                   HorizontalScrollBarVisibility="Auto"/>
                     </Grid>
                 </Grid>
-
-                <!-- Row 5: Summary text -->
-                <TextBox x:Name="PolarizationSummaryBox"
-                         Grid.Row="4"
-                         AcceptsReturn="True"
-                         VerticalScrollBarVisibility="Auto"
-                         TextWrapping="Wrap"
-                         Style="{StaticResource ReadOnlyTextBox}"
-                         Text="Summary statistics will appear here." Margin="0,218,401,0" Grid.RowSpan="2"/>
             </Grid>
         </TabItem>
 

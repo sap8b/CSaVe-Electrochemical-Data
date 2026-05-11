@@ -16,6 +16,7 @@ namespace CSaVe_Electrochemical_Data
     public sealed class BvCurveFitter : IBvCurveFitter
     {
         private const double DefaultPh = 8.0;
+        private const double DefaultMetalIonConcentrationM = 1.0e-6;
         private const double TafelLowerOffsetV = 0.01;
         private const double TafelUpperOffsetV = 0.15;
         private const double DefaultBeta = 0.5;
@@ -57,6 +58,8 @@ namespace CSaVe_Electrochemical_Data
             IReadOnlyList<double> currentDensityAcm2,
             double ecorrHintV,
             double temperatureCelsius,
+            double electrolytePh,
+            double metalIonConcentrationM,
             BvUserOverrides overrides = null)
         {
             if (potentialV.Count != currentDensityAcm2.Count)
@@ -74,7 +77,13 @@ namespace CSaVe_Electrochemical_Data
             double[] e = [.. potentialV];
             double[] i = [.. currentDensityAcm2];
 
-            IReadOnlyList<IBvReaction> reactions = CreateReactionList(temperatureCelsius);
+            double effectivePh = double.IsFinite(electrolytePh) ? electrolytePh : DefaultPh;
+            double effectiveMetalIonConcentrationM =
+                (double.IsFinite(metalIonConcentrationM) && metalIonConcentrationM > 0.0)
+                    ? metalIonConcentrationM
+                    : DefaultMetalIonConcentrationM;
+
+            IReadOnlyList<IBvReaction> reactions = CreateReactionList(temperatureCelsius, effectivePh, effectiveMetalIonConcentrationM);
             double ecorr0 = EstimateEcorr(e, i, ecorrHintV);
 
             FitState initialState = EstimateInitialState(e, i, ecorr0, reactions, includeMetal, includeOrr, includeHer);
@@ -113,9 +122,18 @@ namespace CSaVe_Electrochemical_Data
         /// The order determines the per-reaction estimation sequence in
         /// <see cref="EstimateInitialState"/>.
         /// </summary>
-        private IReadOnlyList<IBvReaction> CreateReactionList(double temperatureCelsius) =>
+        private IReadOnlyList<IBvReaction> CreateReactionList(
+            double temperatureCelsius,
+            double electrolytePh,
+            double metalIonConcentrationM) =>
             _reactionFactories
-                .Select(f => (IBvReaction)f.CreateReaction(DefaultPh, temperatureCelsius))
+                .Select(f =>
+                {
+                    if (f is MetalOxidationFactory metalFactory)
+                        metalFactory.MetalCationConcentration = metalIonConcentrationM;
+
+                    return (IBvReaction)f.CreateReaction(electrolytePh, temperatureCelsius);
+                })
                 .OrderBy(r => r.EquilibriumPotentialVshe)
                 .ToList();
 

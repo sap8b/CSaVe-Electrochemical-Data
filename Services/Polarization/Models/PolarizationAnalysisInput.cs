@@ -32,6 +32,21 @@ namespace CSaVe_Electrochemical_Data
         /// <summary>Temperature in degrees Celsius used for Butler-Volmer calculations. Default 25 °C.</summary>
         public double TemperatureCelsius { get; set; } = 25.0;
 
+        /// <summary>Electrolyte pH used for Nernst equilibrium corrections. Default 8.0.</summary>
+        public double ElectrolytePh { get; set; } = 8.0;
+
+        /// <summary>
+        /// Chloride concentration (mol/L) retained with the analysis context for electrolyte-aware modelling.
+        /// Default 0.6 M.
+        /// </summary>
+        public double ChlorideConcentrationM { get; set; } = 0.6;
+
+        /// <summary>
+        /// Dissolved metal-ion concentration [M²⁺] (mol/L) used by the metal-oxidation Nernst term.
+        /// Default 1.0e-6 M.
+        /// </summary>
+        public double MetalIonConcentrationM { get; set; } = 1.0e-6;
+
         /// <summary>Optional solution resistance in ohms for iR correction. Default 0 Ω (disabled).</summary>
         public double RSolutionOhm { get; set; } = 0.0;
 
