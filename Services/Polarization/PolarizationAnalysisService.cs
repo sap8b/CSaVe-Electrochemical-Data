@@ -176,7 +176,10 @@ namespace CSaVe_Electrochemical_Data
             // bc (ORR cathodic) = 2.303 * R * T / ((1-BetaOrr) * z_ORR * F) with z_ORR = 4.
             double temperatureKelvin = input.TemperatureCelsius + 273.15;
             double rtFactor          = 2.303 * ElectrochemicalConstants.R * temperatureKelvin / ElectrochemicalConstants.F;
-            double metalElectronCount = fitted.GetReactionParam(ReactionType.MetalOxidation)?.Reaction.Z ?? 2.0;
+            BvModelParameters.ReactionParameters metalReaction =
+                fitted.GetReactionParam(ReactionType.MetalOxidation)
+                ?? throw new InvalidOperationException("The selected metal oxidation reaction was not created for the fitted model.");
+            double metalElectronCount = metalReaction.Reaction.Z;
             double betaAnodicV = fitted.IncludeMetal
                 ? rtFactor / (fitted.BetaMetal * metalElectronCount)
                 : double.NaN;

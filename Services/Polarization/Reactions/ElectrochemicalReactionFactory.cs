@@ -1,3 +1,5 @@
+using System;
+
 namespace CSaVe_Electrochemical_Data.Services.Polarization.Reactions
 {
     public readonly struct ElectrolyteConditions
@@ -44,7 +46,7 @@ namespace CSaVe_Electrochemical_Data.Services.Polarization.Reactions
                 MetalSpecies.Mo => new MoOxidationFactory(),
                 MetalSpecies.Cu => new CuOxidationFactory(),
                 MetalSpecies.Al => new AlOxidationFactory(),
-                _ => new FeOxidationFactory()
+                _ => throw new ArgumentOutOfRangeException(nameof(metalSpecies), metalSpecies, "Unsupported metal species.")
             };
 
         /// <summary>Creates a selected metal-oxidation reaction via the matching species factory.</summary>
