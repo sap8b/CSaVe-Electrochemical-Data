@@ -571,7 +571,7 @@
                                 </Grid.RowDefinitions>
 
                                 <StackPanel Grid.Row="0" Grid.Column="0">
-                                    <TextBlock Text="Temperature (°C)"
+                                    <TextBlock Text="Temperature (C)"
                                                FontSize="11"
                                                Foreground="#64748B"
                                                Margin="0,0,0,2"/>
@@ -589,7 +589,7 @@
                                              Text="8.1"/>
                                 </StackPanel>
                                 <StackPanel Grid.Row="2" Grid.Column="0">
-                                    <TextBlock Text="Cl⁻ concentration (M)"
+                                    <TextBlock Text="Chloride concentration (M)"
                                                FontSize="11"
                                                Foreground="#64748B"
                                                Margin="0,0,0,2"/>
@@ -598,7 +598,7 @@
                                              Text="0.6"/>
                                 </StackPanel>
                                 <StackPanel Grid.Row="2" Grid.Column="2">
-                                    <TextBlock Text="Metal ion concentration [M²⁺] (M)"
+                                    <TextBlock Text="Metal ion concentration (M)"
                                                FontSize="11"
                                                Foreground="#64748B"
                                                Margin="0,0,0,2"/>
