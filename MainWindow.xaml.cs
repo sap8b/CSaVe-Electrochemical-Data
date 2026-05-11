@@ -181,6 +181,7 @@ namespace CSaVe_Electrochemical_Data
 
             InitializePlotModels();
             InitializePolarizationFitResultsTable();
+            UpdateOrrIlimFromConditions();
         }
         /// <summary>
         /// This method searches through the provided folder and subfolders or just through the provided folder to find all DTA files and then uses the Background Worker to call
@@ -1014,7 +1015,7 @@ namespace CSaVe_Electrochemical_Data
             polarizationPlotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = "Potential (V)" });
             polarizationPlotModel.Legends.Add(new Legend
             {
-                LegendPosition      = LegendPosition.TopRight,
+                LegendPosition      = LegendPosition.BottomLeft,
                 LegendPlacement     = LegendPlacement.Inside,
                 LegendBackground    = OxyColor.FromAColor(200, OxyColors.White),
                 LegendBorder        = OxyColors.Gray,
@@ -1129,6 +1130,70 @@ namespace CSaVe_Electrochemical_Data
             return double.IsFinite(value)
                 ? value.ToString(format, CultureInfo.InvariantCulture)
                 : "n/a";
+        }
+
+        /// <summary>
+        /// Computes the ORR limiting current density from the current UI values of temperature,
+        /// Cl⁻ concentration, and diffusion-layer thickness, and populates
+        /// <see cref="OrrIlimTextBox"/>. Ignores invalid inputs without showing a dialog.
+        /// </summary>
+        private void UpdateOrrIlimFromConditions()
+        {
+            if (!TryParseIlimInputs(out double tempC, out double clM, out double deltaMicrons, showErrors: false))
+                return;
+
+            try
+            {
+                double deltaCm = deltaMicrons * 1.0e-4;
+                double ilim = DissolvedOxygenCalculator.CalcOrrIlimAcm2(tempC, clM, deltaCm);
+                OrrIlimTextBox.Text = ilim.ToString("E3", CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                // Silently ignore calculation errors during startup or background updates.
+            }
+        }
+
+        /// <summary>
+        /// Parses the temperature, Cl⁻ concentration, and diffusion-layer thickness from the UI.
+        /// </summary>
+        /// <param name="tempC">Parsed temperature (°C).</param>
+        /// <param name="clM">Parsed Cl⁻ concentration (mol/L).</param>
+        /// <param name="deltaMicrons">Parsed diffusion-layer thickness (µm).</param>
+        /// <param name="showErrors">When true, shows a MessageBox for the first invalid input encountered.</param>
+        /// <returns>True when all three inputs are valid.</returns>
+        private bool TryParseIlimInputs(out double tempC, out double clM, out double deltaMicrons, bool showErrors)
+        {
+            tempC = 0; clM = 0; deltaMicrons = 0;
+
+            if (!double.TryParse(TC.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out tempC)
+                || !double.IsFinite(tempC))
+            {
+                if (showErrors)
+                    System.Windows.MessageBox.Show("Enter a valid temperature (°C) before calculating i_lim.",
+                        "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            if (!double.TryParse(ClConc.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out clM)
+                || clM < 0.0)
+            {
+                if (showErrors)
+                    System.Windows.MessageBox.Show("Enter a valid Cl⁻ concentration (M) before calculating i_lim.",
+                        "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            if (!double.TryParse(DiffLayerThicknessTextBox.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out deltaMicrons)
+                || deltaMicrons <= 0.0)
+            {
+                if (showErrors)
+                    System.Windows.MessageBox.Show("Enter a valid positive diffusion-layer thickness (µm) before calculating i_lim.",
+                        "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            return true;
         }
 
         private static string FormatScientific(double value)
@@ -1506,6 +1571,10 @@ namespace CSaVe_Electrochemical_Data
                 chlorideConcentrationM,
                 metalIonConcentrationM);
 
+            // Rebind so DataGrid picks up the newly added columns.
+            PolarizationResultsGrid.ItemsSource = null;
+            PolarizationResultsGrid.ItemsSource = polarizationFitResultsTable.DefaultView;
+
             polarizationPlotModel.Series.Clear();
 
             // ── Determine the potential array to use for model curves ────────────────────────────────────
@@ -1651,6 +1720,59 @@ namespace CSaVe_Electrochemical_Data
             polarizationPlotModel.InvalidatePlot(true);
 
             PolarizationAnalysisStatusBox.Text = "Polarization analysis completed.";
+        }
+
+        /// <summary>
+        /// Exports the current polarization plot (including legend) to a user-selected PNG file.
+        /// </summary>
+        private void SavePolarizationPlotButton_Click(object sender, RoutedEventArgs e)
+        {
+            using var dlg = new SaveFileDialog
+            {
+                Title = "Save polarization plot",
+                Filter = "PNG image (*.png)|*.png",
+                DefaultExt = "png",
+                FileName = "polarization_plot.png"
+            };
+            if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                return;
+
+            try
+            {
+                const int exportWidth  = 1200;
+                const int exportHeight = 900;
+                var exporter = new OxyPlot.Wpf.PngExporter { Width = exportWidth, Height = exportHeight };
+                using var stream = System.IO.File.Create(dlg.FileName);
+                exporter.Export(polarizationPlotModel, stream);
+                PolarizationAnalysisStatusBox.Text = $"Plot saved: {dlg.FileName}";
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Failed to save plot image:\n{ex.Message}",
+                    "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Estimates the ORR limiting current density from temperature, Cl⁻ concentration,
+        /// and diffusion-layer thickness, then populates <see cref="OrrIlimTextBox"/>.
+        /// </summary>
+        private void CalcIlimButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TryParseIlimInputs(out double tempC, out double clM, out double deltaMicrons, showErrors: true))
+                return;
+
+            try
+            {
+                double deltaCm = deltaMicrons * 1.0e-4;
+                double ilim = DissolvedOxygenCalculator.CalcOrrIlimAcm2(tempC, clM, deltaCm);
+                OrrIlimTextBox.Text = ilim.ToString("E3", CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Failed to calculate i_lim:\n{ex.Message}",
+                    "Calculation Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void BrowseEisFilesButton_Click(object sender, RoutedEventArgs e)
