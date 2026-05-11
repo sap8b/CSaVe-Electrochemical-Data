@@ -2,6 +2,11 @@ namespace CSaVe_Electrochemical_Data.Services.Polarization.Reactions
 {
     public readonly struct ElectrolyteConditions
     {
+        public ElectrolyteConditions(double pH, double temperatureCelsius, double metalIonConcentrationM)
+            : this(pH, temperatureCelsius, metalIonConcentrationM, MetalSpecies.Fe)
+        {
+        }
+
         public ElectrolyteConditions(double pH, double temperatureCelsius, double metalIonConcentrationM, MetalSpecies metalSpecies)
         {
             PH = pH;
@@ -48,10 +53,10 @@ namespace CSaVe_Electrochemical_Data.Services.Polarization.Reactions
 
         /// <summary>Creates an <see cref="OrrReaction"/> via <see cref="ORRFactory"/>.</summary>
         public static ElectrochemicalReaction CreateOrr(double pH = 8.0, double temperatureCelsius = 25.0)
-            => new ORRFactory().CreateReaction(new ElectrolyteConditions(pH, temperatureCelsius, 1.0e-6, MetalSpecies.Fe));
+            => new ORRFactory().CreateReaction(new ElectrolyteConditions(pH, temperatureCelsius, 1.0e-6));
 
         /// <summary>Creates a <see cref="HerReaction"/> via <see cref="HERFactory"/>.</summary>
         public static ElectrochemicalReaction CreateHer(double pH = 8.0, double temperatureCelsius = 25.0)
-            => new HERFactory().CreateReaction(new ElectrolyteConditions(pH, temperatureCelsius, 1.0e-6, MetalSpecies.Fe));
+            => new HERFactory().CreateReaction(new ElectrolyteConditions(pH, temperatureCelsius, 1.0e-6));
     }
 }
