@@ -29,7 +29,7 @@ namespace CSaVe_Electrochemical_Data
         private static readonly double[,] DiffParams = new double[6, 3]
         {
             {  0.193015581,  -0.000936823,  -3738.145703 },   // b[0] – prefactor K
-            {  0.586220598,  -0.001982362,  -0.003767555 },   // b[1] – A'  (viscosity conc. term)
+            {  0.586220598,  -0.001982362,  -0.003767555 },   // b[1] – A'  (viscosity concentration term)
             { -2058331786,    7380780.538,  -725742.0949 },   // b[2] – B'₁ (viscosity T term 1)
             {  -12341118,     7397.380585, -1024619.196  },   // b[3] – B'₂ (viscosity T term 2)
             { -0.082481761,   8.05605e-06,  -0.005230993 },   // b[4] – η₀ pre-exponential

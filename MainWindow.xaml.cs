@@ -1133,22 +1133,13 @@ namespace CSaVe_Electrochemical_Data
         }
 
         /// <summary>
-        /// Silently computes the ORR limiting current density from the current UI values of
-        /// temperature, Cl⁻ concentration, and diffusion-layer thickness, and populates
+        /// Computes the ORR limiting current density from the current UI values of temperature,
+        /// Cl⁻ concentration, and diffusion-layer thickness, and populates
         /// <see cref="OrrIlimTextBox"/>. Ignores invalid inputs without showing a dialog.
         /// </summary>
         private void UpdateOrrIlimFromConditions()
         {
-            if (!double.TryParse(TC.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double tempC)
-                || !double.IsFinite(tempC))
-                return;
-
-            if (!double.TryParse(ClConc.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double clM)
-                || clM < 0.0)
-                return;
-
-            if (!double.TryParse(DiffLayerThicknessTextBox.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double deltaMicrons)
-                || deltaMicrons <= 0.0)
+            if (!TryParseIlimInputs(out double tempC, out double clM, out double deltaMicrons, showErrors: false))
                 return;
 
             try
@@ -1161,6 +1152,48 @@ namespace CSaVe_Electrochemical_Data
             {
                 // Silently ignore calculation errors during startup or background updates.
             }
+        }
+
+        /// <summary>
+        /// Parses the temperature, Cl⁻ concentration, and diffusion-layer thickness from the UI.
+        /// </summary>
+        /// <param name="tempC">Parsed temperature (°C).</param>
+        /// <param name="clM">Parsed Cl⁻ concentration (mol/L).</param>
+        /// <param name="deltaMicrons">Parsed diffusion-layer thickness (µm).</param>
+        /// <param name="showErrors">When true, shows a MessageBox for the first invalid input encountered.</param>
+        /// <returns>True when all three inputs are valid.</returns>
+        private bool TryParseIlimInputs(out double tempC, out double clM, out double deltaMicrons, bool showErrors)
+        {
+            tempC = 0; clM = 0; deltaMicrons = 0;
+
+            if (!double.TryParse(TC.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out tempC)
+                || !double.IsFinite(tempC))
+            {
+                if (showErrors)
+                    System.Windows.MessageBox.Show("Enter a valid temperature (°C) before calculating i_lim.",
+                        "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            if (!double.TryParse(ClConc.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out clM)
+                || clM < 0.0)
+            {
+                if (showErrors)
+                    System.Windows.MessageBox.Show("Enter a valid Cl⁻ concentration (M) before calculating i_lim.",
+                        "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            if (!double.TryParse(DiffLayerThicknessTextBox.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out deltaMicrons)
+                || deltaMicrons <= 0.0)
+            {
+                if (showErrors)
+                    System.Windows.MessageBox.Show("Enter a valid positive diffusion-layer thickness (µm) before calculating i_lim.",
+                        "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            return true;
         }
 
         private static string FormatScientific(double value)
@@ -1726,38 +1759,14 @@ namespace CSaVe_Electrochemical_Data
         /// </summary>
         private void CalcIlimButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!double.TryParse(TC.Text?.Trim(), System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out double tempC) ||
-                !double.IsFinite(tempC))
-            {
-                System.Windows.MessageBox.Show("Enter a valid temperature (°C) before calculating i_lim.",
-                    "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (!TryParseIlimInputs(out double tempC, out double clM, out double deltaMicrons, showErrors: true))
                 return;
-            }
-
-            if (!double.TryParse(ClConc.Text?.Trim(), System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out double clM) ||
-                clM < 0.0)
-            {
-                System.Windows.MessageBox.Show("Enter a valid Cl⁻ concentration (M) before calculating i_lim.",
-                    "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            if (!double.TryParse(DiffLayerThicknessTextBox.Text?.Trim(), System.Globalization.NumberStyles.Float,
-                    System.Globalization.CultureInfo.InvariantCulture, out double deltaMicrons) ||
-                deltaMicrons <= 0.0)
-            {
-                System.Windows.MessageBox.Show("Enter a valid positive diffusion-layer thickness (µm) before calculating i_lim.",
-                    "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
 
             try
             {
                 double deltaCm = deltaMicrons * 1.0e-4;
                 double ilim = DissolvedOxygenCalculator.CalcOrrIlimAcm2(tempC, clM, deltaCm);
-                OrrIlimTextBox.Text = ilim.ToString("E3", System.Globalization.CultureInfo.InvariantCulture);
+                OrrIlimTextBox.Text = ilim.ToString("E3", CultureInfo.InvariantCulture);
             }
             catch (Exception ex)
             {
