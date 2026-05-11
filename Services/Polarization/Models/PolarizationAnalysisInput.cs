@@ -18,7 +18,7 @@ namespace CSaVe_Electrochemical_Data
         /// </summary>
         public string CathodicFilePath { get; set; }
 
-        /// <summary>Exposed electrode area in cm². Must be &gt; 0. Default 0.495 cm².</summary>
+        /// <summary>Exposed electrode area in cm2. Must be &gt; 0. Default 0.495 cm2.</summary>
         public double ExposedAreaCm2 { get; set; } = 0.495;
 
         /// <summary>
@@ -29,7 +29,7 @@ namespace CSaVe_Electrochemical_Data
         public IReadOnlyList<double> ProtectionPotentialsMv { get; set; } =
             new[] { -850.0, -1050.0 };
 
-        /// <summary>Temperature in degrees Celsius used for Butler-Volmer calculations. Default 25 °C.</summary>
+        /// <summary>Temperature in degrees Celsius used for Butler-Volmer calculations. Default 25 oC.</summary>
         public double TemperatureCelsius { get; set; } = 25.0;
 
         /// <summary>Electrolyte pH used for Nernst equilibrium corrections. Default 8.0.</summary>
@@ -42,7 +42,7 @@ namespace CSaVe_Electrochemical_Data
         public double ChlorideConcentrationM { get; set; } = 0.6;
 
         /// <summary>
-        /// Dissolved metal-ion concentration [M²⁺] (mol/L) used by the metal-oxidation Nernst term.
+        /// Dissolved metal-ion concentration [M2-] (mol/L) used by the metal-oxidation Nernst term.
         /// Default 1.0e-6 M.
         /// </summary>
         public double MetalIonConcentrationM { get; set; } = 1.0e-6;

@@ -14,7 +14,7 @@ namespace CSaVe_Electrochemical_Data
     ///     3. Form the normal equations:  (J'J + λ·diag(J'J)) Δp = −J'r  (Marquardt scaling).
     ///     4. Solve for Δp using Gaussian elimination with partial pivoting.
     ///     5. Project p + Δp onto box constraints by clamping each component.
-    ///     6. Accept step if new ‖r‖² &lt; old ‖r‖²; reduce λ by factor 10.
+    ///     6. Accept step if new ‖r‖2 &lt; old ‖r‖2; reduce λ by factor 10.
     ///        Reject step (increase λ by 10) otherwise.
     ///     7. Terminate early when ‖Δp‖/‖p‖ &lt; <see cref="ParameterTolerance"/>.
     /// </remarks>

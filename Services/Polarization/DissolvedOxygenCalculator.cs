@@ -15,10 +15,10 @@ namespace CSaVe_Electrochemical_Data
     public static class DissolvedOxygenCalculator
     {
         // ── Physical constants ────────────────────────────────────────────────────────────────────
-        private const double M_O2   = 32.0;      // g/mol – molar mass of O₂
-        private const double M_H2O  = 18.01528;  // g/mol – molar mass of H₂O
+        private const double M_O2   = 32.0;      // g/mol – molar mass of O2
+        private const double M_H2O  = 18.01528;  // g/mol – molar mass of H2O
         private const double M_Cl   = 35.45;     // g/mol – molar mass of Cl⁻
-        private const double P_O2_atm = 0.2095;  // atm   – partial pressure of O₂ in dry air
+        private const double P_O2_atm = 0.2095;  // atm   – partial pressure of O2 in dry air
         private const double VO2    = 22.414;    // L/mol – molar volume used in Stokes model
         private const double Phi    = 2.6;       // association factor for water (Wilke-Chang)
 
@@ -41,12 +41,12 @@ namespace CSaVe_Electrochemical_Data
         // ────────────────────────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Calculates the dissolved O₂ concentration in an NaCl solution using a
+        /// Calculates the dissolved O2 concentration in an NaCl solution using a
         /// Henry's-law correlation that accounts for temperature and salinity.
         /// </summary>
-        /// <param name="tempC">Solution temperature (°C).</param>
+        /// <param name="tempC">Solution temperature (oC).</param>
         /// <param name="chlorideM">Cl⁻ concentration (mol/L).</param>
-        /// <returns>Dissolved O₂ concentration in mol/cm³.</returns>
+        /// <returns>Dissolved O2 concentration in mol/cm³.</returns>
         public static double CalcConcentrationMolPerCm3(double tempC, double chlorideM)
         {
             double gPerCm3 = CalcConcentrationGPerCm3(tempC, chlorideM);
@@ -54,13 +54,13 @@ namespace CSaVe_Electrochemical_Data
         }
 
         /// <summary>
-        /// Calculates the diffusion coefficient of dissolved O₂ in an NaCl solution using
+        /// Calculates the diffusion coefficient of dissolved O2 in an NaCl solution using
         /// a modified Stokes-Einstein / Wilke-Chang model parameterised by temperature and
         /// chloride concentration.
         /// </summary>
-        /// <param name="tempC">Solution temperature (°C).</param>
+        /// <param name="tempC">Solution temperature (oC).</param>
         /// <param name="chlorideM">Cl⁻ concentration (mol/L).</param>
-        /// <returns>O₂ diffusion coefficient (cm²/s).</returns>
+        /// <returns>O2 diffusion coefficient (cm2/s).</returns>
         public static double CalcDiffusivityCm2PerS(double tempC, double chlorideM)
         {
             double tempK = tempC + 273.15;
@@ -72,14 +72,14 @@ namespace CSaVe_Electrochemical_Data
 
         /// <summary>
         /// Estimates the ORR limiting current density using
-        ///   i_lim = n·F·D_O₂·c_O₂ / δ
-        /// where n = 4, F = 96 485 C/mol, D_O₂ and c_O₂ are computed from T and Cl⁻,
+        ///   i_lim = n·F·D_O2·c_O2 / δ
+        /// where n = 4, F = 96 485 C/mol, D_O2 and c_O2 are computed from T and Cl⁻,
         /// and δ is the diffusion-layer thickness.
         /// </summary>
-        /// <param name="tempC">Solution temperature (°C).</param>
+        /// <param name="tempC">Solution temperature (oC).</param>
         /// <param name="chlorideM">Cl⁻ concentration (mol/L).</param>
         /// <param name="diffLayerThicknessCm">Diffusion-layer thickness δ (cm).</param>
-        /// <returns>ORR limiting current density i_lim (A/cm²).</returns>
+        /// <returns>ORR limiting current density i_lim (A/cm2).</returns>
         public static double CalcOrrIlimAcm2(double tempC, double chlorideM, double diffLayerThicknessCm)
         {
             if (diffLayerThicknessCm <= 0.0)
@@ -96,7 +96,7 @@ namespace CSaVe_Electrochemical_Data
         // ────────────────────────────────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Calculates dissolved O₂ concentration via Henry's law (g/cm³).
+        /// Calculates dissolved O2 concentration via Henry's law (g/cm³).
         /// Ported from MATLAB O2.calcConcO2.
         /// </summary>
         private static double CalcConcentrationGPerCm3(double tempC, double chlorideM)
@@ -106,7 +106,7 @@ namespace CSaVe_Electrochemical_Data
             // Chloride mass concentration (mg Cl per L of solution)
             double clMgL = M_Cl * chlorideM * 1000.0;
 
-            // Henry's-constant parameters for O₂ using acentric-factor correlation
+            // Henry's-constant parameters for O2 using acentric-factor correlation
             const double acentric = 0.022;
             const double a1 = 31820.0, b1 = -229.9, c1 = -19.12, d1 = 0.3081;
             const double a2 = -1409.0, b2 = 10.4,   c2 = 0.8628,  d2 = -0.0005235, d3 = 0.07464;
@@ -126,14 +126,14 @@ namespace CSaVe_Electrochemical_Data
 
             double kH = Math.Exp(lnHs0 + expTerm);   // Henry's constant (atm·L/mol)
 
-            // Dissolved O₂ concentration: c [mol/L] = p_O2 [atm] / K_H [atm·L/mol]
+            // Dissolved O2 concentration: c [mol/L] = p_O2 [atm] / K_H [atm·L/mol]
             double cMolL  = P_O2_atm / kH;
             double cGPerL  = cMolL * M_O2;
             return cGPerL / 1000.0;  // g/cm³
         }
 
         /// <summary>
-        /// Modified Stokes-Einstein / Wilke-Chang diffusion model for O₂ in NaCl.
+        /// Modified Stokes-Einstein / Wilke-Chang diffusion model for O2 in NaCl.
         /// Ported from MATLAB O2.StokesModel2 (6-parameter form, O2Diffusivity_RevB).
         /// </summary>
         private static double StokesModel2(double[] b, double tempK, double cCl)

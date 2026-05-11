@@ -352,7 +352,7 @@ namespace CSaVe_Electrochemical_Data
         /// Falls back to the potential at minimum |I| if no zero crossing is found.
         /// </summary>
         /// <param name="e">Potential values (V), sorted ascending.</param>
-        /// <param name="i">Signed current density (A/cm²) values.</param>
+        /// <param name="i">Signed current density (A/cm2) values.</param>
         /// <returns>Estimated Ecorr (V).</returns>
         private static double EstimateEcorr(double[] e, double[] i)
         {
@@ -383,9 +383,9 @@ namespace CSaVe_Electrochemical_Data
         /// Returns <see cref="double.NaN"/> if fewer than 3 points are available.
         /// </summary>
         /// <param name="e">Potential values (V), sorted ascending.</param>
-        /// <param name="i">Signed current density (A/cm²) values.</param>
+        /// <param name="i">Signed current density (A/cm2) values.</param>
         /// <param name="ecorr">Fitted corrosion potential (V).</param>
-        /// <returns>Back-extrapolated i_ox (A/cm²), or NaN if the window is too small.</returns>
+        /// <returns>Back-extrapolated i_ox (A/cm2), or NaN if the window is too small.</returns>
         private static double ComputeIOx(double[] e, double[] i, double ecorr)
         {
             const double lower = 0.01;
@@ -423,9 +423,9 @@ namespace CSaVe_Electrochemical_Data
         /// (potential, |current density|) curve.  Clamps to the boundary values outside the range.
         /// </summary>
         /// <param name="e">Potential values (V), sorted ascending.</param>
-        /// <param name="i">Signed current density (A/cm²) values.</param>
+        /// <param name="i">Signed current density (A/cm2) values.</param>
         /// <param name="targetV">Target potential (V).</param>
-        /// <returns>Interpolated |I| (A/cm²).</returns>
+        /// <returns>Interpolated |I| (A/cm2).</returns>
         private static double InterpolateAbsCurrentDensity(double[] e, double[] i, double targetV)
         {
             double[] absI = [.. i.Select(v => Math.Abs(v))];

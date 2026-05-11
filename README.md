@@ -28,9 +28,9 @@ referenced to a Nernst-equation equilibrium potential:
 
 | Reaction | E₀ (vs. SHE) | z | Notes |
 |---|---|---|---|
-| Metal oxidation (Fe/Fe²⁺) | −0.44 V | 2 | Net anodic current; cathodic reverse term included |
-| ORR (O₂/H₂O) | +1.229 V | 4 | BV kinetics + Koutecky-Levich mass-transport correction |
-| HER (H⁺/H₂) | 0.00 V | 2 | BV kinetics only |
+| Metal oxidation (Fe/Fe2-) | −0.44 V | 2 | Net anodic current; cathodic reverse term included |
+| ORR (O2/H2O) | +1.229 V | 4 | BV kinetics + Koutecky-Levich mass-transport correction |
+| HER (H-/H2) | 0.00 V | 2 | BV kinetics only |
 
 The net model current is:
 
@@ -58,12 +58,12 @@ The plot in Tab 3 shows the following curves (|i| vs. E, logarithmic current axi
 
 | Parameter | Symbol | Units |
 |---|---|---|
-| Metal-oxidation exchange current density | I₀,metal | A/cm² |
+| Metal-oxidation exchange current density | I₀,metal | A/cm2 |
 | Metal-oxidation symmetry factor | βₘₑₜₐₗ | — |
-| ORR exchange current density | I₀,ORR | A/cm² |
+| ORR exchange current density | I₀,ORR | A/cm2 |
 | ORR symmetry factor | βₒᵣᵣ | — |
-| ORR limiting current density | iₗᵢₘ,ORR | A/cm² |
-| HER exchange current density | I₀,HER | A/cm² |
+| ORR limiting current density | iₗᵢₘ,ORR | A/cm2 |
+| HER exchange current density | I₀,HER | A/cm2 |
 | HER symmetry factor | βₕₑᵣ | — |
 
 ## Python requirements (system Python)

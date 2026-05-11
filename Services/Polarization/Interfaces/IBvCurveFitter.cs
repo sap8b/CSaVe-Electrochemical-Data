@@ -14,11 +14,11 @@ namespace CSaVe_Electrochemical_Data
         /// starting guess for Ecorr.
         /// </summary>
         /// <param name="potentialV">Potential values (V), sorted ascending.</param>
-        /// <param name="currentDensityAcm2">Signed current density (A/cm²) at each potential.</param>
+        /// <param name="currentDensityAcm2">Signed current density (A/cm2) at each potential.</param>
         /// <param name="ecorrHintV">Initial estimate for the corrosion potential (V).</param>
-        /// <param name="temperatureCelsius">Electrolyte temperature (°C).</param>
+        /// <param name="temperatureCelsius">Electrolyte temperature (oC).</param>
         /// <param name="electrolytePh">Electrolyte pH.</param>
-        /// <param name="metalIonConcentrationM">Dissolved metal-ion concentration [M²⁺] (mol/L).</param>
+        /// <param name="metalIonConcentrationM">Dissolved metal-ion concentration [M2-] (mol/L).</param>
         /// <param name="overrides">
         /// Optional user-specified starting values and per-reaction fix flags.
         /// Pass <c>null</c> to use fully automatic initialisation and unconstrained LM fitting.

@@ -168,9 +168,9 @@ def parse_xml(path):
     V_xml : np.ndarray
         Applied potential in V vs. SCE.
     I_xml : np.ndarray
-        Total current density in A/m².
+        Total current density in A/m2.
     exp_area : float
-        Exposed area in m² from ``<ExpArea>`` in ``<MaterialData>``.
+        Exposed area in m2 from ``<ExpArea>`` in ``<MaterialData>``.
     """
     tree = ET.parse(path)
     root = tree.getroot()
@@ -323,7 +323,7 @@ def print_diagnostics(V_an, I_an, V_cat, I_cat, v_ecorr, exp_area):
     V_an, I_an   : anodic branch (already trimmed, V >= E_corr)
     V_cat, I_cat : cathodic branch (already trimmed, V < E_corr)
     v_ecorr      : OCP / E_corr in V
-    exp_area     : exposed area in m² (used only to report units)
+    exp_area     : exposed area in m2 (used only to report units)
     """
     print("\n" + "=" * 60)
     print("OCP / Branch-Linkup Diagnostics")
@@ -458,10 +458,10 @@ def main():
         V_xml, I_xml, exp_area = parse_xml(args.xml)
 
     # ------------------------------------------------------------------
-    # Convert DTA currents to current density (A/m²) using exp_area
+    # Convert DTA currents to current density (A/m2) using exp_area
     # ------------------------------------------------------------------
     def to_density(I_A):
-        """Convert raw current (A) to current density (A/m²)."""
+        """Convert raw current (A) to current density (A/m2)."""
         return I_A / exp_area if exp_area != 0 else I_A
 
     # ------------------------------------------------------------------
@@ -566,7 +566,7 @@ def main():
 
     # Axes — Evans diagram: potential on Y, current density on X (log)
     ax.set_xscale("log")
-    ax.set_xlabel("|Current Density| (A/m²)")
+    ax.set_xlabel("|Current Density| (A/m2)")
     ax.set_ylabel("Potential (V vs. SCE)")
     ax.set_title(title)
     ax.legend(loc="best", fontsize=9)

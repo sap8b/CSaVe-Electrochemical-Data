@@ -33,14 +33,14 @@ namespace CSaVe_Electrochemical_Data
             /// <summary>The electrochemical half-reaction (thermodynamic and kinetic data).</summary>
             public IBvReaction Reaction { get; }
 
-            /// <summary>Fitted exchange current density (A/cm²).</summary>
+            /// <summary>Fitted exchange current density (A/cm2).</summary>
             public double I0 { get; }
 
             /// <summary>Fitted symmetry factor β (dimensionless).</summary>
             public double Beta { get; }
 
             /// <summary>
-            /// Fitted Koutecky-Levich limiting current density (A/cm²).
+            /// Fitted Koutecky-Levich limiting current density (A/cm2).
             /// Zero means no mass-transport correction is applied.
             /// </summary>
             public double Ilim { get; }
@@ -84,13 +84,13 @@ namespace CSaVe_Electrochemical_Data
         // These allow the UI layer (PolarizationAnalysisService, WinForms) to continue reading
         // named fields without modification while the internal model has been generalised to a list.
 
-        /// <summary>Fitted metal-oxidation exchange current density I₀,metal (A/cm²).</summary>
+        /// <summary>Fitted metal-oxidation exchange current density I₀,metal (A/cm2).</summary>
         public double I0Metal => GetReactionParam(ReactionType.MetalOxidation)?.I0 ?? 0.0;
 
         /// <summary>Fitted metal-oxidation symmetry factor βₘₑₜₐₗ (dimensionless).</summary>
         public double BetaMetal => GetReactionParam(ReactionType.MetalOxidation)?.Beta ?? 0.5;
 
-        /// <summary>Fitted cathodic limiting current density for metal reduction (A/cm²). Zero = no KL correction.</summary>
+        /// <summary>Fitted cathodic limiting current density for metal reduction (A/cm2). Zero = no KL correction.</summary>
         public double IlimMetal => GetReactionParam(ReactionType.MetalOxidation)?.Ilim ?? 0.0;
 
         /// <summary>Metal equilibrium potential Eₘₑₜₐₗ (V) fixed by the Nernst equation; not a fit parameter.</summary>
@@ -99,13 +99,13 @@ namespace CSaVe_Electrochemical_Data
         /// <summary>Whether the metal oxidation reaction is included in the model.</summary>
         public bool IncludeMetal => GetReactionParam(ReactionType.MetalOxidation)?.IsIncluded ?? false;
 
-        /// <summary>Fitted ORR exchange current density I₀,ₒᵣᵣ (A/cm²).</summary>
+        /// <summary>Fitted ORR exchange current density I₀,ₒᵣᵣ (A/cm2).</summary>
         public double I0Orr => GetReactionParam(ReactionType.OxygenReduction)?.I0 ?? 0.0;
 
         /// <summary>Fitted ORR symmetry factor βₒᵣᵣ (dimensionless).</summary>
         public double BetaOrr => GetReactionParam(ReactionType.OxygenReduction)?.Beta ?? 0.5;
 
-        /// <summary>Fitted ORR mass-transport limiting current density iₗᵢₘ,ₒᵣᵣ (A/cm²).</summary>
+        /// <summary>Fitted ORR mass-transport limiting current density iₗᵢₘ,ₒᵣᵣ (A/cm2).</summary>
         public double IlimOrr => GetReactionParam(ReactionType.OxygenReduction)?.Ilim ?? 0.0;
 
         /// <summary>ORR equilibrium potential Eₒᵣᵣ (V) fixed by the Nernst equation; not a fit parameter.</summary>
@@ -114,13 +114,13 @@ namespace CSaVe_Electrochemical_Data
         /// <summary>Whether the ORR reaction is included in the model.</summary>
         public bool IncludeOrr => GetReactionParam(ReactionType.OxygenReduction)?.IsIncluded ?? false;
 
-        /// <summary>Fitted HER exchange current density I₀,ₕₑᵣ (A/cm²).</summary>
+        /// <summary>Fitted HER exchange current density I₀,ₕₑᵣ (A/cm2).</summary>
         public double I0Her => GetReactionParam(ReactionType.HydrogenEvolution)?.I0 ?? 0.0;
 
         /// <summary>Fitted HER symmetry factor βₕₑᵣ (dimensionless).</summary>
         public double BetaHer => GetReactionParam(ReactionType.HydrogenEvolution)?.Beta ?? 0.5;
 
-        /// <summary>Fitted HER limiting current density (A/cm²). Zero = no KL correction.</summary>
+        /// <summary>Fitted HER limiting current density (A/cm2). Zero = no KL correction.</summary>
         public double IlimHer => GetReactionParam(ReactionType.HydrogenEvolution)?.Ilim ?? 0.0;
 
         /// <summary>HER equilibrium potential Eₕₑᵣ (V) fixed by the Nernst equation; not a fit parameter.</summary>
@@ -132,11 +132,11 @@ namespace CSaVe_Electrochemical_Data
         // ── Public current-density methods ────────────────────────────────────────────────────────
 
         /// <summary>
-        /// Evaluates the net Butler-Volmer model current density (A/cm²) at a single electrode potential.
+        /// Evaluates the net Butler-Volmer model current density (A/cm2) at a single electrode potential.
         /// Net current = sum of all included reactions, each optionally limited by Koutecky-Levich.
         /// </summary>
         /// <param name="potentialV">Electrode potential (V vs. reference).</param>
-        /// <returns>Net signed current density (A/cm²); positive = net anodic.</returns>
+        /// <returns>Net signed current density (A/cm2); positive = net anodic.</returns>
         public double ComputeCurrentDensity(double potentialV)
         {
             double total = 0.0;

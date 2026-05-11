@@ -12,10 +12,10 @@ namespace CSaVe_Electrochemical_Data
         public double CurrentA { get; init; }
 
         /// <summary>
-        /// Returns the signed current density in A/cm² for a given exposed area.
+        /// Returns the signed current density in A/cm2 for a given exposed area.
         /// </summary>
-        /// <param name="exposedAreaCm2">Exposed electrode area in cm². Must be &gt; 0.</param>
-        /// <returns>Signed current density in A/cm².</returns>
+        /// <param name="exposedAreaCm2">Exposed electrode area in cm2. Must be &gt; 0.</param>
+        /// <returns>Signed current density in A/cm2.</returns>
         public double CurrentDensityAcm2(double exposedAreaCm2) => CurrentA / exposedAreaCm2;
     }
 }

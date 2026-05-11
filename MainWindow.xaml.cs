@@ -137,30 +137,30 @@ namespace CSaVe_Electrochemical_Data
         private static readonly Regex PdTokenRegex = new(@"(^|[^a-z])pd([^a-z]|$)", RegexOptions.Compiled);
         private static readonly string[] PolarizationFitParameterRows =
         {
-            "Temperature (°C)",
+            "Temperature (oC)",
             "pH",
             "Cl⁻ concentration (M)",
-            "Metal ion concentration [M²⁺] (M)",
-            "I₀, metal (A/cm²)",
+            "Metal ion concentration [M2-] (M)",
+            "I₀, metal (A/cm2)",
             "β_metal",
-            "I₀, ORR (A/cm²)",
+            "I₀, ORR (A/cm2)",
             "β_ORR",
-            "i_lim, ORR (A/cm²)",
-            "I₀, HER (A/cm²)",
+            "i_lim, ORR (A/cm2)",
+            "I₀, HER (A/cm2)",
             "β_HER",
             "E_corr (mV)",
-            "i_corr (µA/cm²)",
-            "i@-850 mV (µA/cm²)",
-            "i@-1050 mV (µA/cm²)",
-            "Weighted RMSE (A/cm²)"
+            "i_corr (µA/cm2)",
+            "i@-850 mV (µA/cm2)",
+            "i@-1050 mV (µA/cm2)",
+            "Weighted RMSE (A/cm2)"
         };
         private static readonly string[] PolarizationFittedOnlyRows =
         {
             "E_corr (mV)",
-            "i_corr (µA/cm²)",
-            "i@-850 mV (µA/cm²)",
-            "i@-1050 mV (µA/cm²)",
-            "Weighted RMSE (A/cm²)"
+            "i_corr (µA/cm2)",
+            "i@-850 mV (µA/cm2)",
+            "i@-1050 mV (µA/cm2)",
+            "Weighted RMSE (A/cm2)"
         };
 
         public MainWindow()
@@ -1011,7 +1011,7 @@ namespace CSaVe_Electrochemical_Data
         private void InitializePlotModels()
         {
             polarizationPlotModel.Title = "Polarization (|i| vs E)";
-            polarizationPlotModel.Axes.Add(new LogarithmicAxis { Position = AxisPosition.Bottom, Title = "Current Density (A/cm²)", Minimum = 1.0e-12 });
+            polarizationPlotModel.Axes.Add(new LogarithmicAxis { Position = AxisPosition.Bottom, Title = "Current Density (A/cm2)", Minimum = 1.0e-12 });
             polarizationPlotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = "Potential (V)" });
             polarizationPlotModel.Legends.Add(new Legend
             {
@@ -1157,7 +1157,7 @@ namespace CSaVe_Electrochemical_Data
         /// <summary>
         /// Parses the temperature, Cl⁻ concentration, and diffusion-layer thickness from the UI.
         /// </summary>
-        /// <param name="tempC">Parsed temperature (°C).</param>
+        /// <param name="tempC">Parsed temperature (oC).</param>
         /// <param name="clM">Parsed Cl⁻ concentration (mol/L).</param>
         /// <param name="deltaMicrons">Parsed diffusion-layer thickness (µm).</param>
         /// <param name="showErrors">When true, shows a MessageBox for the first invalid input encountered.</param>
@@ -1170,7 +1170,7 @@ namespace CSaVe_Electrochemical_Data
                 || !double.IsFinite(tempC))
             {
                 if (showErrors)
-                    System.Windows.MessageBox.Show("Enter a valid temperature (°C) before calculating i_lim.",
+                    System.Windows.MessageBox.Show("Enter a valid temperature (oC) before calculating i_lim.",
                         "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
@@ -1242,39 +1242,39 @@ namespace CSaVe_Electrochemical_Data
             bool includeHer = HerIncludeCheckBox.IsChecked != false;
             BvModelParameters fp = result.FittedParameters;
 
-            SetPolarizationFitCell("Temperature (°C)", staticColumnName, FormatFixed(electrolyteTemperatureC, "F3"));
-            SetPolarizationFitCell("Temperature (°C)", fitColumnName, "—");
+            SetPolarizationFitCell("Temperature (oC)", staticColumnName, FormatFixed(electrolyteTemperatureC, "F3"));
+            SetPolarizationFitCell("Temperature (oC)", fitColumnName, "—");
             SetPolarizationFitCell("pH", staticColumnName, FormatFixed(electrolytePh, "F3"));
             SetPolarizationFitCell("pH", fitColumnName, "—");
             SetPolarizationFitCell("Cl⁻ concentration (M)", staticColumnName, FormatScientific(chlorideConcentrationM));
             SetPolarizationFitCell("Cl⁻ concentration (M)", fitColumnName, "—");
-            SetPolarizationFitCell("Metal ion concentration [M²⁺] (M)", staticColumnName, FormatScientific(metalIonConcentrationM));
-            SetPolarizationFitCell("Metal ion concentration [M²⁺] (M)", fitColumnName, "—");
+            SetPolarizationFitCell("Metal ion concentration [M2-] (M)", staticColumnName, FormatScientific(metalIonConcentrationM));
+            SetPolarizationFitCell("Metal ion concentration [M2-] (M)", fitColumnName, "—");
 
-            SetPolarizationFitCell("I₀, metal (A/cm²)", staticColumnName, ParseUiOrAuto(MetalI0TextBox.Text, includeMetal));
+            SetPolarizationFitCell("I₀, metal (A/cm2)", staticColumnName, ParseUiOrAuto(MetalI0TextBox.Text, includeMetal));
             SetPolarizationFitCell("β_metal", staticColumnName, ParseUiOrAuto(MetalBetaTextBox.Text, includeMetal));
-            SetPolarizationFitCell("I₀, ORR (A/cm²)", staticColumnName, ParseUiOrAuto(OrrI0TextBox.Text, includeOrr));
+            SetPolarizationFitCell("I₀, ORR (A/cm2)", staticColumnName, ParseUiOrAuto(OrrI0TextBox.Text, includeOrr));
             SetPolarizationFitCell("β_ORR", staticColumnName, ParseUiOrAuto(OrrBetaTextBox.Text, includeOrr));
-            SetPolarizationFitCell("i_lim, ORR (A/cm²)", staticColumnName, ParseUiOrAuto(OrrIlimTextBox.Text, includeOrr));
-            SetPolarizationFitCell("I₀, HER (A/cm²)", staticColumnName, ParseUiOrAuto(HerI0TextBox.Text, includeHer));
+            SetPolarizationFitCell("i_lim, ORR (A/cm2)", staticColumnName, ParseUiOrAuto(OrrIlimTextBox.Text, includeOrr));
+            SetPolarizationFitCell("I₀, HER (A/cm2)", staticColumnName, ParseUiOrAuto(HerI0TextBox.Text, includeHer));
             SetPolarizationFitCell("β_HER", staticColumnName, ParseUiOrAuto(HerBetaTextBox.Text, includeHer));
 
-            SetPolarizationFitCell("I₀, metal (A/cm²)", fitColumnName, fp.IncludeMetal ? FormatScientific(fp.I0Metal) : "excluded");
+            SetPolarizationFitCell("I₀, metal (A/cm2)", fitColumnName, fp.IncludeMetal ? FormatScientific(fp.I0Metal) : "excluded");
             SetPolarizationFitCell("β_metal", fitColumnName, fp.IncludeMetal ? FormatFixed(fp.BetaMetal, "F4") : "excluded");
-            SetPolarizationFitCell("I₀, ORR (A/cm²)", fitColumnName, fp.IncludeOrr ? FormatScientific(fp.I0Orr) : "excluded");
+            SetPolarizationFitCell("I₀, ORR (A/cm2)", fitColumnName, fp.IncludeOrr ? FormatScientific(fp.I0Orr) : "excluded");
             SetPolarizationFitCell("β_ORR", fitColumnName, fp.IncludeOrr ? FormatFixed(fp.BetaOrr, "F4") : "excluded");
-            SetPolarizationFitCell("i_lim, ORR (A/cm²)", fitColumnName, fp.IncludeOrr ? FormatScientific(fp.IlimOrr) : "excluded");
-            SetPolarizationFitCell("I₀, HER (A/cm²)", fitColumnName, fp.IncludeHer ? FormatScientific(fp.I0Her) : "excluded");
+            SetPolarizationFitCell("i_lim, ORR (A/cm2)", fitColumnName, fp.IncludeOrr ? FormatScientific(fp.IlimOrr) : "excluded");
+            SetPolarizationFitCell("I₀, HER (A/cm2)", fitColumnName, fp.IncludeHer ? FormatScientific(fp.I0Her) : "excluded");
             SetPolarizationFitCell("β_HER", fitColumnName, fp.IncludeHer ? FormatFixed(fp.BetaHer, "F4") : "excluded");
 
             foreach (string row in PolarizationFittedOnlyRows)
                 SetPolarizationFitCell(row, staticColumnName, "n/a");
 
             SetPolarizationFitCell("E_corr (mV)", fitColumnName, FormatFixed(result.EcorrV * 1000.0, "F2"));
-            SetPolarizationFitCell("i_corr (µA/cm²)", fitColumnName, FormatFixed(result.IcorrAcm2 * 1.0e6, "F2"));
-            SetPolarizationFitCell("i@-850 mV (µA/cm²)", fitColumnName, FormatFixed(iAt850Acm2 * 1.0e6, "F2"));
-            SetPolarizationFitCell("i@-1050 mV (µA/cm²)", fitColumnName, FormatFixed(iAt1050Acm2 * 1.0e6, "F2"));
-            SetPolarizationFitCell("Weighted RMSE (A/cm²)", fitColumnName, FormatScientific(result.WeightedRmse));
+            SetPolarizationFitCell("i_corr (µA/cm2)", fitColumnName, FormatFixed(result.IcorrAcm2 * 1.0e6, "F2"));
+            SetPolarizationFitCell("i@-850 mV (µA/cm2)", fitColumnName, FormatFixed(iAt850Acm2 * 1.0e6, "F2"));
+            SetPolarizationFitCell("i@-1050 mV (µA/cm2)", fitColumnName, FormatFixed(iAt1050Acm2 * 1.0e6, "F2"));
+            SetPolarizationFitCell("Weighted RMSE (A/cm2)", fitColumnName, FormatScientific(result.WeightedRmse));
         }
 
         /// <summary>

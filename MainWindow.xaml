@@ -406,7 +406,7 @@
                                     <TextBox x:Name="MetaSurfacePrep" Width="180" Text="600 grit SiC" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,6,12,0">
-                                    <TextBlock Text="Exposed Area (m²)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
+                                    <TextBlock Text="Exposed Area (m2)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
                                     <TextBox x:Name="MetaExpArea" Width="110" Text="1.000000E-04" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                             </WrapPanel>
@@ -428,15 +428,15 @@
                                     <TextBox x:Name="MetapH" Width="40" Text="8" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,6,12,0">
-                                    <TextBlock Text="O₂ (M)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
+                                    <TextBlock Text="O2 (M)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
                                     <TextBox x:Name="MetaO2Conc" Width="70" Text="2.5E-4" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,6,12,0">
-                                    <TextBlock Text="S²⁻ (M)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
+                                    <TextBlock Text="S2⁻ (M)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
                                     <TextBox x:Name="MetaS2Conc" Width="60" Text="0.08" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,6,12,0">
-                                    <TextBlock Text="Temp (°C)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
+                                    <TextBlock Text="Temp (oC)" FontSize="11" Foreground="#64748B" Margin="0,0,0,2"/>
                                     <TextBox x:Name="MetaTemperature" Width="50" Text="25" Style="{StaticResource ModernTextBox}"/>
                                 </StackPanel>
                                 <StackPanel Margin="0,6,12,0">
@@ -528,14 +528,14 @@
                 </Grid>
 
                 <DockPanel Grid.Row="2" Margin="0,0,0,8">
-                    <TextBlock Text="Exposed area (cm²):" VerticalAlignment="Center" Margin="0,0,8,0"
+                    <TextBlock Text="Exposed area (cm2):" VerticalAlignment="Center" Margin="0,0,8,0"
                                ToolTip="Electrode exposed area used to normalise current to current density"/>
                     <TextBox x:Name="PolarizationAreaText"
                              Width="80"
                              Margin="0,0,8,0"
                              Style="{StaticResource ModernTextBox}"
                              Text="0.495"
-                             ToolTip="Electrode exposed area (cm²) — used to convert raw current (A) to current density (A/cm²)"/>
+                             ToolTip="Electrode exposed area (cm2) — used to convert raw current (A) to current density (A/cm2)"/>
                     <Button x:Name="RunPolarizationAnalysisButton"
                             Width="220"
                             Height="36"
@@ -653,7 +653,7 @@
                                     <TextBox x:Name="DiffLayerThicknessTextBox"
                                              Style="{StaticResource ModernTextBox}"
                                              Text="850"
-                                             ToolTip="O₂ diffusion-layer thickness δ (µm). 850 µm is typical for a quiescent solution; decrease for stirred or flowing conditions. Used with the 'Calc iLim' button to estimate the ORR limiting current."/>
+                                             ToolTip="O2 diffusion-layer thickness δ (µm). 850 µm is typical for a quiescent solution; decrease for stirred or flowing conditions. Used with the 'Calc iLim' button to estimate the ORR limiting current."/>
                                 </StackPanel>
                             </Grid>
                         </GroupBox>
@@ -691,9 +691,9 @@
                                            HorizontalAlignment="Center"
                                            ToolTip="Check to include this reaction in the Butler-Volmer model"/>
                                 <TextBlock Grid.Row="0" Grid.Column="4"
-                                           Text="i0 (A/cm²)" FontSize="11"
+                                           Text="i0 (A/cm2)" FontSize="11"
                                            FontWeight="SemiBold" Foreground="#475569"
-                                           ToolTip="Exchange current density starting value (A/cm²) — leave blank for auto-estimate"/>
+                                           ToolTip="Exchange current density starting value (A/cm2) — leave blank for auto-estimate"/>
                                 <TextBlock Grid.Row="0" Grid.Column="6"
                                            Text="beta" FontSize="11"
                                            FontWeight="SemiBold" Foreground="#475569"
@@ -708,7 +708,7 @@
                                 <TextBlock Grid.Row="2" Grid.Column="0"
                                            Text="HER" VerticalAlignment="Center"
                                            FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"
-                                           ToolTip="Hydrogen Evolution Reaction (H⁺/H₂)"/>
+                                           ToolTip="Hydrogen Evolution Reaction (H-/H2)"/>
                                 <CheckBox x:Name="HerIncludeCheckBox"
                                           Grid.Row="2" Grid.Column="2"
                                           IsChecked="True"
@@ -719,7 +719,7 @@
                                          Grid.Row="2" Grid.Column="4"
                                          Style="{StaticResource ModernTextBox}"
                                          Text="1.0e-14"
-                                         ToolTip="HER exchange current density starting value (A/cm²)"/>
+                                         ToolTip="HER exchange current density starting value (A/cm2)"/>
                                 <TextBox x:Name="HerBetaTextBox"
                                          Grid.Row="2" Grid.Column="6"
                                          Style="{StaticResource ModernTextBox}"
@@ -735,7 +735,7 @@
                                 <TextBlock Grid.Row="4" Grid.Column="0"
                                            Text="ORR" VerticalAlignment="Center"
                                            FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"
-                                           ToolTip="Oxygen Reduction Reaction (O₂/H₂O)"/>
+                                           ToolTip="Oxygen Reduction Reaction (O2/H2O)"/>
                                 <CheckBox x:Name="OrrIncludeCheckBox"
                                           Grid.Row="4" Grid.Column="2"
                                           IsChecked="True"
@@ -746,7 +746,7 @@
                                          Grid.Row="4" Grid.Column="4"
                                          Style="{StaticResource ModernTextBox}"
                                          Text="1.0e-14"
-                                         ToolTip="ORR exchange current density starting value (A/cm²)"/>
+                                         ToolTip="ORR exchange current density starting value (A/cm2)"/>
                                 <TextBox x:Name="OrrBetaTextBox"
                                          Grid.Row="4" Grid.Column="6"
                                          Style="{StaticResource ModernTextBox}"
@@ -762,26 +762,26 @@
                                 <TextBlock Grid.Row="6" Grid.Column="0"
                                            Text="i_lim" VerticalAlignment="Center"
                                            FontSize="11" Foreground="#64748B" Margin="0,0,8,0"
-                                           ToolTip="ORR limiting current density (A/cm²) — controls the mass-transport plateau at highly negative potentials"/>
+                                           ToolTip="ORR limiting current density (A/cm2) — controls the mass-transport plateau at highly negative potentials"/>
                                 <TextBox x:Name="OrrIlimTextBox"
                                          Grid.Row="6" Grid.Column="4"
                                          Style="{StaticResource ModernTextBox}"
                                          Text="1.0e-5"
-                                         ToolTip="ORR limiting current density i_lim (A/cm²). Click 'Calc iLim' to estimate from temperature, Cl⁻ concentration, and diffusion-layer thickness."/>
+                                         ToolTip="ORR limiting current density i_lim (A/cm2). Click 'Calc iLim' to estimate from temperature, Cl⁻ concentration, and diffusion-layer thickness."/>
                                 <Button x:Name="CalcIlimButton"
                                         Grid.Row="6" Grid.Column="6" Grid.ColumnSpan="3"
                                         Height="22"
                                         FontSize="10"
                                         Style="{StaticResource BrowseButton}"
                                         Content="Calc iLim"
-                                        ToolTip="Estimate the ORR limiting current density from temperature, Cl⁻ concentration, and diffusion-layer thickness using the O₂ solubility and diffusivity models ported from O2.m"
+                                        ToolTip="Estimate the ORR limiting current density from temperature, Cl⁻ concentration, and diffusion-layer thickness using the O2 solubility and diffusivity models ported from O2.m"
                                         Click="CalcIlimButton_Click"/>
 
                                 <!-- Metal Oxidation row -->
                                 <TextBlock Grid.Row="8" Grid.Column="0"
                                            Text="Me Ox" VerticalAlignment="Center"
                                            FontSize="12" Foreground="#1E293B" Margin="0,0,8,0"
-                                           ToolTip="Metal Oxidation reaction (e.g. Fe → Fe²⁺ + 2e⁻)"/>
+                                           ToolTip="Metal Oxidation reaction (e.g. Fe → Fe2- + 2e-)"/>
                                 <CheckBox x:Name="MeOxIncludeCheckBox"
                                           Grid.Row="8" Grid.Column="2"
                                           IsChecked="True"
@@ -792,7 +792,7 @@
                                          Grid.Row="8" Grid.Column="4"
                                          Style="{StaticResource ModernTextBox}"
                                          Text="1.0e-14"
-                                         ToolTip="Metal-oxidation exchange current density starting value (A/cm²)"/>
+                                         ToolTip="Metal-oxidation exchange current density starting value (A/cm2)"/>
                                 <TextBox x:Name="MetalBetaTextBox"
                                          Grid.Row="8" Grid.Column="6"
                                          Style="{StaticResource ModernTextBox}"

@@ -386,7 +386,7 @@ namespace CSaVe_Electrochemical_Data
         {
             // The cathodic limiting current for metal deposition is set by the very low dissolved
             // cation concentration. Estimate from the minimum |i| in the deeply cathodic potential
-            // region, then clamp to [IlimMinAcm2, IlimMaxAcm2] = [1e-14, 1e-6] A/cm².
+            // region, then clamp to [IlimMinAcm2, IlimMaxAcm2] = [1e-14, 1e-6] A/cm2.
             if (e.Length == 0)
                 return Math.Clamp(reaction.IlimMaxAcm2 * 0.1, reaction.IlimMinAcm2, reaction.IlimMaxAcm2);
 
