@@ -143,6 +143,7 @@ namespace CSaVe_Electrochemical_Data
             BvModelParameters fitted = _curveFitter.Fit(
                 ePot.ToList(), iDensity.ToList(), ecorrHint, input.TemperatureCelsius,
                 input.ElectrolytePh, input.MetalIonConcentrationM, input.MetalSpecies,
+                input.DiffusionLayerThicknessCm,
                 input.UserOverrides);
 
             // ── Step 5: compute display-resolution model curves ───────────────────────────────

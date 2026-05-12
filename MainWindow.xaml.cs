@@ -174,9 +174,24 @@ namespace CSaVe_Electrochemical_Data
             CathodicCsvPath.TextChanged += (_, _) => UpdateXmlGenerationAvailability();
             UpdateXmlGenerationAvailability();
 
+            TC.TextChanged += (_, _) =>
+            {
+                UpdateOrrIlimFromConditions();
+                UpdateMetalIlimFromConditions();
+            };
+            ClConc.TextChanged += (_, _) => UpdateOrrIlimFromConditions();
+            MetalIonConcTextBox.TextChanged += (_, _) => UpdateMetalIlimFromConditions();
+            DiffLayerThicknessTextBox.TextChanged += (_, _) =>
+            {
+                UpdateOrrIlimFromConditions();
+                UpdateMetalIlimFromConditions();
+            };
+            MetalSpeciesComboBox.SelectionChanged += (_, _) => UpdateMetalIlimFromConditions();
+
             InitializePlotModels();
             InitializePolarizationFitResultsTable();
             UpdateOrrIlimFromConditions();
+            UpdateMetalIlimFromConditions();
         }
         /// <summary>
         /// This method searches through the provided folder and subfolders or just through the provided folder to find all DTA files and then uses the Background Worker to call
@@ -1115,6 +1130,37 @@ namespace CSaVe_Electrochemical_Data
         }
 
         /// <summary>
+        /// Computes the metal-cation limiting current density from the current UI values of
+        /// temperature, dissolved metal-ion concentration, selected metal species, and
+        /// diffusion-layer thickness, and populates <see cref="MetalIlimTextBox"/>.
+        /// Ignores invalid inputs without showing a dialog.
+        /// </summary>
+        private void UpdateMetalIlimFromConditions()
+        {
+            if (!TryParseMetalIlimInputs(out double tempC, out double metalConcM, out double deltaMicrons, showErrors: false))
+                return;
+
+            try
+            {
+                MetalSpecies species = GetSelectedMetalSpecies();
+                int z = ElectrochemicalReactionFactory.CreateMetalOxidation(species).Z;
+                double deltaCm = deltaMicrons * 1.0e-4;
+                double metalConcMolPerCm3 = metalConcM / 1000.0;
+                double ilim = MetalCationDiffusivityCalculator.CalcMetalIlimAcm2(
+                    species,
+                    z,
+                    tempC,
+                    metalConcMolPerCm3,
+                    deltaCm);
+                MetalIlimTextBox.Text = ilim.ToString("E3", CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                // Silently ignore calculation errors during startup or background updates.
+            }
+        }
+
+        /// <summary>
         /// Parses the temperature, Cl⁻ concentration, and diffusion-layer thickness from the UI.
         /// </summary>
         /// <param name="tempC">Parsed temperature (oC).</param>
@@ -1149,6 +1195,48 @@ namespace CSaVe_Electrochemical_Data
             {
                 if (showErrors)
                     System.Windows.MessageBox.Show("Enter a valid positive diffusion-layer thickness (µm) before calculating i_lim.",
+                        "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Parses the temperature, dissolved metal-ion concentration, and diffusion-layer thickness from the UI.
+        /// </summary>
+        /// <param name="tempC">Parsed temperature (oC).</param>
+        /// <param name="metalConcM">Parsed dissolved metal-ion concentration (mol/L).</param>
+        /// <param name="deltaMicrons">Parsed diffusion-layer thickness (µm).</param>
+        /// <param name="showErrors">When true, shows a MessageBox for the first invalid input encountered.</param>
+        /// <returns>True when all three inputs are valid.</returns>
+        private bool TryParseMetalIlimInputs(out double tempC, out double metalConcM, out double deltaMicrons, bool showErrors)
+        {
+            tempC = 0; metalConcM = 0; deltaMicrons = 0;
+
+            if (!double.TryParse(TC.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out tempC)
+                || !double.IsFinite(tempC))
+            {
+                if (showErrors)
+                    System.Windows.MessageBox.Show("Enter a valid temperature (oC) before calculating metal i_lim.",
+                        "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            if (!double.TryParse(MetalIonConcTextBox.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out metalConcM)
+                || !double.IsFinite(metalConcM) || metalConcM < 0.0)
+            {
+                if (showErrors)
+                    System.Windows.MessageBox.Show("Enter a valid metal ion concentration (M) before calculating metal i_lim.",
+                        "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            if (!double.TryParse(DiffLayerThicknessTextBox.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out deltaMicrons)
+                || deltaMicrons <= 0.0)
+            {
+                if (showErrors)
+                    System.Windows.MessageBox.Show("Enter a valid positive diffusion-layer thickness (µm) before calculating metal i_lim.",
                         "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return false;
             }
@@ -1609,6 +1697,14 @@ namespace CSaVe_Electrochemical_Data
                 return;
             }
 
+            if (!double.TryParse(DiffLayerThicknessTextBox.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double diffLayerThicknessMicrons) ||
+                diffLayerThicknessMicrons <= 0.0)
+            {
+                PolarizationAnalysisStatusBox.Text = "Invalid diffusion-layer thickness value.";
+                return;
+            }
+            double diffLayerThicknessCm = diffLayerThicknessMicrons * 1.0e-4;
+
             // ── Build BV user overrides from UI controls ───────────────────────────────────
             MetalSpecies selectedMetalSpecies = GetSelectedMetalSpecies();
 
@@ -1627,6 +1723,7 @@ namespace CSaVe_Electrochemical_Data
 
                 I0Metal   = TryParsePositiveDouble(MetalI0TextBox.Text),
                 BetaMetal = TryParsePositiveDouble(MetalBetaTextBox.Text),
+                IlimMetal = TryParsePositiveDouble(MetalIlimTextBox.Text),
                 FixMetal  = MetalFixCheckBox.IsChecked == true,
                 IncludeMetal = MeOxIncludeCheckBox.IsChecked != false,
             };
@@ -1642,6 +1739,7 @@ namespace CSaVe_Electrochemical_Data
                 ChlorideConcentrationM   = chlorideConcentrationM,
                 MetalIonConcentrationM   = metalIonConcentrationM,
                 MetalSpecies             = selectedMetalSpecies,
+                DiffusionLayerThicknessCm = diffLayerThicknessCm,
                 ProtectionPotentialsMv   = new[] { -850.0, -1050.0 },
                 UserOverrides            = bvOverrides,
             });
@@ -1950,6 +2048,37 @@ namespace CSaVe_Electrochemical_Data
             catch (Exception ex)
             {
                 System.Windows.MessageBox.Show($"Failed to calculate i_lim:\n{ex.Message}",
+                    "Calculation Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Estimates the metal-cation limiting current density from temperature, metal-ion
+        /// concentration, selected species, and diffusion-layer thickness, then populates
+        /// <see cref="MetalIlimTextBox"/>.
+        /// </summary>
+        private void CalcMetalIlimButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TryParseMetalIlimInputs(out double tempC, out double metalConcM, out double deltaMicrons, showErrors: true))
+                return;
+
+            try
+            {
+                MetalSpecies species = GetSelectedMetalSpecies();
+                int z = ElectrochemicalReactionFactory.CreateMetalOxidation(species).Z;
+                double deltaCm = deltaMicrons * 1.0e-4;
+                double metalConcMolPerCm3 = metalConcM / 1000.0;
+                double ilim = MetalCationDiffusivityCalculator.CalcMetalIlimAcm2(
+                    species,
+                    z,
+                    tempC,
+                    metalConcMolPerCm3,
+                    deltaCm);
+                MetalIlimTextBox.Text = ilim.ToString("E3", CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Failed to calculate metal i_lim:\n{ex.Message}",
                     "Calculation Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
