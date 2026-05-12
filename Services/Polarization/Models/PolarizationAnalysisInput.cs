@@ -53,6 +53,12 @@ namespace CSaVe_Electrochemical_Data
         /// <summary>Selected alloying-metal oxidation reaction. Default Fe.</summary>
         public MetalSpecies MetalSpecies { get; set; } = MetalSpecies.Fe;
 
+        /// <summary>
+        /// Diffusion-layer thickness δ (cm) used for transport-limited current initial estimates.
+        /// Default 850 µm = 0.085 cm.
+        /// </summary>
+        public double DiffusionLayerThicknessCm { get; set; } = 850.0e-4;
+
         /// <summary>Optional solution resistance in ohms for iR correction. Default 0 Ω (disabled).</summary>
         public double RSolutionOhm { get; set; } = 0.0;
 
