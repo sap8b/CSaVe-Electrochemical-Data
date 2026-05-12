@@ -22,6 +22,7 @@ namespace CSaVe_Electrochemical_Data
         /// <param name="electrolytePh">Electrolyte pH.</param>
         /// <param name="metalIonConcentrationM">Dissolved metal-ion concentration [M^z+] (mol/L), where z is the selected metal charge number.</param>
         /// <param name="metalSpecies">Selected alloying-metal oxidation reaction to fit.</param>
+        /// <param name="diffLayerThicknessCm">Diffusion-layer thickness δ (cm) used for transport-limited current estimates.</param>
         /// <param name="overrides">
         /// Optional user-specified starting values and per-reaction fix flags.
         /// Pass <c>null</c> to use fully automatic initialisation and unconstrained LM fitting.
@@ -35,6 +36,7 @@ namespace CSaVe_Electrochemical_Data
             double electrolytePh,
             double metalIonConcentrationM,
             MetalSpecies metalSpecies,
+            double diffLayerThicknessCm,
             BvUserOverrides overrides = null);
     }
 }

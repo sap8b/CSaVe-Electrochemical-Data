@@ -42,6 +42,7 @@ namespace CSaVe_Electrochemical_Data
             double electrolytePh,
             double metalIonConcentrationM,
             MetalSpecies metalSpecies,
+            double diffLayerThicknessCm,
             BvUserOverrides overrides = null)
         {
             if (potentialV.Count != currentDensityAcm2.Count)
@@ -60,15 +61,22 @@ namespace CSaVe_Electrochemical_Data
             double[] i = [.. currentDensityAcm2];
 
             double effectivePh = double.IsFinite(electrolytePh) ? electrolytePh : DefaultPh;
+            double ilimCalculationMetalConcM = double.IsFinite(metalIonConcentrationM)
+                ? metalIonConcentrationM
+                : 0.0;
             double effectiveMetalIonConcentrationM =
                 (double.IsFinite(metalIonConcentrationM) && metalIonConcentrationM > 0.0)
                     ? metalIonConcentrationM
                     : DefaultMetalIonConcentrationM;
 
-            IReadOnlyList<IBvReaction> reactions = CreateReactionList(temperatureCelsius, effectivePh, effectiveMetalIonConcentrationM, metalSpecies);
+            var reactionElectrolyte = new ElectrolyteConditions(effectivePh, temperatureCelsius, effectiveMetalIonConcentrationM, metalSpecies);
+            var ilimElectrolyte = new ElectrolyteConditions(effectivePh, temperatureCelsius, ilimCalculationMetalConcM, metalSpecies);
+
+            IReadOnlyList<IBvReaction> reactions = CreateReactionList(reactionElectrolyte);
             double ecorr0 = EstimateEcorr(e, i, ecorrHintV);
 
-            FitState initialState = EstimateInitialState(e, i, ecorr0, reactions, includeMetal, includeOrr, includeHer);
+            FitState initialState = EstimateInitialState(
+                e, i, ecorr0, reactions, includeMetal, includeOrr, includeHer, ilimElectrolyte, diffLayerThicknessCm);
             ApplyOverrides(initialState, overrides);
 
             List<FitParameterBinding> bindings = BuildBindings(initialState, overrides);
@@ -104,16 +112,11 @@ namespace CSaVe_Electrochemical_Data
         /// potential. The order determines the per-reaction estimation sequence in
         /// <see cref="EstimateInitialState"/>.
         /// </summary>
-        private static IReadOnlyList<IBvReaction> CreateReactionList(
-            double temperatureCelsius,
-            double electrolytePh,
-            double metalIonConcentrationM,
-            MetalSpecies metalSpecies)
+        private static IReadOnlyList<IBvReaction> CreateReactionList(ElectrolyteConditions electrolyte)
         {
-            var electrolyte = new ElectrolyteConditions(electrolytePh, temperatureCelsius, metalIonConcentrationM, metalSpecies);
             var reactions = new List<IBvReaction>(3)
             {
-                ElectrochemicalReactionFactory.CreateMetalOxidationFactory(metalSpecies).CreateReaction(electrolyte),
+                ElectrochemicalReactionFactory.CreateMetalOxidationFactory(electrolyte.MetalSpecies).CreateReaction(electrolyte),
                 new ORRFactory().CreateReaction(electrolyte),
                 new HERFactory().CreateReaction(electrolyte)
             };
@@ -131,7 +134,9 @@ namespace CSaVe_Electrochemical_Data
             IReadOnlyList<IBvReaction> reactions,
             bool includeMetal,
             bool includeOrr,
-            bool includeHer)
+            bool includeHer,
+            ElectrolyteConditions electrolyteConditions,
+            double diffLayerThicknessCm)
         {
             // Build per-reaction state objects in the same sorted order as the reaction list.
             var rfsList = new List<ReactionFitState>();
@@ -175,7 +180,7 @@ namespace CSaVe_Electrochemical_Data
                         rfs.Beta = betaMetal;
                         rfs.I0   = i0Metal;
                         if (rfs.Reaction.IlimMaxAcm2 > 0.0)
-                            rfs.Ilim = EstimateIlimMetal(e, i, ecorr, rfs.Reaction);
+                            rfs.Ilim = EstimateIlimMetal(e, i, ecorr, rfs.Reaction, electrolyteConditions, diffLayerThicknessCm);
                         break;
 
                     case ReactionType.HydrogenEvolution:
@@ -366,27 +371,50 @@ namespace CSaVe_Electrochemical_Data
             }
         }
 
-        private static double EstimateIlimMetal(double[] e, double[] i, double ecorr, IBvReaction reaction)
+        private static double EstimateIlimMetal(
+            double[] e,
+            double[] i,
+            double ecorr,
+            IBvReaction reaction,
+            ElectrolyteConditions electrolyteConditions,
+            double diffLayerThicknessCm)
         {
-            // The cathodic limiting current for metal deposition is set by the very low dissolved
-            // cation concentration. Estimate from the minimum |i| in the deeply cathodic potential
-            // region, then clamp to [IlimMinAcm2, IlimMaxAcm2] = [1e-14, 1e-6] A/cm2.
-            if (e.Length == 0)
-                return Math.Clamp(reaction.IlimMaxAcm2 * 0.1, reaction.IlimMinAcm2, reaction.IlimMaxAcm2);
+            double metalIonConcentrationMolPerCm3 = electrolyteConditions.MetalIonConcentrationM / 1000.0;
 
-            double eMin    = e.Min();
-            double eRange  = e.Max() - eMin;
-            double cutoff  = eMin + eRange * IlimDepthFraction;
+            double raw;
+            if (metalIonConcentrationMolPerCm3 > 0.0 && diffLayerThicknessCm > 0.0)
+            {
+                raw = MetalCationDiffusivityCalculator.CalcMetalIlimAcm2(
+                    electrolyteConditions.MetalSpecies,
+                    reaction.Z,
+                    electrolyteConditions.TemperatureCelsius,
+                    metalIonConcentrationMolPerCm3,
+                    diffLayerThicknessCm);
+            }
+            else
+            {
+                raw = EstimateIlimMetalFromData(e, i, ecorr, reaction);
+            }
+
+            return Math.Clamp(raw, reaction.IlimMinAcm2, reaction.IlimMaxAcm2);
+        }
+
+        private static double EstimateIlimMetalFromData(double[] e, double[] i, double ecorr, IBvReaction reaction)
+        {
+            if (e.Length == 0)
+                return reaction.IlimMaxAcm2 * 0.1;
+
+            double eMin   = e.Min();
+            double eRange = e.Max() - eMin;
+            double cutoff = eMin + eRange * IlimDepthFraction;
 
             double[] deepAbsI = [.. i
                 .Where((_, k) => e[k] <= cutoff && e[k] < ecorr)
                 .Select(v => Math.Abs(v))];
 
-            double raw = deepAbsI.Length > 0
+            return deepAbsI.Length > 0
                 ? deepAbsI.Min()
                 : reaction.IlimMaxAcm2 * 0.1;
-
-            return Math.Clamp(raw, reaction.IlimMinAcm2, reaction.IlimMaxAcm2);
         }
 
         private static void FitOrrBv(
