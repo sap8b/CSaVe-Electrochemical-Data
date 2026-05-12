@@ -61,7 +61,7 @@ namespace CSaVe_Electrochemical_Data
             double[] i = [.. currentDensityAcm2];
 
             double effectivePh = double.IsFinite(electrolytePh) ? electrolytePh : DefaultPh;
-            double ilimMetalIonConcentrationM = double.IsFinite(metalIonConcentrationM)
+            double ilimCalculationMetalConcM = double.IsFinite(metalIonConcentrationM)
                 ? metalIonConcentrationM
                 : 0.0;
             double effectiveMetalIonConcentrationM =
@@ -70,7 +70,7 @@ namespace CSaVe_Electrochemical_Data
                     : DefaultMetalIonConcentrationM;
 
             var reactionElectrolyte = new ElectrolyteConditions(effectivePh, temperatureCelsius, effectiveMetalIonConcentrationM, metalSpecies);
-            var ilimElectrolyte = new ElectrolyteConditions(effectivePh, temperatureCelsius, ilimMetalIonConcentrationM, metalSpecies);
+            var ilimElectrolyte = new ElectrolyteConditions(effectivePh, temperatureCelsius, ilimCalculationMetalConcM, metalSpecies);
 
             IReadOnlyList<IBvReaction> reactions = CreateReactionList(reactionElectrolyte);
             double ecorr0 = EstimateEcorr(e, i, ecorrHintV);
