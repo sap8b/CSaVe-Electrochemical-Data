@@ -23,7 +23,7 @@ namespace CSaVe_Electrochemical_Data
         /// <param name="temperatureCelsius">Electrolyte temperature in °C (default 25.0).</param>
         /// <param name="metalCationConcentration">Dissolved metal cation concentration [M²⁺] (mol/L, default 1.0e-6).</param>
         public MetalOxidationReaction(double pH = 8.0, double temperatureCelsius = 25.0, double metalCationConcentration = 1.0e-6)
-            : base(ReactionType.MetalOxidation, e0Vshe: -0.54, z: 2, pH, temperatureCelsius)
+            : base(ReactionType.MetalOxidation, e0Vshe: -0.44, z: 2, pH, temperatureCelsius)
         {
             _metalCationConcentration = metalCationConcentration;
         }
