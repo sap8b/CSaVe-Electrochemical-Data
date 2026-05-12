@@ -9,5 +9,10 @@ namespace CSaVe_Electrochemical_Data
             : base(e0Vshe: -0.44, z: 2, pH, temperatureCelsius, metalCationConcentration)
         {
         }
+        /// <summary>Minimum Fe reduction limiting current density for LM box bounds (A/cm2).</summary>
+        public override double IlimMinAcm2 => 1.0e-18;
+
+        /// <summary>Maximum Fe oxidation limiting current density for LM box bounds (A/cm2).</summary>
+        public override double IlimMaxAcm2 => 1.0;
     }
 }
