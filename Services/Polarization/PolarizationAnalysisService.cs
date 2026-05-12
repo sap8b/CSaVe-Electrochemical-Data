@@ -1,3 +1,5 @@
+using CSaVe_Electrochemical_Data.Services.Polarization.Reactions;
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,8 +8,8 @@ namespace CSaVe_Electrochemical_Data
 {
     /// <summary>
     /// Orchestrates the full polarization-curve analysis pipeline:
-    /// CSV reading → monotonicity filtering → curve joining (if two files) →
-    /// Ecorr estimation → BV fitting → metric extraction → result assembly.
+    /// CSV reading -> monotonicity filtering -> curve joining (if two files) ->
+    /// Ecorr estimation -> BV fitting -> metric extraction -> result assembly.
     /// Depends on interface abstractions injected through the constructor (Dependency-Inversion Principle).
     /// </summary>
     public sealed class PolarizationAnalysisService : IPolarizationAnalysisService
@@ -140,6 +142,7 @@ namespace CSaVe_Electrochemical_Data
             // ── Step 4: BV fitting ────────────────────────────────────────────────────────────
             BvModelParameters fitted = _curveFitter.Fit(
                 ePot.ToList(), iDensity.ToList(), ecorrHint, input.TemperatureCelsius,
+                input.ElectrolytePh, input.MetalIonConcentrationM, input.MetalSpecies,
                 input.UserOverrides);
 
             // ── Step 5: compute display-resolution model curves ───────────────────────────────
@@ -169,12 +172,16 @@ namespace CSaVe_Electrochemical_Data
                 : double.NaN;
 
             // Effective Tafel slopes derived from BV symmetry factors for display.
-            // ba (metal anodic) = 2.303 * R * T / (BetaMetal * z_metal * F)  with z_metal = 2
-            // bc (ORR cathodic) = 2.303 * R * T / ((1-BetaOrr) * z_ORR * F) with z_ORR   = 4
+            // ba (metal anodic) = 2.303 * R * T / (BetaMetal * z_metal * F) using the selected metal reaction z.
+            // bc (ORR cathodic) = 2.303 * R * T / ((1-BetaOrr) * z_ORR * F) with z_ORR = 4.
             double temperatureKelvin = input.TemperatureCelsius + 273.15;
             double rtFactor          = 2.303 * ElectrochemicalConstants.R * temperatureKelvin / ElectrochemicalConstants.F;
+            BvModelParameters.ReactionParameters metalReaction =
+                fitted.GetReactionParam(ReactionType.MetalOxidation)
+                ?? throw new InvalidOperationException("The selected metal oxidation reaction was not created for the fitted model.");
+            double metalElectronCount = metalReaction.Reaction.Z;
             double betaAnodicV = fitted.IncludeMetal
-                ? rtFactor / (fitted.BetaMetal * 2.0)
+                ? rtFactor / (fitted.BetaMetal * metalElectronCount)
                 : double.NaN;
             double betaCathodicV = fitted.IncludeOrr
                 ? rtFactor / ((1.0 - fitted.BetaOrr) * 4.0)
@@ -285,7 +292,7 @@ namespace CSaVe_Electrochemical_Data
         }
 
         /// <summary>
-        /// Applies direct iR correction to measured polarization points using E_corrected = E_measured − I·R.
+        /// Applies direct iR correction to measured polarization points using E_corrected = E_measured − I*R.
         /// </summary>
         private static IReadOnlyList<PolarizationPoint> ApplyIrCorrection(
             IReadOnlyList<PolarizationPoint> points,
@@ -351,7 +358,7 @@ namespace CSaVe_Electrochemical_Data
         /// Falls back to the potential at minimum |I| if no zero crossing is found.
         /// </summary>
         /// <param name="e">Potential values (V), sorted ascending.</param>
-        /// <param name="i">Signed current density (A/cm²) values.</param>
+        /// <param name="i">Signed current density (A/cm2) values.</param>
         /// <returns>Estimated Ecorr (V).</returns>
         private static double EstimateEcorr(double[] e, double[] i)
         {
@@ -382,9 +389,9 @@ namespace CSaVe_Electrochemical_Data
         /// Returns <see cref="double.NaN"/> if fewer than 3 points are available.
         /// </summary>
         /// <param name="e">Potential values (V), sorted ascending.</param>
-        /// <param name="i">Signed current density (A/cm²) values.</param>
+        /// <param name="i">Signed current density (A/cm2) values.</param>
         /// <param name="ecorr">Fitted corrosion potential (V).</param>
-        /// <returns>Back-extrapolated i_ox (A/cm²), or NaN if the window is too small.</returns>
+        /// <returns>Back-extrapolated i_ox (A/cm2), or NaN if the window is too small.</returns>
         private static double ComputeIOx(double[] e, double[] i, double ecorr)
         {
             const double lower = 0.01;
@@ -422,9 +429,9 @@ namespace CSaVe_Electrochemical_Data
         /// (potential, |current density|) curve.  Clamps to the boundary values outside the range.
         /// </summary>
         /// <param name="e">Potential values (V), sorted ascending.</param>
-        /// <param name="i">Signed current density (A/cm²) values.</param>
+        /// <param name="i">Signed current density (A/cm2) values.</param>
         /// <param name="targetV">Target potential (V).</param>
-        /// <returns>Interpolated |I| (A/cm²).</returns>
+        /// <returns>Interpolated |I| (A/cm2).</returns>
         private static double InterpolateAbsCurrentDensity(double[] e, double[] i, double targetV)
         {
             double[] absI = [.. i.Select(v => Math.Abs(v))];

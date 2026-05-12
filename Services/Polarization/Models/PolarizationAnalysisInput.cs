@@ -1,3 +1,5 @@
+using CSaVe_Electrochemical_Data.Services.Polarization.Reactions;
+
 using System.Collections.Generic;
 
 namespace CSaVe_Electrochemical_Data
@@ -18,7 +20,7 @@ namespace CSaVe_Electrochemical_Data
         /// </summary>
         public string CathodicFilePath { get; set; }
 
-        /// <summary>Exposed electrode area in cm². Must be &gt; 0. Default 0.495 cm².</summary>
+        /// <summary>Exposed electrode area in cm2. Must be &gt; 0. Default 0.495 cm2.</summary>
         public double ExposedAreaCm2 { get; set; } = 0.495;
 
         /// <summary>
@@ -29,8 +31,27 @@ namespace CSaVe_Electrochemical_Data
         public IReadOnlyList<double> ProtectionPotentialsMv { get; set; } =
             new[] { -850.0, -1050.0 };
 
-        /// <summary>Temperature in degrees Celsius used for Butler-Volmer calculations. Default 25 °C.</summary>
+        /// <summary>Temperature in degrees Celsius used for Butler-Volmer calculations. Default 25 oC.</summary>
         public double TemperatureCelsius { get; set; } = 25.0;
+
+        /// <summary>Electrolyte pH used for Nernst equilibrium corrections. Default 8.0.</summary>
+        public double ElectrolytePh { get; set; } = 8.0;
+
+        /// <summary>
+        /// Chloride concentration (mol/L) retained with the analysis context for electrolyte-aware modelling.
+        /// Default 0.6 M.
+        /// </summary>
+        public double ChlorideConcentrationM { get; set; } = 0.6;
+
+        /// <summary>
+        /// Dissolved metal-ion concentration [M^z+] (mol/L), where z is the selected metal charge number,
+        /// used by the selected metal-oxidation Nernst term.
+        /// Default 1.0e-6 M.
+        /// </summary>
+        public double MetalIonConcentrationM { get; set; } = 1.0e-6;
+
+        /// <summary>Selected alloying-metal oxidation reaction. Default Fe.</summary>
+        public MetalSpecies MetalSpecies { get; set; } = MetalSpecies.Fe;
 
         /// <summary>Optional solution resistance in ohms for iR correction. Default 0 Ω (disabled).</summary>
         public double RSolutionOhm { get; set; } = 0.0;

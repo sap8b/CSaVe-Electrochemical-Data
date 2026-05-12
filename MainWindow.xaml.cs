@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Data;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -8,8 +9,8 @@ using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms;
-using CSaVe_Electrochemical_Data.Models;
 using CSaVe_Electrochemical_Data.Services;
+using CSaVe_Electrochemical_Data.Services.Polarization.Reactions;
 using OxyPlot;
 using OxyPlot.Axes;
 using OxyPlot.Legends;
@@ -122,21 +123,46 @@ namespace CSaVe_Electrochemical_Data
         //Message window that displays the progress bar
         MessageWindowDialog mwd;
 
-        private readonly PythonAnalysisService pythonAnalysisService;
         private readonly IPolarizationAnalysisService _polarizationAnalysisService;
         private string _anodicPolarizationFilePath = string.Empty;
         private string _cathodicPolarizationFilePath = string.Empty;
-        private readonly List<string> eisAnalysisFiles = new();
         private readonly PlotModel polarizationPlotModel = new();
-        private readonly PlotModel eisNyquistPlotModel = new();
-        private readonly PlotModel eisBodePlotModel = new();
+        private readonly DataTable polarizationFitResultsTable = new();
+        private readonly Dictionary<string, int> polarizationFitRowIndexByName = new(StringComparer.Ordinal);
+        private int polarizationAnalysisRunCount;
         private static readonly Regex PdTokenRegex = new(@"(^|[^a-z])pd([^a-z]|$)", RegexOptions.Compiled);
+        private static readonly string[] PolarizationFitParameterRows =
+        {
+            "Metal species",
+            "Temperature (oC)",
+            "pH",
+            "Cl⁻ concentration (M)",
+            "Metal ion concentration [Mz+] (M)",
+            "I₀, metal (A/cm2)",
+            "β_metal",
+            "I₀, ORR (A/cm2)",
+            "β_ORR",
+            "i_lim, ORR (A/cm2)",
+            "I₀, HER (A/cm2)",
+            "β_HER",
+            "E_corr (mV)",
+            "i_corr (µA/cm2)",
+            "i@-850 mV (µA/cm2)",
+            "i@-1050 mV (µA/cm2)",
+            "Weighted RMSE (A/cm2)"
+        };
+        private static readonly string[] PolarizationFittedOnlyRows =
+        {
+            "E_corr (mV)",
+            "i_corr (µA/cm2)",
+            "i@-850 mV (µA/cm2)",
+            "i@-1050 mV (µA/cm2)",
+            "Weighted RMSE (A/cm2)"
+        };
 
         public MainWindow()
         {
             InitializeComponent();
-
-            pythonAnalysisService = new PythonAnalysisService(FindRepositoryRoot());
 
             _polarizationAnalysisService = new PolarizationAnalysisService(
                 new PolarizationCsvReader(),
@@ -149,6 +175,8 @@ namespace CSaVe_Electrochemical_Data
             UpdateXmlGenerationAvailability();
 
             InitializePlotModels();
+            InitializePolarizationFitResultsTable();
+            UpdateOrrIlimFromConditions();
         }
         /// <summary>
         /// This method searches through the provided folder and subfolders or just through the provided folder to find all DTA files and then uses the Background Worker to call
@@ -955,64 +983,39 @@ namespace CSaVe_Electrochemical_Data
             UNSUPPORTED
         }
 
-        private sealed class PolarizationResultRow
-        {
-            public string File { get; set; } = string.Empty;
-            public double Ecorr_mV { get; set; }
-            public double Icorr_uAcm2 { get; set; }
-            public double I_ox_uAcm2 { get; set; }
-            public double Ilim_uAcm2 { get; set; }
-            public double HER_Eeq_mV { get; set; }
-            public double I_at_neg850mV_uAcm2 { get; set; }
-            public double I_at_neg1050mV_uAcm2 { get; set; }
-        }
-
-        private sealed class EisResultRow
-        {
-            public string File { get; set; } = string.Empty;
-            public string Model { get; set; } = string.Empty;
-            public string Parameters { get; set; } = string.Empty;
-        }
-
-        private static string FindRepositoryRoot()
-        {
-            var dir = new DirectoryInfo(AppContext.BaseDirectory);
-            while (dir is not null)
-            {
-                if (File.Exists(Path.Combine(dir.FullName, "CSaVe Electrochemical Data.csproj")))
-                    return dir.FullName;
-                dir = dir.Parent;
-            }
-
-            throw new DirectoryNotFoundException("Unable to locate repository root for Python analysis scripts.");
-        }
-
         private void InitializePlotModels()
         {
             polarizationPlotModel.Title = "Polarization (|i| vs E)";
-            polarizationPlotModel.Axes.Add(new LogarithmicAxis { Position = AxisPosition.Bottom, Title = "Current Density (A/cm²)", Minimum = 1.0e-12 });
+            polarizationPlotModel.Axes.Add(new LogarithmicAxis { Position = AxisPosition.Bottom, Title = "Current Density (A/cm2)", Minimum = 1.0e-12 });
             polarizationPlotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = "Potential (V)" });
             polarizationPlotModel.Legends.Add(new Legend
             {
-                LegendPosition      = LegendPosition.TopRight,
-                LegendPlacement     = LegendPlacement.Inside,
-                LegendBackground    = OxyColor.FromAColor(200, OxyColors.White),
-                LegendBorder        = OxyColors.Gray,
+                LegendPosition        = LegendPosition.BottomLeft,
+                LegendPlacement       = LegendPlacement.Inside,
+                LegendBackground      = OxyColor.FromAColor(200, OxyColors.White),
+                LegendBorder          = OxyColors.Gray,
                 LegendBorderThickness = 0.5,
-                LegendFontSize      = 10.0,
+                LegendFontSize        = 10.0,
             });
             PolarizationPlotView.Model = polarizationPlotModel;
+        }
 
-            eisNyquistPlotModel.Title = "Nyquist";
-            eisNyquistPlotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Bottom, Title = "Z' (Ohm)" });
-            eisNyquistPlotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = "-Z'' (Ohm)" });
-            EisNyquistPlotView.Model = eisNyquistPlotModel;
+        private void InitializePolarizationFitResultsTable()
+        {
+            polarizationFitResultsTable.Columns.Clear();
+            polarizationFitResultsTable.Rows.Clear();
+            polarizationFitRowIndexByName.Clear();
+            polarizationAnalysisRunCount = 0;
+            polarizationFitResultsTable.Columns.Add("Parameter", typeof(string));
 
-            eisBodePlotModel.Title = "Bode";
-            eisBodePlotModel.Axes.Add(new LogarithmicAxis { Position = AxisPosition.Bottom, Title = "Frequency (Hz)", Minimum = 1.0e-3 });
-            eisBodePlotModel.Axes.Add(new LogarithmicAxis { Position = AxisPosition.Left, Title = "|Z| (Ohm)", Key = "MagAxis", Minimum = 1.0e-3 });
-            eisBodePlotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Right, Title = "Phase (deg)", Key = "PhaseAxis" });
-            EisBodePlotView.Model = eisBodePlotModel;
+            foreach (string rowName in PolarizationFitParameterRows)
+            {
+                int rowIndex = polarizationFitResultsTable.Rows.Count;
+                polarizationFitResultsTable.Rows.Add(rowName);
+                polarizationFitRowIndexByName[rowName] = rowIndex;
+            }
+
+            PolarizationResultsGrid.ItemsSource = polarizationFitResultsTable.DefaultView;
         }
 
         private static XmlEligibleCsvType DetectXmlEligibleType(string csvPath)
@@ -1033,10 +1036,6 @@ namespace CSaVe_Electrochemical_Data
             string[] cols = [.. header.Split(',').Select(c => c.Trim().ToLowerInvariant())];
             bool hasVf = cols.Contains("vf");
             bool hasIm = cols.Contains("im");
-            bool looksLikeEis = cols.Contains("freq") || cols.Contains("zreal") || cols.Contains("zimag");
-
-            if (looksLikeEis)
-                return XmlEligibleCsvType.UNSUPPORTED;
             if (hasVf && hasIm)
                 return XmlEligibleCsvType.POLARIZATION_UNKNOWN;
 
@@ -1086,17 +1085,285 @@ namespace CSaVe_Electrochemical_Data
             }
         }
 
-        private static string FormatMeanStd(IEnumerable<double> vals)
+        private static string FormatFixed(double value, string format)
         {
-            var arr = vals.Where(v => !double.IsNaN(v) && !double.IsInfinity(v)).ToArray();
-            if (arr.Length == 0)
-                return "n/a";
+            return double.IsFinite(value)
+                ? value.ToString(format, CultureInfo.InvariantCulture)
+                : "n/a";
+        }
 
-            double mean = arr.Average();
-            double std = arr.Length > 1
-                ? Math.Sqrt(arr.Sum(v => (v - mean) * (v - mean)) / (arr.Length - 1))
-                : 0.0;
-            return $"{mean:F2} ± {std:F2}";
+        /// <summary>
+        /// Computes the ORR limiting current density from the current UI values of temperature,
+        /// Cl⁻ concentration, and diffusion-layer thickness, and populates
+        /// <see cref="OrrIlimTextBox"/>. Ignores invalid inputs without showing a dialog.
+        /// </summary>
+        private void UpdateOrrIlimFromConditions()
+        {
+            if (!TryParseIlimInputs(out double tempC, out double clM, out double deltaMicrons, showErrors: false))
+                return;
+
+            try
+            {
+                double deltaCm = deltaMicrons * 1.0e-4;
+                double ilim = DissolvedOxygenCalculator.CalcOrrIlimAcm2(tempC, clM, deltaCm);
+                OrrIlimTextBox.Text = ilim.ToString("E3", CultureInfo.InvariantCulture);
+            }
+            catch
+            {
+                // Silently ignore calculation errors during startup or background updates.
+            }
+        }
+
+        /// <summary>
+        /// Parses the temperature, Cl⁻ concentration, and diffusion-layer thickness from the UI.
+        /// </summary>
+        /// <param name="tempC">Parsed temperature (oC).</param>
+        /// <param name="clM">Parsed Cl⁻ concentration (mol/L).</param>
+        /// <param name="deltaMicrons">Parsed diffusion-layer thickness (µm).</param>
+        /// <param name="showErrors">When true, shows a MessageBox for the first invalid input encountered.</param>
+        /// <returns>True when all three inputs are valid.</returns>
+        private bool TryParseIlimInputs(out double tempC, out double clM, out double deltaMicrons, bool showErrors)
+        {
+            tempC = 0; clM = 0; deltaMicrons = 0;
+
+            if (!double.TryParse(TC.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out tempC)
+                || !double.IsFinite(tempC))
+            {
+                if (showErrors)
+                    System.Windows.MessageBox.Show("Enter a valid temperature (oC) before calculating i_lim.",
+                        "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            if (!double.TryParse(ClConc.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out clM)
+                || clM < 0.0)
+            {
+                if (showErrors)
+                    System.Windows.MessageBox.Show("Enter a valid Cl⁻ concentration (M) before calculating i_lim.",
+                        "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            if (!double.TryParse(DiffLayerThicknessTextBox.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out deltaMicrons)
+                || deltaMicrons <= 0.0)
+            {
+                if (showErrors)
+                    System.Windows.MessageBox.Show("Enter a valid positive diffusion-layer thickness (µm) before calculating i_lim.",
+                        "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return false;
+            }
+
+            return true;
+        }
+
+        private static string FormatScientific(double value)
+        {
+            return double.IsFinite(value)
+                ? value.ToString("E3", CultureInfo.InvariantCulture)
+                : "n/a";
+        }
+
+        private static string ParseUiOrAuto(string text, bool included)
+        {
+            if (!included)
+                return "excluded";
+            string trimmed = text?.Trim();
+            return string.IsNullOrWhiteSpace(trimmed) ? "auto" : trimmed;
+        }
+
+        private static string QuoteCsvValue(string value)
+        {
+            return $"\"{(value ?? string.Empty).Replace("\"", "\"\"")}\"";
+        }
+
+        private static string UnquoteCsvValue(string line)
+        {
+            string trimmed = line?.Trim() ?? string.Empty;
+            if (trimmed.Length >= 2 && trimmed[0] == '\"' && trimmed[^1] == '\"')
+                return trimmed[1..^1].Replace("\"\"", "\"");
+            return trimmed;
+        }
+
+        private static string GetImportedValue(IDictionary<string, string> values, string key)
+        {
+            return values.TryGetValue(key, out string value) ? value : string.Empty;
+        }
+
+        private static bool IsExportedMissingValue(string value)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                || string.Equals(value, "—", StringComparison.Ordinal)
+                || string.Equals(value, "n/a", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(value, "auto", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsExcludedValue(string value)
+        {
+            return string.Equals(value?.Trim(), "excluded", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string SelectImportedValue(string staticValue, string fitValue)
+        {
+            if (!IsExportedMissingValue(fitValue) && !IsExcludedValue(fitValue))
+                return fitValue;
+            if (!IsExportedMissingValue(staticValue) && !IsExcludedValue(staticValue))
+                return staticValue;
+            return string.Empty;
+        }
+
+        private MetalSpecies GetSelectedMetalSpecies()
+        {
+            string selected = (MetalSpeciesComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "Fe";
+            return Enum.TryParse(selected, ignoreCase: true, out MetalSpecies metalSpecies)
+                ? metalSpecies
+                : MetalSpecies.Fe;
+        }
+
+        private string GetSelectedMetalSpeciesLabel()
+        {
+            return GetSelectedMetalSpecies().ToString();
+        }
+
+        private void SetSelectedMetalSpecies(string label)
+        {
+            if (string.IsNullOrWhiteSpace(label))
+                return;
+
+            foreach (object item in MetalSpeciesComboBox.Items)
+            {
+                if (item is ComboBoxItem comboBoxItem
+                    && string.Equals(comboBoxItem.Content?.ToString(), label.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    MetalSpeciesComboBox.SelectedItem = comboBoxItem;
+                    break;
+                }
+            }
+        }
+
+        private void ApplyImportedBvSetup(string parameterName, string staticValue, string fitValue)
+        {
+            string preferredValue = SelectImportedValue(staticValue, fitValue);
+            switch (parameterName)
+            {
+                case "Metal species":
+                    SetSelectedMetalSpecies(preferredValue);
+                    break;
+                case "Temperature (oC)":
+                    if (!string.IsNullOrWhiteSpace(preferredValue))
+                        TC.Text = preferredValue;
+                    break;
+                case "pH":
+                    if (!string.IsNullOrWhiteSpace(preferredValue))
+                        pH.Text = preferredValue;
+                    break;
+                case "Cl⁻ concentration (M)":
+                    if (!string.IsNullOrWhiteSpace(preferredValue))
+                        ClConc.Text = preferredValue;
+                    break;
+                case "Metal ion concentration [Mz+] (M)":
+                    if (!string.IsNullOrWhiteSpace(preferredValue))
+                        MetalIonConcTextBox.Text = preferredValue;
+                    break;
+                case "I₀, metal (A/cm2)":
+                    MeOxIncludeCheckBox.IsChecked = !IsExcludedValue(fitValue) && !IsExcludedValue(staticValue);
+                    if (!string.IsNullOrWhiteSpace(preferredValue))
+                        MetalI0TextBox.Text = preferredValue;
+                    break;
+                case "β_metal":
+                    if (!string.IsNullOrWhiteSpace(preferredValue))
+                        MetalBetaTextBox.Text = preferredValue;
+                    break;
+                case "I₀, ORR (A/cm2)":
+                    OrrIncludeCheckBox.IsChecked = !IsExcludedValue(fitValue) && !IsExcludedValue(staticValue);
+                    if (!string.IsNullOrWhiteSpace(preferredValue))
+                        OrrI0TextBox.Text = preferredValue;
+                    break;
+                case "β_ORR":
+                    if (!string.IsNullOrWhiteSpace(preferredValue))
+                        OrrBetaTextBox.Text = preferredValue;
+                    break;
+                case "i_lim, ORR (A/cm2)":
+                    if (!string.IsNullOrWhiteSpace(preferredValue))
+                        OrrIlimTextBox.Text = preferredValue;
+                    break;
+                case "I₀, HER (A/cm2)":
+                    HerIncludeCheckBox.IsChecked = !IsExcludedValue(fitValue) && !IsExcludedValue(staticValue);
+                    if (!string.IsNullOrWhiteSpace(preferredValue))
+                        HerI0TextBox.Text = preferredValue;
+                    break;
+                case "β_HER":
+                    if (!string.IsNullOrWhiteSpace(preferredValue))
+                        HerBetaTextBox.Text = preferredValue;
+                    break;
+            }
+        }
+
+        private void SetPolarizationFitCell(string parameterName, string columnName, string value)
+        {
+            if (!polarizationFitRowIndexByName.TryGetValue(parameterName, out int rowIndex))
+                throw new ArgumentException($"Unknown polarization fit table parameter row: '{parameterName}'.", nameof(parameterName));
+            if (!polarizationFitResultsTable.Columns.Contains(columnName))
+                throw new ArgumentException($"Unknown polarization fit table column: '{columnName}'.", nameof(columnName));
+
+            DataRow row = polarizationFitResultsTable.Rows[rowIndex];
+            row[columnName] = value;
+        }
+
+        private void AppendPolarizationFitResults(
+            PolarizationAnalysisResult result,
+            double iAt850Acm2,
+            double iAt1050Acm2,
+            double electrolyteTemperatureC,
+            double electrolytePh,
+            double chlorideConcentrationM,
+            double metalIonConcentrationM)
+        {
+            polarizationAnalysisRunCount++;
+            string staticColumnName = $"Static {polarizationAnalysisRunCount}";
+            string fitColumnName = $"Fit {polarizationAnalysisRunCount}";
+            polarizationFitResultsTable.Columns.Add(staticColumnName, typeof(string));
+            polarizationFitResultsTable.Columns.Add(fitColumnName, typeof(string));
+
+            bool includeMetal = MeOxIncludeCheckBox.IsChecked != false;
+            bool includeOrr = OrrIncludeCheckBox.IsChecked != false;
+            bool includeHer = HerIncludeCheckBox.IsChecked != false;
+            BvModelParameters fp = result.FittedParameters;
+
+            SetPolarizationFitCell("Metal species", staticColumnName, GetSelectedMetalSpeciesLabel());
+            SetPolarizationFitCell("Metal species", fitColumnName, GetSelectedMetalSpeciesLabel());
+            SetPolarizationFitCell("Temperature (oC)", staticColumnName, FormatFixed(electrolyteTemperatureC, "F3"));
+            SetPolarizationFitCell("Temperature (oC)", fitColumnName, "—");
+            SetPolarizationFitCell("pH", staticColumnName, FormatFixed(electrolytePh, "F3"));
+            SetPolarizationFitCell("pH", fitColumnName, "—");
+            SetPolarizationFitCell("Cl⁻ concentration (M)", staticColumnName, FormatScientific(chlorideConcentrationM));
+            SetPolarizationFitCell("Cl⁻ concentration (M)", fitColumnName, "—");
+            SetPolarizationFitCell("Metal ion concentration [Mz+] (M)", staticColumnName, FormatScientific(metalIonConcentrationM));
+            SetPolarizationFitCell("Metal ion concentration [Mz+] (M)", fitColumnName, "—");
+
+            SetPolarizationFitCell("I₀, metal (A/cm2)", staticColumnName, ParseUiOrAuto(MetalI0TextBox.Text, includeMetal));
+            SetPolarizationFitCell("β_metal", staticColumnName, ParseUiOrAuto(MetalBetaTextBox.Text, includeMetal));
+            SetPolarizationFitCell("I₀, ORR (A/cm2)", staticColumnName, ParseUiOrAuto(OrrI0TextBox.Text, includeOrr));
+            SetPolarizationFitCell("β_ORR", staticColumnName, ParseUiOrAuto(OrrBetaTextBox.Text, includeOrr));
+            SetPolarizationFitCell("i_lim, ORR (A/cm2)", staticColumnName, ParseUiOrAuto(OrrIlimTextBox.Text, includeOrr));
+            SetPolarizationFitCell("I₀, HER (A/cm2)", staticColumnName, ParseUiOrAuto(HerI0TextBox.Text, includeHer));
+            SetPolarizationFitCell("β_HER", staticColumnName, ParseUiOrAuto(HerBetaTextBox.Text, includeHer));
+
+            SetPolarizationFitCell("I₀, metal (A/cm2)", fitColumnName, fp.IncludeMetal ? FormatScientific(fp.I0Metal) : "excluded");
+            SetPolarizationFitCell("β_metal", fitColumnName, fp.IncludeMetal ? FormatFixed(fp.BetaMetal, "F4") : "excluded");
+            SetPolarizationFitCell("I₀, ORR (A/cm2)", fitColumnName, fp.IncludeOrr ? FormatScientific(fp.I0Orr) : "excluded");
+            SetPolarizationFitCell("β_ORR", fitColumnName, fp.IncludeOrr ? FormatFixed(fp.BetaOrr, "F4") : "excluded");
+            SetPolarizationFitCell("i_lim, ORR (A/cm2)", fitColumnName, fp.IncludeOrr ? FormatScientific(fp.IlimOrr) : "excluded");
+            SetPolarizationFitCell("I₀, HER (A/cm2)", fitColumnName, fp.IncludeHer ? FormatScientific(fp.I0Her) : "excluded");
+            SetPolarizationFitCell("β_HER", fitColumnName, fp.IncludeHer ? FormatFixed(fp.BetaHer, "F4") : "excluded");
+
+            foreach (string row in PolarizationFittedOnlyRows)
+                SetPolarizationFitCell(row, staticColumnName, "n/a");
+
+            SetPolarizationFitCell("E_corr (mV)", fitColumnName, FormatFixed(result.EcorrV * 1000.0, "F2"));
+            SetPolarizationFitCell("i_corr (µA/cm2)", fitColumnName, FormatFixed(result.IcorrAcm2 * 1.0e6, "F2"));
+            SetPolarizationFitCell("i@-850 mV (µA/cm2)", fitColumnName, FormatFixed(iAt850Acm2 * 1.0e6, "F2"));
+            SetPolarizationFitCell("i@-1050 mV (µA/cm2)", fitColumnName, FormatFixed(iAt1050Acm2 * 1.0e6, "F2"));
+            SetPolarizationFitCell("Weighted RMSE (A/cm2)", fitColumnName, FormatScientific(result.WeightedRmse));
         }
 
         /// <summary>
@@ -1121,7 +1388,7 @@ namespace CSaVe_Electrochemical_Data
         }
 
         // ─────────────────────────────────────────────────────────────────────────
-        // Tab 2: Combine CSVs → XML  event handlers
+        // Tab 2: Combine CSVs -> XML  event handlers
         // ─────────────────────────────────────────────────────────────────────────
 
         private void BrowseAnodicButton_Click(object sender, RoutedEventArgs e)
@@ -1176,9 +1443,9 @@ namespace CSaVe_Electrochemical_Data
         /// <summary>
         /// Derives the suggested XML output filename from the primary CSV path.
         /// Strips trailing suffix patterns (case-insensitive):
-        ///   Anodic{digits}  — e.g. "HY80Anodic1"  → "HY80"
-        ///   Cycpol{digits}  — e.g. "SteelCycpol2" → "Steel"
-        ///   Pol{digits}     — e.g. "SamplePol"    → "Sample"
+        ///   Anodic{digits}  — e.g. "HY80Anodic1"  -> "HY80"
+        ///   Cycpol{digits}  — e.g. "SteelCycpol2" -> "Steel"
+        ///   Pol{digits}     — e.g. "SamplePol"    -> "Sample"
         /// Then appends "_polarization.xml".
         /// </summary>
         private void AutoPopulateXmlFilename(string primaryPath)
@@ -1314,7 +1581,37 @@ namespace CSaVe_Electrochemical_Data
                 return;
             }
 
+            if (!double.TryParse(TC.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double electrolyteTemperatureC) ||
+                !double.IsFinite(electrolyteTemperatureC))
+            {
+                PolarizationAnalysisStatusBox.Text = "Invalid electrolyte temperature value.";
+                return;
+            }
+
+            if (!double.TryParse(pH.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double electrolytePh) ||
+                !double.IsFinite(electrolytePh))
+            {
+                PolarizationAnalysisStatusBox.Text = "Invalid electrolyte pH value.";
+                return;
+            }
+
+            if (!double.TryParse(ClConc.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double chlorideConcentrationM) ||
+                !double.IsFinite(chlorideConcentrationM) || chlorideConcentrationM < 0.0)
+            {
+                PolarizationAnalysisStatusBox.Text = "Invalid chloride concentration value.";
+                return;
+            }
+
+            if (!double.TryParse(MetalIonConcTextBox.Text?.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double metalIonConcentrationM) ||
+                !double.IsFinite(metalIonConcentrationM) || metalIonConcentrationM <= 0.0)
+            {
+                PolarizationAnalysisStatusBox.Text = "Invalid metal ion concentration value.";
+                return;
+            }
+
             // ── Build BV user overrides from UI controls ───────────────────────────────────
+            MetalSpecies selectedMetalSpecies = GetSelectedMetalSpecies();
+
             var bvOverrides = new BvUserOverrides
             {
                 I0Her    = TryParsePositiveDouble(HerI0TextBox.Text),
@@ -1340,6 +1637,11 @@ namespace CSaVe_Electrochemical_Data
                 PrimaryFilePath          = _anodicPolarizationFilePath,
                 CathodicFilePath         = string.IsNullOrWhiteSpace(_cathodicPolarizationFilePath) ? string.Empty : _cathodicPolarizationFilePath,
                 ExposedAreaCm2           = areaCm2,
+                TemperatureCelsius       = electrolyteTemperatureC,
+                ElectrolytePh            = electrolytePh,
+                ChlorideConcentrationM   = chlorideConcentrationM,
+                MetalIonConcentrationM   = metalIonConcentrationM,
+                MetalSpecies             = selectedMetalSpecies,
                 ProtectionPotentialsMv   = new[] { -850.0, -1050.0 },
                 UserOverrides            = bvOverrides,
             });
@@ -1352,72 +1654,18 @@ namespace CSaVe_Electrochemical_Data
 
             double iAt850  = result.ProtectionCurrentDensitiesAcm2.TryGetValue("-850",  out double v850)  ? v850  : double.NaN;
             double iAt1050 = result.ProtectionCurrentDensitiesAcm2.TryGetValue("-1050", out double v1050) ? v1050 : double.NaN;
+            AppendPolarizationFitResults(
+                result,
+                iAt850,
+                iAt1050,
+                electrolyteTemperatureC,
+                electrolytePh,
+                chlorideConcentrationM,
+                metalIonConcentrationM);
 
-            var rows = new List<PolarizationResultRow>
-            {
-                new PolarizationResultRow
-                {
-                    File                 = Path.GetFileName(_anodicPolarizationFilePath),
-                    Ecorr_mV             = result.EcorrV * 1000.0,
-                    Icorr_uAcm2          = result.IcorrAcm2 * 1.0e6,
-                    I_ox_uAcm2           = double.IsNaN(result.IOxAcm2) ? double.NaN : result.IOxAcm2 * 1.0e6,
-                    Ilim_uAcm2           = result.IlimOrrAcm2 * 1.0e6,
-                    HER_Eeq_mV           = result.HerEquilibriumV * 1000.0,
-                    I_at_neg850mV_uAcm2  = iAt850  * 1.0e6,
-                    I_at_neg1050mV_uAcm2 = iAt1050 * 1.0e6
-                }
-            };
-            PolarizationResultsGrid.ItemsSource = rows;
-
-            // ── Build summary text ─────────────────────────────────────────────────────────
-            var fp = result.FittedParameters;
-            var summaryLines = new List<string>
-            {
-                $"E_corr (mV): {FormatMeanStd(rows.Select(r => r.Ecorr_mV))}",
-                $"i_corr (uA/cm²): {FormatMeanStd(rows.Select(r => r.Icorr_uAcm2))}",
-                $"i_ox (uA/cm²): {FormatMeanStd(rows.Select(r => r.I_ox_uAcm2))}",
-                $"i_lim ORR (uA/cm²): {FormatMeanStd(rows.Select(r => r.Ilim_uAcm2))}",
-                $"HER E_eq (mV): {FormatMeanStd(rows.Select(r => r.HER_Eeq_mV))}",
-                $"i@-850 mV (uA/cm²): {FormatMeanStd(rows.Select(r => r.I_at_neg850mV_uAcm2))}",
-                $"i@-1050 mV (uA/cm²): {FormatMeanStd(rows.Select(r => r.I_at_neg1050mV_uAcm2))}",
-                string.Empty,
-                "--- Fitted B-V Parameters ---",
-            };
-            if (fp.IncludeMetal)
-            {
-                summaryLines.Add($"I\u2080,metal (A/cm\u00B2): {fp.I0Metal:E3}");
-                summaryLines.Add($"\u03B2_metal: {fp.BetaMetal:F4}");
-            }
-            else
-            {
-                summaryLines.Add("Metal oxidation: excluded");
-            }
-
-            if (fp.IncludeOrr)
-            {
-                summaryLines.Add($"I\u2080,ORR (A/cm\u00B2): {fp.I0Orr:E3}");
-                summaryLines.Add($"\u03B2_ORR: {fp.BetaOrr:F4}");
-                summaryLines.Add($"i_lim,ORR (A/cm\u00B2): {fp.IlimOrr:E3}");
-            }
-            else
-            {
-                summaryLines.Add("ORR: excluded");
-            }
-
-            if (fp.IncludeHer)
-            {
-                summaryLines.Add($"I\u2080,HER (A/cm\u00B2): {fp.I0Her:E3}");
-                summaryLines.Add($"\u03B2_HER: {fp.BetaHer:F4}");
-            }
-            else
-            {
-                summaryLines.Add("HER: excluded");
-            }
-
-            summaryLines.Add(string.Empty);
-            summaryLines.Add($"Weighted RMSE (A/cm\u00B2): {(double.IsNaN(result.WeightedRmse) ? "n/a" : result.WeightedRmse.ToString("E3"))}");
-            string summary = string.Join(Environment.NewLine, summaryLines);
-            PolarizationSummaryBox.Text = summary;
+            // Rebind so DataGrid picks up the newly added columns.
+            PolarizationResultsGrid.ItemsSource = null;
+            PolarizationResultsGrid.ItemsSource = polarizationFitResultsTable.DefaultView;
 
             polarizationPlotModel.Series.Clear();
 
@@ -1486,7 +1734,7 @@ namespace CSaVe_Electrochemical_Data
             {
                 var metalSeries = new LineSeries
                 {
-                    Title           = "Metal oxidation BV",
+                    Title           = $"{selectedMetalSpecies} oxidation BV",
                     Color           = OxyColors.LightBlue,
                     LineStyle       = LineStyle.Solid,
                     StrokeThickness = 1.5
@@ -1566,93 +1814,144 @@ namespace CSaVe_Electrochemical_Data
             PolarizationAnalysisStatusBox.Text = "Polarization analysis completed.";
         }
 
-        private void BrowseEisFilesButton_Click(object sender, RoutedEventArgs e)
+        private void ExportFitsToCsvButton_Click(object sender, RoutedEventArgs e)
         {
-            using var dlg = new OpenFileDialog
+            if (polarizationFitResultsTable.Columns.Count < 3)
             {
+                PolarizationAnalysisStatusBox.Text = "Run a polarization fit before exporting CSV values.";
+                return;
+            }
+
+            using var dlg = new SaveFileDialog
+            {
+                Title = "Export fit columns to CSV",
                 Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
-                Multiselect = true,
-                Title = "Select EIS CSV file(s)"
+                DefaultExt = "csv",
+                FileName = "polarization_fit_setup.csv"
             };
             if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
                 return;
 
-            eisAnalysisFiles.Clear();
-            eisAnalysisFiles.AddRange(dlg.FileNames);
-            EisFilesStatusText.Text = $"{eisAnalysisFiles.Count} EIS file(s) selected.";
-        }
-
-        private void RunEisAnalysisButton_Click(object sender, RoutedEventArgs e)
-        {
-            if (eisAnalysisFiles.Count == 0)
+            try
             {
-                EisAnalysisStatusBox.Text = "Select one or more EIS CSV files first.";
-                return;
-            }
+                string staticColumnName = polarizationFitResultsTable.Columns[polarizationFitResultsTable.Columns.Count - 2].ColumnName;
+                string fitColumnName = polarizationFitResultsTable.Columns[polarizationFitResultsTable.Columns.Count - 1].ColumnName;
+                var lines = new List<string> { "Entry" };
 
-            string model = (EisModelComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "randles_cpe_w";
-            EisAnalysisStatusBox.Text = $"Running EIS analysis ({model}) in system Python...";
-
-            var response = pythonAnalysisService.RunEis(new EisAnalysisRequest
-            {
-                Files = [.. eisAnalysisFiles],
-                Model = model
-            });
-
-            if (!response.Success)
-            {
-                EisAnalysisStatusBox.Text = response.Message;
-                return;
-            }
-
-            var rows = response.Files.Select(f => new EisResultRow
-            {
-                File = Path.GetFileName(f.File),
-                Model = f.Model,
-                Parameters = string.Join(", ", f.Fit_Parameters.Select(kv => $"{kv.Key}={kv.Value:G4}"))
-            }).ToList();
-            EisResultsGrid.ItemsSource = rows;
-
-            eisNyquistPlotModel.Series.Clear();
-            eisBodePlotModel.Series.Clear();
-
-            if (response.Files.Count > 0)
-            {
-                var first = response.Files[0];
-                var nyquistData = new LineSeries { Title = "Data", Color = OxyColors.DodgerBlue };
-                for (int i = 0; i < Math.Min(first.Plot.Zreal_Ohm.Count, first.Plot.Zimag_Ohm.Count); i++)
-                    nyquistData.Points.Add(new DataPoint(first.Plot.Zreal_Ohm[i], -first.Plot.Zimag_Ohm[i]));
-                eisNyquistPlotModel.Series.Add(nyquistData);
-
-                var nyquistFit = new LineSeries { Title = "Fit", Color = OxyColors.Crimson, LineStyle = LineStyle.Dash };
-                for (int i = 0; i < Math.Min(first.Plot.Zreal_Fit_Ohm.Count, first.Plot.Zimag_Fit_Ohm.Count); i++)
-                    nyquistFit.Points.Add(new DataPoint(first.Plot.Zreal_Fit_Ohm[i], -first.Plot.Zimag_Fit_Ohm[i]));
-                eisNyquistPlotModel.Series.Add(nyquistFit);
-
-                var bodeMag = new LineSeries { Title = "|Z| Data", Color = OxyColors.ForestGreen, YAxisKey = "MagAxis" };
-                var bodeMagFit = new LineSeries { Title = "|Z| Fit", Color = OxyColors.DarkOrange, LineStyle = LineStyle.Dash, YAxisKey = "MagAxis" };
-                var bodePhase = new LineSeries { Title = "Phase Data", Color = OxyColors.Purple, YAxisKey = "PhaseAxis" };
-                var bodePhaseFit = new LineSeries { Title = "Phase Fit", Color = OxyColors.Gray, LineStyle = LineStyle.Dash, YAxisKey = "PhaseAxis" };
-
-                int n = first.Plot.Freq_Hz.Count;
-                for (int i = 0; i < n; i++)
+                foreach (DataRow row in polarizationFitResultsTable.Rows)
                 {
-                    double f = Math.Max(first.Plot.Freq_Hz[i], 1.0e-6);
-                    if (i < first.Plot.Zmod_Ohm.Count) bodeMag.Points.Add(new DataPoint(f, Math.Max(first.Plot.Zmod_Ohm[i], 1.0e-9)));
-                    if (i < first.Plot.Zmod_Fit_Ohm.Count) bodeMagFit.Points.Add(new DataPoint(f, Math.Max(first.Plot.Zmod_Fit_Ohm[i], 1.0e-9)));
-                    if (i < first.Plot.Phase_Deg.Count) bodePhase.Points.Add(new DataPoint(f, first.Plot.Phase_Deg[i]));
-                    if (i < first.Plot.Phase_Fit_Deg.Count) bodePhaseFit.Points.Add(new DataPoint(f, first.Plot.Phase_Fit_Deg[i]));
+                    string parameterName = row["Parameter"]?.ToString() ?? string.Empty;
+                    lines.Add(QuoteCsvValue($"Static|{parameterName}|{row[staticColumnName]?.ToString() ?? string.Empty}"));
+                    lines.Add(QuoteCsvValue($"Fit|{parameterName}|{row[fitColumnName]?.ToString() ?? string.Empty}"));
                 }
 
-                eisBodePlotModel.Series.Add(bodeMag);
-                eisBodePlotModel.Series.Add(bodeMagFit);
-                eisBodePlotModel.Series.Add(bodePhase);
-                eisBodePlotModel.Series.Add(bodePhaseFit);
+                File.WriteAllLines(dlg.FileName, lines);
+                PolarizationAnalysisStatusBox.Text = $"Fit CSV exported: {dlg.FileName}";
             }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Failed to export fit CSV:\n{ex.Message}",
+                    "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
 
-            eisNyquistPlotModel.InvalidatePlot(true);
-            eisBodePlotModel.InvalidatePlot(true);
-            EisAnalysisStatusBox.Text = response.Message;
+        private void ImportFitSetupButton_Click(object sender, RoutedEventArgs e)
+        {
+            using var dlg = new OpenFileDialog
+            {
+                Title = "Import fit setup CSV",
+                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*"
+            };
+            if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                return;
+
+            try
+            {
+                var staticValues = new Dictionary<string, string>(StringComparer.Ordinal);
+                var fitValues = new Dictionary<string, string>(StringComparer.Ordinal);
+
+                foreach (string line in File.ReadLines(dlg.FileName))
+                {
+                    string value = UnquoteCsvValue(line);
+                    if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "Entry", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    string[] parts = value.Split('|', 3);
+                    if (parts.Length != 3)
+                        continue;
+
+                    if (string.Equals(parts[0], "Static", StringComparison.OrdinalIgnoreCase))
+                        staticValues[parts[1]] = parts[2];
+                    else if (string.Equals(parts[0], "Fit", StringComparison.OrdinalIgnoreCase))
+                        fitValues[parts[1]] = parts[2];
+                }
+
+                if (staticValues.Count == 0 && fitValues.Count == 0)
+                    throw new InvalidDataException("The selected CSV does not contain any exported fit entries.");
+
+                foreach (string parameterName in staticValues.Keys.Concat(fitValues.Keys).Distinct(StringComparer.Ordinal))
+                    ApplyImportedBvSetup(parameterName, GetImportedValue(staticValues, parameterName), GetImportedValue(fitValues, parameterName));
+
+                PolarizationAnalysisStatusBox.Text = $"Fit setup imported: {dlg.FileName}";
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Failed to import fit CSV:\n{ex.Message}",
+                    "Import Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Exports the current polarization plot (including legend) to a user-selected PNG file.
+        /// </summary>
+        private void SavePolarizationPlotButton_Click(object sender, RoutedEventArgs e)
+        {
+            using var dlg = new SaveFileDialog
+            {
+                Title = "Save polarization plot",
+                Filter = "PNG image (*.png)|*.png",
+                DefaultExt = "png",
+                FileName = "polarization_plot.png"
+            };
+            if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                return;
+
+            try
+            {
+                const int exportWidth  = 1200;
+                const int exportHeight = 900;
+                var exporter = new OxyPlot.Wpf.PngExporter { Width = exportWidth, Height = exportHeight };
+                using var stream = System.IO.File.Create(dlg.FileName);
+                exporter.Export(polarizationPlotModel, stream);
+                PolarizationAnalysisStatusBox.Text = $"Plot saved: {dlg.FileName}";
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Failed to save plot image:\n{ex.Message}",
+                    "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        /// <summary>
+        /// Estimates the ORR limiting current density from temperature, Cl⁻ concentration,
+        /// and diffusion-layer thickness, then populates <see cref="OrrIlimTextBox"/>.
+        /// </summary>
+        private void CalcIlimButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!TryParseIlimInputs(out double tempC, out double clM, out double deltaMicrons, showErrors: true))
+                return;
+
+            try
+            {
+                double deltaCm = deltaMicrons * 1.0e-4;
+                double ilim = DissolvedOxygenCalculator.CalcOrrIlimAcm2(tempC, clM, deltaCm);
+                OrrIlimTextBox.Text = ilim.ToString("E3", CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Failed to calculate i_lim:\n{ex.Message}",
+                    "Calculation Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private static double ParseDouble(string text, double defaultValue)

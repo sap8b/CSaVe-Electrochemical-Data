@@ -9,13 +9,13 @@ namespace CSaVe_Electrochemical_Data
     /// <summary>
     /// Fits a Butler-Volmer model to a merged polarization curve using a dynamic parameter vector
     /// that only includes the reactions selected for the analysis run.
-    /// Reactions are stored in a list sorted ascending by equilibrium potential (Nernst), so the
-    /// algorithm is independent of the number and type of reactions — any factory added to the
-    /// default constructor list is automatically included.
+    /// The fitted reaction set always includes ORR and HER plus the currently selected
+    /// alloying-metal oxidation reaction, sorted ascending by equilibrium potential.
     /// </summary>
     public sealed class BvCurveFitter : IBvCurveFitter
     {
         private const double DefaultPh = 8.0;
+        private const double DefaultMetalIonConcentrationM = 1.0e-6;
         private const double TafelLowerOffsetV = 0.01;
         private const double TafelUpperOffsetV = 0.15;
         private const double DefaultBeta = 0.5;
@@ -30,26 +30,8 @@ namespace CSaVe_Electrochemical_Data
         private const int MinTafelPoints = 2;
         private const int MinHerPoints = 5;
 
-        private readonly IReadOnlyList<ElectrochemicalReactionFactory> _reactionFactories;
-
         public BvCurveFitter()
-            : this(new ElectrochemicalReactionFactory[]
-            {
-                new MetalOxidationFactory(),
-                new ORRFactory(),
-                new HERFactory()
-            })
         {
-        }
-
-        internal BvCurveFitter(IEnumerable<ElectrochemicalReactionFactory> reactionFactories)
-        {
-            if (reactionFactories == null)
-                throw new ArgumentNullException(nameof(reactionFactories));
-
-            _reactionFactories = reactionFactories.ToArray();
-            if (_reactionFactories.Count == 0)
-                throw new ArgumentException("At least one reaction factory must be provided.", nameof(reactionFactories));
         }
 
         public BvModelParameters Fit(
@@ -57,6 +39,9 @@ namespace CSaVe_Electrochemical_Data
             IReadOnlyList<double> currentDensityAcm2,
             double ecorrHintV,
             double temperatureCelsius,
+            double electrolytePh,
+            double metalIonConcentrationM,
+            MetalSpecies metalSpecies,
             BvUserOverrides overrides = null)
         {
             if (potentialV.Count != currentDensityAcm2.Count)
@@ -74,7 +59,13 @@ namespace CSaVe_Electrochemical_Data
             double[] e = [.. potentialV];
             double[] i = [.. currentDensityAcm2];
 
-            IReadOnlyList<IBvReaction> reactions = CreateReactionList(temperatureCelsius);
+            double effectivePh = double.IsFinite(electrolytePh) ? electrolytePh : DefaultPh;
+            double effectiveMetalIonConcentrationM =
+                (double.IsFinite(metalIonConcentrationM) && metalIonConcentrationM > 0.0)
+                    ? metalIonConcentrationM
+                    : DefaultMetalIonConcentrationM;
+
+            IReadOnlyList<IBvReaction> reactions = CreateReactionList(temperatureCelsius, effectivePh, effectiveMetalIonConcentrationM, metalSpecies);
             double ecorr0 = EstimateEcorr(e, i, ecorrHintV);
 
             FitState initialState = EstimateInitialState(e, i, ecorr0, reactions, includeMetal, includeOrr, includeHer);
@@ -109,15 +100,27 @@ namespace CSaVe_Electrochemical_Data
         // ── Reaction list (replaces the old fixed ReactionSet) ────────────────────────────────────
 
         /// <summary>
-        /// Creates one reaction per registered factory, sorted ascending by equilibrium potential.
-        /// The order determines the per-reaction estimation sequence in
+        /// Creates the selected metal reaction plus ORR and HER, sorted ascending by equilibrium
+        /// potential. The order determines the per-reaction estimation sequence in
         /// <see cref="EstimateInitialState"/>.
         /// </summary>
-        private IReadOnlyList<IBvReaction> CreateReactionList(double temperatureCelsius) =>
-            _reactionFactories
-                .Select(f => (IBvReaction)f.CreateReaction(DefaultPh, temperatureCelsius))
-                .OrderBy(r => r.EquilibriumPotentialVshe)
-                .ToList();
+        private static IReadOnlyList<IBvReaction> CreateReactionList(
+            double temperatureCelsius,
+            double electrolytePh,
+            double metalIonConcentrationM,
+            MetalSpecies metalSpecies)
+        {
+            var electrolyte = new ElectrolyteConditions(electrolytePh, temperatureCelsius, metalIonConcentrationM, metalSpecies);
+            var reactions = new List<IBvReaction>(3)
+            {
+                ElectrochemicalReactionFactory.CreateMetalOxidationFactory(metalSpecies).CreateReaction(electrolyte),
+                new ORRFactory().CreateReaction(electrolyte),
+                new HERFactory().CreateReaction(electrolyte)
+            };
+
+            reactions.Sort((left, right) => left.EquilibriumPotentialVshe.CompareTo(right.EquilibriumPotentialVshe));
+            return reactions;
+        }
 
         // ── Initial-state estimation ──────────────────────────────────────────────────────────────
 
@@ -159,7 +162,7 @@ namespace CSaVe_Electrochemical_Data
             if (orrRfs != null && orrRfs.IsIncluded)
                 orrRfs.Ilim = EstimateIlimOrr(e, i, ecorr, orrRfs.Reaction);
 
-            // Estimate kinetic parameters for each included reaction in sorted (low→high E_eq) order.
+            // Estimate kinetic parameters for each included reaction in sorted (low->high E_eq) order.
             foreach (ReactionFitState rfs in rfsList)
             {
                 if (!rfs.IsIncluded)
@@ -367,7 +370,7 @@ namespace CSaVe_Electrochemical_Data
         {
             // The cathodic limiting current for metal deposition is set by the very low dissolved
             // cation concentration. Estimate from the minimum |i| in the deeply cathodic potential
-            // region, then clamp to [IlimMinAcm2, IlimMaxAcm2] = [1e-14, 1e-6] A/cm².
+            // region, then clamp to [IlimMinAcm2, IlimMaxAcm2] = [1e-14, 1e-6] A/cm2.
             if (e.Length == 0)
                 return Math.Clamp(reaction.IlimMaxAcm2 * 0.1, reaction.IlimMinAcm2, reaction.IlimMaxAcm2);
 

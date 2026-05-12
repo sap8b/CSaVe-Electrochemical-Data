@@ -1,3 +1,5 @@
+using CSaVe_Electrochemical_Data.Services.Polarization.Reactions;
+
 using System.Collections.Generic;
 
 namespace CSaVe_Electrochemical_Data
@@ -14,9 +16,12 @@ namespace CSaVe_Electrochemical_Data
         /// starting guess for Ecorr.
         /// </summary>
         /// <param name="potentialV">Potential values (V), sorted ascending.</param>
-        /// <param name="currentDensityAcm2">Signed current density (A/cm²) at each potential.</param>
+        /// <param name="currentDensityAcm2">Signed current density (A/cm2) at each potential.</param>
         /// <param name="ecorrHintV">Initial estimate for the corrosion potential (V).</param>
-        /// <param name="temperatureCelsius">Electrolyte temperature (°C).</param>
+        /// <param name="temperatureCelsius">Electrolyte temperature (oC).</param>
+        /// <param name="electrolytePh">Electrolyte pH.</param>
+        /// <param name="metalIonConcentrationM">Dissolved metal-ion concentration [M^z+] (mol/L), where z is the selected metal charge number.</param>
+        /// <param name="metalSpecies">Selected alloying-metal oxidation reaction to fit.</param>
         /// <param name="overrides">
         /// Optional user-specified starting values and per-reaction fix flags.
         /// Pass <c>null</c> to use fully automatic initialisation and unconstrained LM fitting.
@@ -27,6 +32,9 @@ namespace CSaVe_Electrochemical_Data
             IReadOnlyList<double> currentDensityAcm2,
             double ecorrHintV,
             double temperatureCelsius,
+            double electrolytePh,
+            double metalIonConcentrationM,
+            MetalSpecies metalSpecies,
             BvUserOverrides overrides = null);
     }
 }

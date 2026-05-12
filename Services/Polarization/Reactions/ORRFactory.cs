@@ -13,9 +13,9 @@ namespace CSaVe_Electrochemical_Data.Services.Polarization.Reactions
             return reactionName == ReactionType.OxygenReduction;
         }
 
-        public override ElectrochemicalReaction CreateReaction(double pH, double temperatureCelsius)
+        public override ElectrochemicalReaction CreateReaction(ElectrolyteConditions electrolyte)
         {
-            return new OrrReaction(pH, temperatureCelsius);
+            return new OrrReaction(electrolyte.PH, electrolyte.TemperatureCelsius);
         }
     }
 }

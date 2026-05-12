@@ -13,9 +13,9 @@ namespace CSaVe_Electrochemical_Data.Services.Polarization.Reactions
             return reactionName == ReactionType.HydrogenEvolution;
         }
 
-        public override ElectrochemicalReaction CreateReaction(double pH, double temperatureCelsius)
+        public override ElectrochemicalReaction CreateReaction(ElectrolyteConditions electrolyte)
         {
-            return new HerReaction(pH, temperatureCelsius);
+            return new HerReaction(electrolyte.PH, electrolyte.TemperatureCelsius);
         }
     }
 }

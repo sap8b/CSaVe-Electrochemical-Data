@@ -71,8 +71,8 @@ function [v,iVals] = calculatePolarizationCurve2(Temperature,cCl,eApp)
                 % O2 + 4H+ + 4e- -> 2H2O
                 % -- or ---
                 % ORR - 2e- alkaline
-                % 𝑂_2+𝐻_2 𝑂+2𝑒^−→𝐻𝑂_2^−+𝑂𝐻^−
-                % 𝐻𝑂_2^−+𝐻_2 𝑂+2𝑒^−→3𝑂𝐻^−
+                % 𝑂_2+𝐻_2 𝑂+2𝑒^−->𝐻𝑂_2^−+𝑂𝐻^−
+                % 𝐻𝑂_2^−+𝐻_2 𝑂+2𝑒^−->3𝑂𝐻^−
                 % =====                 
                 dG_cathodic = calculateParameter(cCl,Temperature,9);
                 dG_anodic = calculateParameter(cCl,Temperature,10);

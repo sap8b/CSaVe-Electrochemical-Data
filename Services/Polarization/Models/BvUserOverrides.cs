@@ -11,13 +11,13 @@ namespace CSaVe_Electrochemical_Data
     public sealed class BvUserOverrides
     {
         // ── Metal oxidation ───────────────────────────────────────────────────────────────────────
-        /// <summary>User-specified initial exchange current density for metal oxidation (A/cm²).</summary>
+        /// <summary>User-specified initial exchange current density for metal oxidation (A/cm2).</summary>
         public double? I0Metal { get; init; }
 
         /// <summary>User-specified initial symmetry factor β for metal oxidation (dimensionless, 0–1).</summary>
         public double? BetaMetal { get; init; }
 
-        /// <summary>User-specified initial limiting current density for metal oxidation (A/cm²).</summary>
+        /// <summary>User-specified initial limiting current density for metal oxidation (A/cm2).</summary>
         public double? IlimMetal { get; init; }
 
         /// <summary>
@@ -27,13 +27,13 @@ namespace CSaVe_Electrochemical_Data
         public bool FixMetal { get; init; }
 
         // ── ORR ──────────────────────────────────────────────────────────────────────────────────
-        /// <summary>User-specified initial exchange current density for ORR (A/cm²).</summary>
+        /// <summary>User-specified initial exchange current density for ORR (A/cm2).</summary>
         public double? I0Orr { get; init; }
 
         /// <summary>User-specified initial symmetry factor β for ORR (dimensionless, 0–1).</summary>
         public double? BetaOrr { get; init; }
 
-        /// <summary>User-specified initial ORR limiting current density (A/cm²).</summary>
+        /// <summary>User-specified initial ORR limiting current density (A/cm2).</summary>
         public double? IlimOrr { get; init; }
 
         /// <summary>
@@ -46,13 +46,13 @@ namespace CSaVe_Electrochemical_Data
         public bool FixOrr { get; init; }
 
         // ── HER ──────────────────────────────────────────────────────────────────────────────────
-        /// <summary>User-specified initial exchange current density for HER (A/cm²).</summary>
+        /// <summary>User-specified initial exchange current density for HER (A/cm2).</summary>
         public double? I0Her { get; init; }
 
         /// <summary>User-specified initial symmetry factor β for HER (dimensionless, 0–1).</summary>
         public double? BetaHer { get; init; }
 
-        /// <summary>User-specified initial limiting current density for HER (A/cm²).</summary>
+        /// <summary>User-specified initial limiting current density for HER (A/cm2).</summary>
         public double? IlimHer { get; init; }
 
         /// <summary>
