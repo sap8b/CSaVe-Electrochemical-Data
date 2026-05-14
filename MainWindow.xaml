@@ -196,6 +196,22 @@
                              Style="{StaticResource ModernTextBox}"
                              Text="0.495"
                              ToolTip="Electrode exposed area (cm2) — used to convert raw current (A) to current density (A/cm2)"/>
+                    <TextBlock Text="Reference electrode:"
+                               VerticalAlignment="Center"
+                               Margin="0,0,8,0"
+                               ToolTip="Reference electrode used during measurement. Selected values are converted to SHE before fitting and plotting."/>
+                    <ComboBox x:Name="ReferenceElectrodeComboBox"
+                              Width="280"
+                              Margin="0,0,8,0"
+                              ToolTip="Measured potentials are shifted by the selected E(ref vs SHE) value to convert to SHE.">
+                        <ComboBoxItem Content="Already vs SHE (no conversion)" Tag="0.000" IsSelected="True"/>
+                        <ComboBoxItem Content="Saturated KCl (Hg₂Cl₂) / SCE (+0.241 V)" Tag="0.241"/>
+                        <ComboBoxItem Content="Saturated KCl (Ag/AgCl) (+0.197 V)" Tag="0.197"/>
+                        <ComboBoxItem Content="Seawater (Ag/AgCl) (+0.250 V)" Tag="0.250"/>
+                        <ComboBoxItem Content="Saturated K2SO4 (Hg/Hg2SO4) (+0.640 V)" Tag="0.640"/>
+                        <ComboBoxItem Content="Saturated Cu/CuSO4 (+0.316 V)" Tag="0.316"/>
+                        <ComboBoxItem Content="1 M NaOH (Hg/HgO) (+0.098 V)" Tag="0.098"/>
+                    </ComboBox>
                     <Button x:Name="RunPolarizationAnalysisButton"
                             Width="220"
                             Height="36"

@@ -63,6 +63,13 @@ namespace CSaVe_Electrochemical_Data
         public double RSolutionOhm { get; set; } = 0.0;
 
         /// <summary>
+        /// Potential shift (V) to convert measured potentials from the selected reference
+        /// electrode scale to SHE: E_SHE = E_measured + ReferenceToSheOffsetV.
+        /// Default 0 V (already vs SHE).
+        /// </summary>
+        public double ReferenceToSheOffsetV { get; set; } = 0.0;
+
+        /// <summary>
         /// Optional user-specified starting values and per-reaction fix flags for BV curve fitting.
         /// When null, all parameters are initialised automatically and fully optimised by LM.
         /// </summary>

@@ -1002,7 +1002,7 @@ namespace CSaVe_Electrochemical_Data
         {
             polarizationPlotModel.Title = "Polarization (|i| vs E)";
             polarizationPlotModel.Axes.Add(new LogarithmicAxis { Position = AxisPosition.Bottom, Title = "Current Density (A/cm2)", Minimum = 1.0e-12 });
-            polarizationPlotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = "Potential (V)" });
+            polarizationPlotModel.Axes.Add(new LinearAxis { Position = AxisPosition.Left, Title = "Potential (V vs SHE)" });
             polarizationPlotModel.Legends.Add(new Legend
             {
                 LegendPosition        = LegendPosition.BottomLeft,
@@ -1305,6 +1305,18 @@ namespace CSaVe_Electrochemical_Data
             return Enum.TryParse(selected, ignoreCase: true, out MetalSpecies metalSpecies)
                 ? metalSpecies
                 : MetalSpecies.Fe;
+        }
+
+        private double GetSelectedReferenceElectrodeOffsetV()
+        {
+            if (ReferenceElectrodeComboBox.SelectedItem is ComboBoxItem comboBoxItem
+                && double.TryParse(comboBoxItem.Tag?.ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out double offsetV)
+                && double.IsFinite(offsetV))
+            {
+                return offsetV;
+            }
+
+            return 0.0;
         }
 
         private string GetSelectedMetalSpeciesLabel()
@@ -1707,6 +1719,7 @@ namespace CSaVe_Electrochemical_Data
 
             // ── Build BV user overrides from UI controls ───────────────────────────────────
             MetalSpecies selectedMetalSpecies = GetSelectedMetalSpecies();
+            double referenceToSheOffsetV = GetSelectedReferenceElectrodeOffsetV();
 
             var bvOverrides = new BvUserOverrides
             {
@@ -1740,6 +1753,7 @@ namespace CSaVe_Electrochemical_Data
                 MetalIonConcentrationM   = metalIonConcentrationM,
                 MetalSpecies             = selectedMetalSpecies,
                 DiffusionLayerThicknessCm = diffLayerThicknessCm,
+                ReferenceToSheOffsetV    = referenceToSheOffsetV,
                 ProtectionPotentialsMv   = new[] { -850.0, -1050.0 },
                 UserOverrides            = bvOverrides,
             });

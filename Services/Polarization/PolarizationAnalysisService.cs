@@ -17,6 +17,7 @@ namespace CSaVe_Electrochemical_Data
         private const double FaradayConstantCmol = 96485.0;
         private const double OxygenDiffusivityCm2s = 1.8e-5;
         private const double OxygenConcentrationMolCm3 = 2.4e-7;
+        private const double PotentialOffsetEpsilonV = 1.0e-9;
 
         private readonly IPolarizationCsvReader     _csvReader;
         private readonly IMonotonicityFilter        _monotonicityFilter;
@@ -89,8 +90,12 @@ namespace CSaVe_Electrochemical_Data
             if (twoFileMode)
             {
                 // Two-file mode: separate anodic and cathodic experiments.
-                IReadOnlyList<PolarizationPoint> rawAnodic   = _csvReader.Read(input.PrimaryFilePath);
-                IReadOnlyList<PolarizationPoint> rawCathodic = _csvReader.Read(input.CathodicFilePath);
+                IReadOnlyList<PolarizationPoint> rawAnodic = ApplyReferenceToSheOffset(
+                    _csvReader.Read(input.PrimaryFilePath),
+                    input.ReferenceToSheOffsetV);
+                IReadOnlyList<PolarizationPoint> rawCathodic = ApplyReferenceToSheOffset(
+                    _csvReader.Read(input.CathodicFilePath),
+                    input.ReferenceToSheOffsetV);
 
                 IReadOnlyList<PolarizationPoint> fwdAnodic   = _monotonicityFilter.Filter(rawAnodic,   isAnodic: true);
                 IReadOnlyList<PolarizationPoint> fwdCathodic = _monotonicityFilter.Filter(rawCathodic, isAnodic: false);
@@ -109,7 +114,9 @@ namespace CSaVe_Electrochemical_Data
             else
             {
                 // Single-file mode: combined sweep already in one CSV.
-                IReadOnlyList<PolarizationPoint> rawPoints = _csvReader.Read(input.PrimaryFilePath);
+                IReadOnlyList<PolarizationPoint> rawPoints = ApplyReferenceToSheOffset(
+                    _csvReader.Read(input.PrimaryFilePath),
+                    input.ReferenceToSheOffsetV);
 
                 // Sort all points by potential for a monotonic axis.
                 var sorted = rawPoints.OrderBy(p => p.PotentialV).ToList();
@@ -238,6 +245,22 @@ namespace CSaVe_Electrochemical_Data
                 FittedParameters = fitted,
                 WeightedRmse     = wrmse,
             };
+        }
+
+        private static IReadOnlyList<PolarizationPoint> ApplyReferenceToSheOffset(
+            IReadOnlyList<PolarizationPoint> points,
+            double referenceToSheOffsetV)
+        {
+            if (!double.IsFinite(referenceToSheOffsetV) || Math.Abs(referenceToSheOffsetV) < PotentialOffsetEpsilonV)
+                return points;
+
+            return points
+                .Select(p => new PolarizationPoint
+                {
+                    PotentialV = p.PotentialV + referenceToSheOffsetV,
+                    CurrentA = p.CurrentA
+                })
+                .ToList();
         }
 
         // ── Private helpers ───────────────────────────────────────────────────────────────────────
