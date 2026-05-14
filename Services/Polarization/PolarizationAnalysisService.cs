@@ -17,6 +17,7 @@ namespace CSaVe_Electrochemical_Data
         private const double FaradayConstantCmol = 96485.0;
         private const double OxygenDiffusivityCm2s = 1.8e-5;
         private const double OxygenConcentrationMolCm3 = 2.4e-7;
+        private const double PotentialOffsetEpsilonV = 1.0e-9;
 
         private readonly IPolarizationCsvReader     _csvReader;
         private readonly IMonotonicityFilter        _monotonicityFilter;
@@ -250,7 +251,7 @@ namespace CSaVe_Electrochemical_Data
             IReadOnlyList<PolarizationPoint> points,
             double referenceToSheOffsetV)
         {
-            if (!double.IsFinite(referenceToSheOffsetV) || Math.Abs(referenceToSheOffsetV) < 1.0e-12)
+            if (!double.IsFinite(referenceToSheOffsetV) || Math.Abs(referenceToSheOffsetV) < PotentialOffsetEpsilonV)
                 return points;
 
             return points
